@@ -31,12 +31,12 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 
 # COLOQUE AQUI OS LINKS REAIS DAS SUAS 6 PLANILHAS DO GOOGLE DRIVE
 DICIONARIO_SALAS = {
-    "Sala 1": "https://docs.google.com/spreadsheets/d/LINK_DA_SALA_1/edit#gid=0",
-    "Sala 2": "https://docs.google.com/spreadsheets/d/LINK_DA_SALA_2/edit#gid=0",
-    "Sala 3": "https://docs.google.com/spreadsheets/d/LINK_DA_SALA_3/edit#gid=0",
-    "Sala 4": "https://docs.google.com/spreadsheets/d/LINK_DA_SALA_4/edit#gid=0",
-    "Sala 5": "https://docs.google.com/spreadsheets/d/LINK_DA_SALA_5/edit#gid=0",
-    "Sala 6": "https://docs.google.com/spreadsheets/d/LINK_DA_SALA_6/edit#gid=0"
+    "Sala 1": "https://docs.google.com/spreadsheets/d/1AHJl32OV7dw5XoNvxCLWvdjEZCVEuuxCm91LbOk3RUI/edit?usp=sharing",
+    "Sala 2": "https://docs.google.com/spreadsheets/d/19Vq5dinFVch39zl4ECEx97qKCsQ5HjP58SBcwrUFNUM/edit?usp=sharing",
+    "Sala 3": "https://docs.google.com/spreadsheets/d/19BQ-zpl78NnMZTH2d9JdgtDaLE2xQblR65VgrsxaNIM/edit?usp=sharing",
+    "Sala 4": "https://docs.google.com/spreadsheets/d/1-GUoRPAvLMGZPYbg-dwP-7C--I4ZxFI3yj7AjO62-5w/edit?usp=sharing",
+    "Sala 5": "https://docs.google.com/spreadsheets/d/1CDTOojkHV65gqXlB7zEDJQUyJlYb-T-rLqgFiu9MTVU/edit?usp=sharing",
+    "Sala 6": "https://docs.google.com/spreadsheets/d/1TZqPXPp0172r-x9DrZAZ9J39WUP8KxfzKk4MRe2g_yA/edit?usp=sharing"
 }
 
 # =========================================================================
