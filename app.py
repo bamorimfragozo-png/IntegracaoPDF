@@ -4,7 +4,7 @@ import plotly.express as px
 from streamlit_gsheets import GSheetsConnection
 from pypdf import PdfReader
 import io
-oi
+
 # 1. Configuração da Página e Estilo
 st.set_page_config(page_title="Dashboard Acadêmico Integrado", layout="wide")
 
