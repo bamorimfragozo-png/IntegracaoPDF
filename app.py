@@ -5,7 +5,9 @@ from streamlit_gsheets import GSheetsConnection
 from pypdf import PdfReader
 import io
 
-# 1. Configuração da Página e Estilo
+# =========================================================================
+# 1. CONFIGURAÇÃO DA PÁGINA E ESTILO (IDÊNTICO AO SEU)
+# =========================================================================
 st.set_page_config(page_title="Dashboard Acadêmico Integrado", layout="wide")
 
 st.markdown("""
@@ -22,7 +24,24 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 2. Inicialização dos Estados de Sessão
+# =========================================================================
+# 2. CONEXÃO GENÉRICA E DICIONÁRIO DE LINKS (SUBSTITUA PELOS SEUS LINKS REAIS)
+# =========================================================================
+conn = st.connection("gsheets", type=GSheetsConnection)
+
+# COLOQUE AQUI OS LINKS REAIS DAS SUAS 6 PLANILHAS DO GOOGLE DRIVE
+DICIONARIO_SALAS = {
+    "Sala 1": "https://docs.google.com/spreadsheets/d/LINK_DA_SALA_1/edit#gid=0",
+    "Sala 2": "https://docs.google.com/spreadsheets/d/LINK_DA_SALA_2/edit#gid=0",
+    "Sala 3": "https://docs.google.com/spreadsheets/d/LINK_DA_SALA_3/edit#gid=0",
+    "Sala 4": "https://docs.google.com/spreadsheets/d/LINK_DA_SALA_4/edit#gid=0",
+    "Sala 5": "https://docs.google.com/spreadsheets/d/LINK_DA_SALA_5/edit#gid=0",
+    "Sala 6": "https://docs.google.com/spreadsheets/d/LINK_DA_SALA_6/edit#gid=0"
+}
+
+# =========================================================================
+# 3. ESTADOS DE SESSÃO E FUNÇÃO EXTRAÇÃO DO PDF
+# =========================================================================
 if 'dados_carregados' not in st.session_state:
     st.session_state.dados_carregados = False
 if 'aluno_idx' not in st.session_state: 
@@ -31,34 +50,27 @@ if 'disciplina_ativa' not in st.session_state:
     st.session_state.disciplina_ativa = None
 if 'reset_obs' not in st.session_state: 
     st.session_state.reset_obs = 0
+if 'sala_ativa' not in st.session_state:
+    st.session_state.sala_ativa = "Sala 1"
 
-# Conexão com o Google Sheets
-conn = st.connection("gsheets", type=GSheetsConnection)
-
-# --- FUNÇÃO DE LEITURA DO PDF E PARSER (EXEMPLO GENÉRICO) ---
 def extrair_dados_pdf(arquivos_pdf):
     """
-    Lê os PDFs carregados e transforma em um DataFrame do Pandas.
-    Ajuste a lógica interna com base no layout de texto do seu PDF específico.
+    Função para ler os PDFs da memória usando o módulo 'io'.
+    Ajuste as regras de extração abaixo de acordo com a estrutura do seu PDF.
     """
     dados_finais = []
     
     for arquivo in arquivos_pdf:
+        # Usa o io.BytesIO para ler o arquivo diretamente da memória RAM
         pdf_reader = PdfReader(io.BytesIO(arquivo.read()))
         texto_completo = ""
         for pagina in pdf_reader.pages:
             texto_completo += pagina.extract_text() + "\n"
         
-        # --- LÓGICA DE EXEMPLO PARA SIMULAR A EXTRAÇÃO DE LINHAS ---
-        # Substitua esta lógica simulada pelas regras reais de extração das colunas do seu PDF
-        linhas = texto_completo.split('\n')
-        for linha in lines:
-            if "Matrícula" in linha or "Aluno" in linha or csv_condicao: 
-                # Parsear dados aqui e dar append em dados_finais
-                pass
-                
-    # Criando o DataFrame baseado na estrutura real das suas imagens
-    # Exemplo simulado com a estrutura que o seu dashboard atual consome:
+        # [AQUI VAI A SUA LÓGICA DE TRATAMENTO DE TEXTO DO SEU PDF]
+        # Exemplo: quebrar por linhas, procurar padrões, etc.
+        
+    # --- ESTRUTURA DE EXEMPLO (Simulando os dados que alimentam suas imagens) ---
     exemplo_df = pd.DataFrame({
         'Nº Chamada': [1, 1, 2, 2],
         'Aluno': ['Bruno', 'Bruno', 'Beatriz', 'Beatriz'],
@@ -80,47 +92,58 @@ def extrair_dados_pdf(arquivos_pdf):
     })
     return exemplo_df
 
-# ==========================================
-# TELA 1: UPLOAD DOS ARQUIVOS (PÁGINA EM BRANCO)
-# ==========================================
+# =========================================================================
+# TELA 1: PÁGINA EM BRANCO PARA UPLOAD (Se os dados não estiverem carregados)
+# =========================================================================
 if not st.session_state.dados_carregados:
-    st.title("📂 Inicialização de Dados - Upload de PDFs")
-    st.subheader("Selecione a sala correspondente e faça o upload dos relatórios em PDF.")
+    st.title("📂 Upload de Relatórios (PDF)")
+    st.subheader("Escolha a sala desejada e envie os arquivos para atualizar o banco de dados.")
     
-    # Seleção de qual das 6 salas/planilhas será atualizada
-    sala_selecionada = st.selectbox("Selecione a Sala:", [f"Sala {i}" for i in range(1, 7)])
+    # Usuário seleciona qual das salas quer gerenciar
+    sala_selecionada = st.selectbox("Selecione a Sala para atualizar:", list(DICIONARIO_SALAS.keys()))
     
-    arquivos_enviados = st.file_uploader("Arraste e solte quantos PDFs desejar aqui:", type=["pdf"], accept_multiple_files=True)
+    # Campo para múltiplos uploads
+    arquivos_enviados = st.file_uploader("Arraste e solte seus PDFs aqui:", type=["pdf"], accept_multiple_files=True)
     
     if st.button("PROCESSAR E ATUALIZAR DASHBOARD"):
         if arquivos_enviados:
-            with st.spinner("Processando PDFs e limpando/atualizando o Google Sheets..."):
-                # 1. Transforma o PDF em DataFrame (Dados e Colunas criados dinamicamente)
+            with st.spinner("Processando PDFs e limpando/sobrescrevendo o Google Sheets..."):
+                # 1. Transforma o PDF em DataFrame estruturado
                 df_novo = extrair_dados_pdf(arquivos_enviados)
                 
-                # 2. Atualiza a planilha no Google Sheets (Sobrescreve tudo na planilha)
-                # NOTA: Para gerenciar 6 salas, você pode configurar worksheets diferentes: worksheet=sala_selecionada
-                conn.update(data=df_novo) 
+                # 2. Captura o link correto baseado na escolha do Selectbox
+                link_da_sala_ativa = DICIONARIO_SALAS[sala_selecionada]
                 
+                # 3. Limpa a planilha antiga e injeta os novos dados passando o link direto
+                conn.update(spreadsheet=link_da_sala_ativa, data=df_novo) 
+                
+                # Guarda na sessão qual sala deve ser exibida no dashboard
+                st.session_state.sala_ativa = sala_selecionada
                 st.session_state.dados_carregados = True
-                st.success("Planilha atualizada com sucesso!")
+                
+                st.success(f"Planilha da {sala_selecionada} atualizada com sucesso!")
                 st.rerun()
         else:
-            st.error("Por favor, envie pelo menos um arquivo PDF.")
+            st.error("Por favor, envie ao menos um arquivo PDF para continuar.")
 
-# ==========================================
-# TELA 2: EXIBIÇÃO DO DASHBOARD (APÓS UPLOAD)
-# ==========================================
+# =========================================================================
+# TELA 2: EXIBIÇÃO DO DASHBOARD COM GRÁFICOS (Após o upload de sucesso)
+# =========================================================================
 else:
-    # Botão para resetar e voltar para a tela de upload se necessário
-    if st.sidebar.button("🔄 Fazer Novo Upload / Limpar"):
+    # Botão lateral na barra para poder voltar e carregar novos dados/outra sala
+    if st.sidebar.button("🔄 Voltar para Tela de Upload"):
         st.session_state.dados_carregados = False
         st.session_state.aluno_idx = 0
         st.session_state.disciplina_ativa = None
         st.rerun()
 
-    # Leitura dos dados atualizados diretamente da Planilha Google
-    df = conn.read(ttl="0")
+    st.sidebar.write(f"📊 Visualizando: **{st.session_state.sala_ativa}**")
+
+    # 1. Captura o link da sala ativa que guardamos no upload
+    link_da_sala_ativa = DICIONARIO_SALAS[st.session_state.sala_ativa]
+
+    # 2. Faz a leitura injetando o link direto
+    df = conn.read(spreadsheet=link_da_sala_ativa, ttl="0")
     df.columns = df.columns.str.strip()
 
     if 'Observações' in df.columns:
@@ -128,9 +151,13 @@ else:
     else:
         df['Observações'] = ""
 
-    # Ordenação da lista de alunos pelo número da chamada
+    # Ordenação dos alunos pelo número da chamada
     df_ordem_chamada = df.sort_values(by='Nº Chamada', ascending=True)
     alunos_lista = df_ordem_chamada['Aluno'].unique().tolist()
+
+    # Proteção caso o índice da chamada dê algum erro ao mudar de sala
+    if st.session_state.aluno_idx >= len(alunos_lista):
+        st.session_state.aluno_idx = 0
 
     aluno_nome = alunos_lista[st.session_state.aluno_idx]
     df_aluno = df[df['Aluno'] == aluno_nome].copy()
@@ -151,7 +178,7 @@ else:
     # --- OPÇÕES DE ORDENAÇÃO ---
     ordem_bolinha = st.radio("Ordenar disciplinas por menor:", ["Nota", "Frequência"], horizontal=True)
 
-    # --- MIOLO ---
+    # --- MIOLO: DISCIPLINAS | GRÁFICOS | GLOBAL | OBSERVAÇÕES ---
     m1, m2, m3, m4 = st.columns([2, 3, 2, 2])
 
     with m1:
@@ -171,7 +198,7 @@ else:
     df_mat = df_aluno[df_aluno['Disciplina'] == st.session_state.disciplina_ativa].iloc[0]
 
     with m2:
-        # Gráfico de Notas
+        # Notas
         val_m_final = round(float(df_mat['Média Final']), 2)
         st.write(f"**Evolução: {st.session_state.disciplina_ativa} (Média Final: {val_m_final})**")
         fig_n = px.line(x=['1º BI', '2º BI', '3º BI', '4º BI'], 
@@ -181,7 +208,7 @@ else:
         
         st.divider()
         
-        # Gráfico de Frequência
+        # Frequência
         f_final_val = df_mat['Freq. Final']
         f_final_display = round(f_final_val * 100, 2) if f_final_val <= 1.0 else round(f_final_val, 2)
         st.write(f"**Frequência Mensal (Final: {f_final_display}%)**")
@@ -235,7 +262,10 @@ else:
                     idx = df[(df['Aluno'] == aluno_nome) & (df['Disciplina'] == st.session_state.disciplina_ativa)].index
                     if not idx.empty:
                         df.at[idx[0], 'Observações'] = str(texto_final)
-                        conn.update(data=df)
+                        
+                        # SALVA UTILIZANDO O LINK DIRETO CORRETO DA SALA ATIVA
+                        conn.update(spreadsheet=link_da_sala_ativa, data=df)
+                        
                         st.session_state.reset_obs += 1
                         st.success("Salvo!")
                         st.rerun()
@@ -252,6 +282,7 @@ else:
     with b2:
         dict_chamada = {df[df['Aluno'] == a]['Nº Chamada'].iloc[0]: i for i, a in enumerate(alunos_lista)}
         num_atual = df_aluno['Nº Chamada'].iloc[0]
+        
         opcoes_ordenadas = sorted(list(dict_chamada.keys()))
         
         escolha_num = st.selectbox(
