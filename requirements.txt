@@ -1,6 +1,5 @@
 streamlit
 pandas
 plotly
-streamlit_gsheets
+st-gsheet-connection
 pypdf
-io
