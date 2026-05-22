@@ -106,7 +106,7 @@ def extrair_dados_pdf(arquivos_pdf):
         # Buscar as linhas de disciplinas e capturar as notas/frequências reais
         for linha in linhas:
             for disc in lista_disciplinas_padrao:
-                if disc.lower() in inline.lower():
+                if disc.lower() in linha.lower():
                     valores_linha = [float(s) for s in linha.replace(',', '.').split() if s.replace('.', '', 1).isdigit()]
                     
                     while len(valores_linha) < 5:
