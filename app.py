@@ -97,7 +97,7 @@ def extrair_dados_pdf(arquivos_pdf):
                     numeros = ''.join(c for c in linha if c.isdigit())
                     if numeros: matricula_aluno = float(numeros)
                 except: pass
-            if "Série" in inline or "Serie" in linha or "Ano" in linha:
+            if "Série" in linha or "Serie" in linha or "Ano" in linha:
                 if "1" in linha: serie_aluno = "1º Ano"
                 elif "2" in linha: serie_aluno = "2º Ano"
                 elif "3" in linha: serie_aluno = "3º Ano"
