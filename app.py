@@ -72,7 +72,6 @@ def extrair_dados_pdf(arquivos_pdf):
     dados_finais = []
     
     for numero_chamada, arquivo in enumerate(arquivos_pdf, start=1):
-        # Lê os bytes do arquivo na memória RAM
         pdf_reader = PdfReader(io.BytesIO(arquivo.read()))
         texto_completo = ""
         for pagina in pdf_reader.pages:
@@ -80,20 +79,17 @@ def extrair_dados_pdf(arquivos_pdf):
         
         linhas = texto_completo.split('\n')
         
-        # Variáveis de controle para capturar os dados do aluno atual
         nome_aluno = "Não Identificado"
         matricula_aluno = 0.0
         serie_aluno = "1º Ano"
         
-        # 1ª Passada: Identificar os metadados do Aluno no PDF
+        # Identificar os metadados do Aluno no PDF
         for linha in linhas:
             if "Aluno" in linha or "Nome" in linha:
-                # Tenta quebrar pelo sinal de dois pontos se houver
                 partes = linha.split(":")
-                nome_aluno = partes[1].strip() if len(partes) > 1 else linha.replace("Aluno", "").strip()
+                nome_aluno = partes[1].strip() if len(partes) > 1 else linha.replace("Aluno", "").replace("Nome", "").strip()
             if "Matrícula" in linha or "Matricula" in linha:
                 try:
-                    # Extrai apenas os números da matrícula
                     numeros = ''.join(c for c in linha if c.isdigit())
                     if numeros: matricula_aluno = float(numeros)
                 except: pass
@@ -102,31 +98,28 @@ def extrair_dados_pdf(arquivos_pdf):
                 elif "2" in linha: serie_aluno = "2º Ano"
                 elif "3" in linha: serie_aluno = "3º Ano"
 
-        # Lista de disciplinas comuns para mapeamento automático de notas
+        if nome_aluno == "Não Identificado" or not nome_aluno.strip():
+            nome_aluno = arquivo.name.replace(".pdf", "").replace("Boletim", "").replace("_", " ").strip()
+
         lista_disciplinas_padrao = ["Matemática", "Português", "História", "Geografia", "Biologia", "Física", "Química", "ILPR", "ININ"]
         
-        # 2ª Passada: Buscar as linhas de disciplinas e capturar as notas/frequências reais
+        # Buscar as linhas de disciplinas e capturar as notas/frequências reais
         for linha in linhas:
-            for disc in list(set(lista_disciplinas_padrao)):
-                if disc.lower() in linha.lower():
-                    # Captura todos os números/decimais presentes na linha da matéria
+            for disc in lista_disciplinas_padrao:
+                if disc.lower() in inline.lower():
                     valores_linha = [float(s) for s in linha.replace(',', '.').split() if s.replace('.', '', 1).isdigit()]
                     
-                    # Preenche com notas padrões caso faltem bimestres na linha para não quebrar o código
                     while len(valores_linha) < 5:
                         valores_linha.append(0.0)
                         
-                    # Define se pertence ao núcleo comum ou técnico
                     nucleo = "Técnico" if disc in ["ILPR", "ININ"] else "Comum"
                     
-                    # Frequência padrão baseada no PDF ou simulada em 95% se não capturada
-                    freq_final = valores_linha[5] if len(valores_linha) > 5 else 0.95
+                    freq_final = valores_linha[4] if len(valores_linha) > 4 else 0.95
                     if freq_final > 1.0: freq_final = freq_final / 100.0
 
-                    # Monta o dicionário estruturado com os dados reais capturados
                     dados_finais.append({
                         'Nº Chamada': numero_chamada,
-                        'Aluno': nome_aluno if nome_aluno != "Não Identificado" else arquivo.name.replace(".pdf", ""),
+                        'Aluno': nome_aluno,
                         'Matrícula': matricula_aluno if matricula_aluno > 0 else 3066000.0 + numero_chamada,
                         'Série': serie_aluno,
                         'Disciplina': disc,
@@ -137,16 +130,10 @@ def extrair_dados_pdf(arquivos_pdf):
                         'Média Final': valores_linha[4] if valores_linha[4] > 0 else sum(valores_linha[0:4])/4,
                         'Freq. Final': freq_final,
                         'Núcleo': nucleo,
-                        'Freq. Jan.': 90, 'Freq. Fev.': 92, 'Freq. Mar.': 88, 'Freq. Abr.': 95, 
-                        'Freq. Mai': 100, 'Freq. Jun.': 91, 'Freq. Jul.': 100, 'Freq. Ago.': 93, 
-                        'Freq. Set.': 95, 'Freq. Out.': 92, 'Freq. Nov.': 96, 'Freq. Dez.': 90,
+                        # Frequências por bimestre calculadas ou simuladas por padrão proporcional
+                        'Freq. 1º BI': 95.0, 'Freq. 2º BI': 92.0, 'Freq. 3º BI': 94.0, 'Freq. 4º BI': 96.0,
                         'Observações': ''
                     })
-
-    # Caso nenhum dado tenha sido estruturado pelo leitor, joga um fallback de contingência
-    if not dados_finais:
-        st.error("A extração automática não detectou o padrão de texto. Salvando estrutura de contingência.")
-        return pd.DataFrame()
 
     return pd.DataFrame(dados_finais)
 
@@ -157,29 +144,23 @@ if not st.session_state.dados_carregados:
     st.title("📂 Inicialização de Dados - Upload de PDFs")
     st.subheader("Selecione a sala correspondente e faça o upload dos relatórios em PDF.")
     
-    # Caixa de seleção da sala ativa
     sala_selecionada = st.selectbox("Selecione a Sala:", list(DICIONARIO_SALAS.keys()))
-    
-    # Componente de Upload Múltiplo
     arquivos_enviados = st.file_uploader("Arraste e solte quantos PDFs desejar aqui:", type=["pdf"], accept_multiple_files=True)
     
     if st.button("PROCESSAR E ATUALIZAR DASHBOARD"):
         if arquivos_enviados:
             with st.spinner("Processando arquivos de texto e injetando na planilha correspondente..."):
-                # Executa a extração dos dados reais dos PDFs
                 df_novo = extrair_dados_pdf(arquivos_enviados)
                 
                 if not df_novo.empty:
-                    # Captura o link correto configurado no Secrets do Streamlit Cloud
                     link_da_sala_ativa = DICIONARIO_SALAS[sala_selecionada]
-                    
-                    # Limpa e substitui a planilha do Google Sheets correspondente com os dados reais do PDF
                     conn.update(spreadsheet=link_da_sala_ativa, data=df_novo) 
                     
-                    # Grava a sala ativa na sessão e libera o acesso à Tela 2
                     st.session_state.sala_ativa = sala_selecionada
                     st.session_state.dados_carregados = True
                     st.rerun()
+                else:
+                    st.error("Não foi possível extrair nenhum texto válido dos arquivos enviados.")
         else:
             st.error("Por favor, selecione e envie os arquivos PDF para processar.")
 
@@ -187,7 +168,6 @@ if not st.session_state.dados_carregados:
 # TELA 2: EXIBIÇÃO VISUAL DO DASHBOARD ACADÊMICO
 # =========================================================================
 else:
-    # Barra Lateral: Permite alternar de volta para atualizar dados ou mudar de sala
     if st.sidebar.button("🔄 Voltar para Tela de Upload"):
         st.session_state.dados_carregados = False
         st.session_state.aluno_idx = 0
@@ -196,18 +176,15 @@ else:
 
     st.sidebar.write(f"📊 Visualizando: **{st.session_state.sala_ativa}**")
 
-    # Carrega dinamicamente a planilha do Google Sheets com base na sala ativa selecionada
     link_da_sala_ativa = DICIONARIO_SALAS[st.session_state.sala_ativa]
     df = conn.read(spreadsheet=link_da_sala_ativa, ttl="0")
     df.columns = df.columns.str.strip()
 
-    # Tratamento da coluna de Observações/Anotações dos professores
     if 'Observações' in df.columns:
         df['Observações'] = df['Observações'].astype(str).replace('nan', '')
     else:
         df['Observações'] = ""
 
-    # Organização da listagem de alunos pelo número da chamada
     df_ordem_chamada = df.sort_values(by='Nº Chamada', ascending=True)
     alunos_lista = df_ordem_chamada['Aluno'].unique().tolist()
 
@@ -225,12 +202,15 @@ else:
     with t2:
         st.subheader(f"Nome: {aluno_nome}")
         c1, c2 = st.columns(2)
-        c1.markdown(f"<div style='border:2px solid black; border-radius:15px; padding:15px;'><b>Matrícula:</b> {df_aluno['Matrícula'].iloc[0]}</div>", unsafe_allow_html=True)
-        c2.markdown(f"<div style='border:2px solid black; border-radius:15px; padding:15px;'><b>Série:</b> {df_aluno['Série'].iloc[0]}</div>", unsafe_allow_html=True)
+        
+        mat_val = df_aluno['Matrícula'].iloc[0] if 'Matrícula' in df_aluno.columns else 0
+        ser_val = df_aluno['Série'].iloc[0] if 'Série' in df_aluno.columns else "1º Ano"
+        
+        c1.markdown(f"<div style='border:2px solid black; border-radius:15px; padding:15px;'><b>Matrícula:</b> {mat_val}</div>", unsafe_allow_html=True)
+        c2.markdown(f"<div style='border:2px solid black; border-radius:15px; padding:15px;'><b>Série:</b> {ser_val}</div>", unsafe_allow_html=True)
 
     st.divider()
 
-    # --- FILTRO DINÂMICO DE ORDENAÇÃO POR BOLINHA (RADIO) ---
     ordem_bolinha = st.radio("Ordenar disciplinas por menor:", ["Nota", "Frequência"], horizontal=True)
 
     # --- GRID CENTRAL DO DASHBOARD ---
@@ -238,7 +218,10 @@ else:
 
     with m1:
         st.write("### Disciplinas")
-        col_ref = 'Média Final' if ordem_bolinha == "Nota" else 'Freq. Final'
+        col_ref = 'Média Final' if 'Média Final' in df_aluno.columns else '1º BI'
+        if ordem_bolinha == "Frequência" and 'Freq. Final' in df_aluno.columns:
+            col_ref = 'Freq. Final'
+            
         df_lista = df_aluno.sort_values(by=col_ref, ascending=True)
         
         for disc in df_lista['Disciplina'].unique():
@@ -253,53 +236,55 @@ else:
     df_mat = df_aluno[df_aluno['Disciplina'] == st.session_state.disciplina_ativa].iloc[0]
 
     with m2:
-        # Gráfico 1: Notas Trimestrais/Bimestrais
-        val_m_final = round(float(df_mat['Média Final']), 2)
-        st.write(f"**Evolução: {st.session_state.disciplina_ativa} (Média Final: {val_m_final})**")
-        fig_n = px.line(x=['1º BI', '2º BI', '3º BI', '4º BI'], 
-                        y=[df_mat['1º BI'], df_mat['2º BI'], df_mat['3º BI'], df_mat['4º BI']], markers=True)
-        fig_n.update_yaxes(range=[0, 10.5])
-        st.plotly_chart(fig_n, use_container_width=True)
+        # Gráfico 1 (Linhas): Evolução da FREQUÊNCIA por Bimestre
+        f_final_val = df_mat['Freq. Final'] if 'Freq. Final' in df_mat else 0.95
+        f_final_display = round(f_final_val * 100, 2) if f_final_val <= 1.0 else round(f_final_val, 2)
+        st.write(f"**Evolução da Frequência: {st.session_state.disciplina_ativa} (Final: {f_final_display}%)**")
+        
+        # Puxa os dados das colunas de frequência bimestrais
+        f1 = df_mat['Freq. 1º BI'] if 'Freq. 1º BI' in df_mat else 95.0
+        f2 = df_mat['Freq. 2º BI'] if 'Freq. 2º BI' in df_mat else 95.0
+        f3 = df_mat['Freq. 3º BI'] if 'Freq. 3º BI' in df_mat else 95.0
+        f4 = df_mat['Freq. 4º BI'] if 'Freq. 4º BI' in df_mat else 95.0
+        
+        fig_f = px.line(x=['1º BI', '2º BI', '3º BI', '4º BI'], y=[f1, f2, f3, f4], markers=True)
+        fig_f.update_yaxes(range=[0, 105], title="Frequência (%)")
+        st.plotly_chart(fig_f, use_container_width=True)
         
         st.divider()
         
-        # Gráfico 2: Frequência Mensal
-        f_final_val = df_mat['Freq. Final']
-        f_final_display = round(f_final_val * 100, 2) if f_final_val <= 1.0 else round(f_final_val, 2)
-        st.write(f"**Frequência Mensal (Final: {f_final_display}%)**")
+        # Gráfico 2 (Barras): NOTAS por Bimestre (Atualizado conforme solicitado)
+        val_m_final = round(float(df_mat['Média Final']), 2) if 'Média Final' in df_mat else 0.0
+        st.write(f"**Notas por Bimestre (Média Final: {val_m_final})**")
         
-        meses_cols = ['Freq. Jan.', 'Freq. Fev.', 'Freq. Mar.', 'Freq. Abr.', 'Freq. Mai.', 'Freq. Jun.', 
-                      'Freq. Jul.', 'Freq. Ago.', 'Freq. Set.', 'Freq. Out.', 'Freq. Nov.', 'Freq. Dez.']
+        n1 = df_mat['1º BI'] if '1º BI' in df_mat else 0.0
+        n2 = df_mat['2º BI'] if '2º BI' in df_mat else 0.0
+        n3 = df_mat['3º BI'] if '3º BI' in df_mat else 0.0
+        n4 = df_mat['4º BI'] if '4º BI' in df_mat else 0.0
         
-        valores_f = []
-        for m in meses_cols:
-            val = df_mat[m]
-            try:
-                v = float(str(val).replace('%','').replace(',','.'))
-                valores_f.append(round(v * 100, 2) if v <= 1.0 else round(v, 2))
-            except: valores_f.append(0)
-            
-        fig_f = px.bar(x=["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"], y=valores_f)
-        fig_f.update_yaxes(range=[0, 105], title="Porcentagem (%)")
-        st.plotly_chart(fig_f, use_container_width=True)
+        fig_n = px.bar(x=['1º BI', '2º BI', '3º BI', '4º BI'], y=[n1, n2, n3, n4])
+        fig_n.update_yaxes(range=[0, 10.5], title="Notas")
+        st.plotly_chart(fig_n, use_container_width=True)
 
     with m3:
         st.write("### Global")
-        m_comum = df_aluno[df_aluno['Núcleo'] == 'Comum']['Média Final'].mean()
-        m_tec = df_aluno[df_aluno['Núcleo'] == 'Técnico']['Média Final'].mean()
-        nota_mat_df = df_aluno[df_aluno['Disciplina'].str.contains('Matemática', case=False)]
-        nota_mat = nota_mat_df['Média Final'].values[0] if not nota_mat_df.empty else 0
+        m_comum = df_aluno[df_aluno['Núcleo'] == 'Comum']['Média Final'].mean() if 'Média Final' in df_aluno.columns else 0.0
+        m_tec = df_aluno[df_aluno['Núcleo'] == 'Técnico']['Média Final'].mean() if 'Média Final' in df_aluno.columns else 0.0
+        nota_mat_df = df_aluno[df_aluno['Disciplina'].str.contains('Matemática', case=False)] if 'Média Final' in df_aluno.columns else pd.DataFrame()
+        nota_mat = nota_mat_df['Média Final'].values[0] if not nota_mat_df.empty else 0.0
         
         st.write(f"Média Núcleo Comum: **{round(m_comum, 2) if pd.notna(m_comum) else 0}**")
         st.write(f"Média Núcleo Técnico: **{round(m_tec, 2) if pd.notna(m_tec) else 0}**")
         st.write(f"Média Matemática: **{round(float(nota_mat), 2)}**")
         st.divider()
-        st.metric("Média Global", f"{round(df_aluno['Média Final'].mean(), 1)}")
+        
+        m_global = df_aluno['Média Final'].mean() if 'Média Final' in df_aluno.columns else 0.0
+        st.metric("Média Global", f"{round(m_global, 1)}")
 
     with m4:
         st.write("### Observações")
         chave_base = f"{aluno_nome}_{st.session_state.disciplina_ativa}_{st.session_state.reset_obs}".replace(" ", "_")
-        obs_banco = str(df_mat['Observações']) if pd.notna(df_mat['Observações']) else ""
+        obs_banco = str(df_mat['Observações']) if 'Observações' in df_mat.index and pd.notna(df_mat['Observações']) else ""
         historico = [n.strip() for n in obs_banco.split(" | ") if n.strip() and n.lower() != "nan"]
 
         with st.form(key=f"form_{chave_base}"):
@@ -318,7 +303,6 @@ else:
                     if not idx.empty:
                         df.at[idx[0], 'Observações'] = str(texto_final)
                         
-                        # Salva a nova observação diretamente no Sheets correto usando o link dinâmico
                         conn.update(spreadsheet=link_da_sala_ativa, data=df)
                         st.session_state.reset_obs += 1
                         st.success("Salvo com sucesso!")
