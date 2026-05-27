@@ -7,7 +7,7 @@ import io
 import re
 
 # =========================================================================
-# 1. CONFIGURAÇÃO DA PÁGINA E ESTILO CSS ATUALIZADO (REMOVIDO REQUADRO DUPLO)
+# 1. CONFIGURAÇÃO DA PÁGINA E ESTILO CSS ATUALIZADO (REMOVIDO DUPLO CONTORNO)
 # =========================================================================
 st.set_page_config(page_title="Dashboard Acadêmico Integrado", layout="wide")
 
@@ -30,13 +30,11 @@ st.markdown("""
     flex-direction: row; 
     gap: 20px; 
 }
-/* Estilização para caixas simples sem recuadro interno do Streamlit */
+/* Caixa de informação simples - sem borda interna para não duplicar com a coluna */
 .info-box {
-    border: 2px solid black; 
-    border-radius: 15px; 
-    padding: 15px;
     background-color: #fdfdfd;
     font-size: 16px;
+    padding: 5px 0px;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -70,7 +68,7 @@ if 'sala_ativa' not in st.session_state:
     st.session_state.sala_ativa = "Sala 1"
 
 # =========================================================================
-# 4. FUNÇÃO DE EXTRAÇÃO TOTALMENTE DINÂMICA CORRIGIDA (SEM INLINE)
+# 4. FUNÇÃO DE EXTRAÇÃO MELHORADA (DADOS REAIS DO PDF)
 # =========================================================================
 def extrair_dados_pdf(arquivos_pdf):
     dados_finais = []
@@ -87,23 +85,24 @@ def extrair_dados_pdf(arquivos_pdf):
         matricula_aluno = "Não Identificada"
         serie_aluno = "Não Identificada"
         
-        # 1. Captura limpa dos Metadados do Aluno
+        # Captura de Metadados do Aluno
         for linha in linhas:
             if "Aluno" in linha or "Nome" in linha:
                 partes = linha.split(":")
                 val_nome = partes[1].strip() if len(partes) > 1 else linha.replace("Aluno", "").replace("Nome", "").strip()
-                # Ajuste 1: Remove a palavra 'Matrícula' residual do nome do aluno se houver
+                # Ajuste 1: Remove a palavra 'Matrícula' residual do nome do aluno
                 nome_aluno = re.sub(r'\bMatrícula\b.*', '', val_nome, flags=re.IGNORECASE).strip()
                 
-            if "Matrícula" in linha or "Matricula" in linha:
-                partes = linha.split(":")
-                if len(partes) > 1:
-                    matricula_aluno = ''.join(c for c in partes[1] if c.isdigit() or c == '-')
+            # Ajuste 1: Captura a matrícula real que começa com 'BT'
+            if "Matrícula" in linha or "Matricula" in linha or "Prontuário" in linha:
+                match_bt = re.search(r'\bBT\d+[-\d]*\b|\b\d{7,}\b', linha, re.IGNORECASE)
+                if match_bt:
+                    matricula_aluno = match_bt.group(0)
                 else:
-                    numeros = ''.join(c for c in linha if c.isdigit())
-                    if numeros: matricula_aluno = numeros
-                    
-            # CORRIGIDO DEFINITIVAMENTE: Mudado de 'inline' para 'linha' para evitar o NameError
+                    partes = linha.split(":")
+                    if len(partes) > 1 and partes[1].strip():
+                        matricula_aluno = partes[1].strip()
+
             if "Série" in linha or "Serie" in linha or "Ano" in linha or "Turma" in linha:
                 partes = linha.split(":")
                 if len(partes) > 1:
@@ -114,55 +113,92 @@ def extrair_dados_pdf(arquivos_pdf):
         if nome_aluno == "Não Identificado" or not nome_aluno.strip():
             nome_aluno = arquivo.name.replace(".pdf", "").replace("Boletim", "").replace("_", " ").strip()
 
-        # Ajuste 6 e 7: Captura Dinâmica Baseada na Estrutura de Notas da Linha
-        for linha in linhas:
-            if any(pax in linha for pax in ["Aluno", "Nome", "Matrícula", "Série", "Boletim"]):
+        # Listas para guardar temporariamente os blocos encontrados
+        mapeamento_disciplinas = {}
+
+        # Ajuste 4 e 5: Varredura estruturada de Notas (N1-N4) e Faltas (F1-F4)
+        for i, linha in enumerate(linhas):
+            # Ignora meta-legendas informativas do PDF
+            if "Notas das etapas" in linha or "Faltas nas etapas" in linha:
                 continue
                 
+            # Detecta linhas de matérias ignorando códigos soltos
             valores_linha = [float(s) for s in linha.replace(',', '.').split() if s.replace('.', '', 1).isdigit()]
             
-            if len(valores_linha) >= 4:
+            if len(valores_linha) >= 1:
+                # Extrai o nome exato da disciplina preservando códigos nativos do PDF
                 partes_texto = []
                 for palavra in linha.split():
-                    if palavra.replace(',', '.').replace('.', '', 1).isdigit():
+                    if palavra.replace(',', '.').replace('.', '', 1).isdigit() or palavra in ["N1,", "F1,"]:
                         break
                     partes_texto.append(palavra)
                 
                 nome_disciplina = " ".join(partes_texto).strip()
                 
-                if not nome_disciplina or len(nome_disciplina) < 3:
+                # Ajuste 4: Limpeza rigorosa para remover falsas disciplinas
+                if not nome_disciplina or len(nome_disciplina) < 3 or any(p in nome_disciplina for p in ["N1", "N2", "N3", "N4", "F1", "F2", "F3", "F4", "Faltas", "Notas"]):
                     continue
                 
-                while len(valores_linha) < 6:
-                    valores_linha.append(0.0)
+                # Inicializa a estrutura da disciplina se não existir
+                if nome_disciplina not in mapeamento_disciplinas:
+                    mapeamento_disciplinas[nome_disciplina] = {
+                        'notas': [0.0, 0.0, 0.0, 0.0],
+                        'faltas': [0.0, 0.0, 0.0, 0.0],
+                        'media_final': 0.0
+                    }
                 
-                tecnicas_keywords = ["ILPR", "ININ", "SISTEMAS", "DESENVOLVIMENTO", "BANCO", "LOGICA", "PROGRAMAÇÃO", "TECNICO", "TÉCNICO"]
-                is_tecnico = any(kw in nome_disciplina.upper() for kw in tecnicas_keywords)
-                nucleo = "Técnico" if is_tecnico else "Comum"
-                
-                f_final = valores_linha[5] if len(valores_linha) > 5 else (valores_linha[4] if valores_linha[4] > 10 else 100.0)
-                if f_final > 1.0 and f_final <= 100.0: f_final = f_final / 100.0
-                elif f_final > 100.0: f_final = 1.0
+                # Se a linha seguinte ou o contexto indicar que são as notas (abaixo de N1, N2...)
+                if i + 1 < len(linhas):
+                    linha_segunda = linhas[i+1].replace(',', '.')
+                    valores_segunda = [float(s) for s in linha_segunda.split() if s.replace('.', '', 1).isdigit()]
+                    
+                    # Mapeia até 4 bimestres de notas. Se faltar, preenche com 0.0
+                    for idx_b in range(4):
+                        if idx_b < len(valores_segunda):
+                            mapeamento_disciplinas[nome_disciplina]['notas'][idx_b] = valores_segunda[idx_b]
+                    
+                    if len(valores_segunda) >= 5:
+                        mapeamento_disciplinas[nome_disciplina]['media_final'] = valores_segunda[4]
+                    else:
+                        mapeamento_disciplinas[nome_disciplina]['media_final'] = sum(mapeamento_disciplinas[nome_disciplina]['notas'])/4
 
-                dados_finais.append({
-                    'Nº Chamada': numero_chamada,
-                    'Aluno': nome_aluno,
-                    'Matrícula': matricula_aluno,
-                    'Série': serie_aluno,
-                    'Disciplina': nome_disciplina,
-                    '1º BI': valores_linha[0],
-                    '2º BI': valores_linha[1],
-                    '3º BI': valores_linha[2],
-                    '4º BI': valores_linha[3],
-                    'Média Final': valores_linha[4] if valores_linha[4] <= 10 else sum(valores_linha[0:4])/4,
-                    'Freq. Final': f_final,
-                    'Núcleo': nucleo,
-                    'Freq. 1º BI': round(f_final * 100, 1),
-                    'Freq. 2º BI': round(f_final * 100, 1),
-                    'Freq. 3º BI': round(f_final * 100, 1),
-                    'Freq. 4º BI': round(f_final * 100, 1),
-                    'Observações': ''
-                })
+                # Varre buscando faltas associadas no bloco subsequente próximo
+                if i + 2 < len(linhas):
+                    linha_terceira = linhas[i+2].replace(',', '.')
+                    valores_terceira = [float(s) for s in linha_terceira.split() if s.replace('.', '', 1).isdigit()]
+                    for idx_f in range(4):
+                        if idx_f < len(valores_terceira):
+                            mapeamento_disciplinas[nome_disciplina]['faltas'][idx_f] = valores_terceira[idx_f]
+
+        # Consolida o dicionário estruturado para o DataFrame
+        for nome_disp, blocos in mapeamento_disciplinas.items():
+            tecnicas_keywords = ["ILPR", "ININ", "SISTEMAS", "DESENVOLVIMENTO", "BANCO", "LOGICA", "PROGRAMAÇÃO", "TECNICO", "TÉCNICO", "REDES", "INFRAESTRUTURA"]
+            is_tecnico = any(kw in nome_disp.upper() for kw in tecnicas_keywords)
+            nucleo = "Técnico" if is_tecnico else "Comum"
+            
+            # Cálculo de Frequência Real Inversa baseada em faltas registradas por etapa
+            total_faltas = sum(blocos['faltas'])
+            freq_final_calc = max(0.0, (100.0 - total_faltas) / 100.0)
+
+            dados_finais.append({
+                'Nº Chamada': numero_chamada,
+                'Aluno': nome_aluno,
+                'Matrícula': matricula_aluno,
+                'Série': serie_aluno,
+                'Disciplina': nome_disp,
+                '1º BI': blocos['notas'][0],
+                '2º BI': blocos['notas'][1],
+                '3º BI': blocos['notas'][2],
+                '4º BI': blocos['notas'][3],
+                'Média Final': blocos['media_final'],
+                'Freq. Final': freq_final_calc,
+                'Núcleo': nucleo,
+                'Freq. 1º BI': max(0.0, 100.0 - blocos['faltas'][0]),
+                'Freq. 2º BI': max(0.0, 100.0 - blocos['faltas'][1]),
+                'Freq. 3º BI': max(0.0, 100.0 - blocos['faltas'][2]),
+                'Freq. 4º BI': max(0.0, 100.0 - blocos['faltas'][3]),
+                'Observações': ''
+            })
 
     return pd.DataFrame(dados_finais)
 
@@ -228,10 +264,12 @@ else:
     with t1:
         st.markdown("### Foto")
         st.image("https://via.placeholder.com/150", use_container_width=True)
+        
     with t2:
         st.subheader(f"Nome: {aluno_nome}")
-        c1, c2 = st.columns(2)
         
+        # Ajuste 2: Removido duplo contorno. Cada um fica em um único retângulo limpo da coluna.
+        c1, c2 = st.columns(2)
         mat_val = df_aluno['Matrícula'].iloc[0] if 'Matrícula' in df_aluno.columns else "Não Informado"
         ser_val = df_aluno['Série'].iloc[0] if 'Série' in df_aluno.columns else "Não Informado"
         
@@ -240,6 +278,7 @@ else:
 
     st.divider()
 
+    # Ajuste 5: Ordenação Correta do maior para o menor notas/frequência
     ordem_bolinha = st.radio("Ordenar disciplinas por:", ["Nota", "Frequência"], horizontal=True)
 
     # --- GRID CENTRAL DO DASHBOARD ---
@@ -265,7 +304,8 @@ else:
     df_mat = df_aluno[df_aluno['Disciplina'] == st.session_state.disciplina_ativa].iloc[0]
 
     with m2:
-        f_final_val = df_mat['Freq. Final'] if 'Freq. Final' in df_mat else 0.95
+        # Ajuste 6: Mantido Gráfico de Linha para Frequência
+        f_final_val = df_mat['Freq. Final'] if 'Freq. Final' in df_mat else 1.0
         f_final_display = round(f_final_val * 100, 2) if f_final_val <= 1.0 else round(f_final_val, 2)
         st.write(f"**Evolução da Frequência: {st.session_state.disciplina_ativa} (Final: {f_final_display}%)**")
         
@@ -280,6 +320,7 @@ else:
         
         st.divider()
         
+        # Ajuste 6: Mantido Gráfico de Barras para Notas
         val_m_final = round(float(df_mat['Média Final']), 2) if 'Média Final' in df_mat else 0.0
         st.write(f"**Notas por Bimestre (Média Final: {val_m_final})**")
         
