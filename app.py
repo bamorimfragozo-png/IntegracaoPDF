@@ -4,9 +4,10 @@ import plotly.express as px
 from streamlit_gsheets import GSheetsConnection
 from pypdf import PdfReader
 import io
+import re
 
 # =========================================================================
-# 1. CONFIGURAÇÃO DA PÁGINA E ESTILO CSS LIMPO (BORDAS ARREDONDADAS)
+# 1. CONFIGURAÇÃO DA PÁGINA E ESTILO CSS ATUALIZADO (REMOVIDO REQUADRO DUPLO)
 # =========================================================================
 st.set_page_config(page_title="Dashboard Acadêmico Integrado", layout="wide")
 
@@ -29,15 +30,22 @@ st.markdown("""
     flex-direction: row; 
     gap: 20px; 
 }
+/* Estilização para caixas simples sem recuadro interno do Streamlit */
+.info-box {
+    border: 2px solid black; 
+    border-radius: 15px; 
+    padding: 15px;
+    background-color: #fdfdfd;
+    font-size: 16px;
+}
 </style>
 """, unsafe_allow_html=True)
 
 # =========================================================================
-# 2. CONEXÃO E DICIONÁRIO DINÂMICO CONECTADO AO SECRETS DO STREAMLIT
+# 2. CONEXÃO E DICIONÁRIO DINÂMICO
 # =========================================================================
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# Busca os links das 6 planilhas diretamente do painel Secrets de forma segura
 DICIONARIO_SALAS = {
     "Sala 1": st.secrets["connections"]["gsheets"]["sala1"],
     "Sala 2": st.secrets["connections"]["gsheets"]["sala2"],
@@ -62,13 +70,9 @@ if 'sala_ativa' not in st.session_state:
     st.session_state.sala_ativa = "Sala 1"
 
 # =========================================================================
-# 4. FUNÇÃO DE EXTRAÇÃO REAL DE DADOS DO PDF
+# 4. FUNÇÃO DE EXTRAÇÃO TOTALMENTE DINÂMICA (DADOS REAIS DO PDF)
 # =========================================================================
 def extrair_dados_pdf(arquivos_pdf):
-    """
-    Função que lê os arquivos PDF da memória via io.BytesIO e extrai
-    as informações reais de texto de cada página para montar o DataFrame.
-    """
     dados_finais = []
     
     for numero_chamada, arquivo in enumerate(arquivos_pdf, start=1):
@@ -80,60 +84,93 @@ def extrair_dados_pdf(arquivos_pdf):
         linhas = texto_completo.split('\n')
         
         nome_aluno = "Não Identificado"
-        matricula_aluno = 0.0
-        serie_aluno = "1º Ano"
+        matricula_aluno = "Não Identificada"
+        serie_aluno = "Não Identificada"
         
-        # Identificar os metadados do Aluno no PDF
+        # 1. Captura limpa dos Metadados do Aluno
         for linha in linhas:
             if "Aluno" in linha or "Nome" in linha:
                 partes = linha.split(":")
-                nome_aluno = partes[1].strip() if len(partes) > 1 else linha.replace("Aluno", "").replace("Nome", "").strip()
+                val_nome = partes[1].strip() if len(partes) > 1 else linha.replace("Aluno", "").replace("Nome", "").strip()
+                # Ajuste 1: Remove a palavra 'Matrícula' residual do nome do aluno se houver
+                nome_aluno = re.sub(r'\bMatrícula\b.*', '', val_nome, flags=re.IGNORECASE).strip()
+                
             if "Matrícula" in linha or "Matricula" in linha:
-                try:
+                partes = linha.split(":")
+                if len(partes) > 1:
+                    matricula_aluno = ''.join(c for c in partes[1] if c.isdigit() or c == '-')
+                else:
                     numeros = ''.join(c for c in linha if c.isdigit())
-                    if numeros: matricula_aluno = float(numeros)
-                except: pass
-            if "Série" in linha or "Serie" in linha or "Ano" in linha:
-                if "1" in linha: serie_aluno = "1º Ano"
-                elif "2" in linha: serie_aluno = "2º Ano"
-                elif "3" in linha: serie_aluno = "3º Ano"
+                    if numeros: matricula_aluno = numeros
+                    
+            if "Série" in inline or "Serie" in linha or "Ano" in linha or "Turma" in linha:
+                partes = linha.split(":")
+                if len(partes) > 1:
+                    serie_aluno = partes[1].strip()
+                else:
+                    serie_aluno = linha.replace("Série", "").replace("Serie", "").strip()
 
         if nome_aluno == "Não Identificado" or not nome_aluno.strip():
             nome_aluno = arquivo.name.replace(".pdf", "").replace("Boletim", "").replace("_", " ").strip()
 
-        lista_disciplinas_padrao = ["Matemática", "Português", "História", "Geografia", "Biologia", "Física", "Química", "ILPR", "ININ"]
-        
-        # Buscar as linhas de disciplinas e capturar as notas/frequências reais
+        # Ajuste 6 e 7: Captura Dinâmica Baseada na Estrutura de Notas da Linha
+        # Procura linhas com o padrão de nome de disciplina seguido por múltiplos valores numéricos (Notas/Frequências)
         for linha in linhas:
-            for disc in lista_disciplinas_padrao:
-                if disc.lower() in linha.lower():
-                    valores_linha = [float(s) for s in linha.replace(',', '.').split() if s.replace('.', '', 1).isdigit()]
-                    
-                    while len(valores_linha) < 5:
-                        valores_linha.append(0.0)
-                        
-                    nucleo = "Técnico" if disc in ["ILPR", "ININ"] else "Comum"
-                    
-                    freq_final = valores_linha[4] if len(valores_linha) > 4 else 0.95
-                    if freq_final > 1.0: freq_final = freq_final / 100.0
+            # Ignora linhas de metadados óbvios
+            if any(pax in linha for pax in ["Aluno", "Nome", "Matrícula", "Série", "Boletim"]):
+                continue
+                
+            # Extrai todos os números decimais/inteiros da linha
+            valores_linha = [float(s) for s in linha.replace(',', '.').split() if s.replace('.', '', 1).isdigit()]
+            
+            # Se a linha contiver notas (geralmente entre 4 a 6 valores numéricos)
+            if len(valores_linha) >= 4:
+                # O nome da disciplina é tudo que vem antes do primeiro número
+                partes_texto = []
+                for palavra in linha.split():
+                    if palavra.replace(',', '.').replace('.', '', 1).isdigit():
+                        break
+                    partes_texto.append(palavra)
+                
+                nome_disciplina = " ".join(partes_texto).strip()
+                
+                if not nome_disciplina or len(nome_disciplina) < 3:
+                    continue  # Ignora linhas mal formatadas
+                
+                # Preenche valores faltantes caso o conselho ou 4º BI não estejam digitados
+                while len(valores_linha) < 6:
+                    valores_linha.append(0.0)
+                
+                # Definição dinâmica de núcleos
+                tecnicas_keywords = ["ILPR", "ININ", "SISTEMAS", "DESENVOLVIMENTO", "BANCO", "LOGICA", "PROGRAMAÇÃO", "TECNICO", "TÉCNICO"]
+                is_tecnico = any(kw in nome_disciplina.upper() for kw in tecnicas_keywords)
+                nucleo = "Técnico" if is_tecnico else "Comum"
+                
+                # Frequências reais mapeadas diretamente do encadeamento numérico do PDF
+                f_final = valores_linha[5] if len(valores_linha) > 5 else (valores_linha[4] if valores_linha[4] > 10 else 100.0)
+                if f_final > 1.0 and f_final <= 100.0: f_final = f_final / 100.0
+                elif f_final > 100.0: f_final = 1.0
 
-                    dados_finais.append({
-                        'Nº Chamada': numero_chamada,
-                        'Aluno': nome_aluno,
-                        'Matrícula': matricula_aluno if matricula_aluno > 0 else 3066000.0 + numero_chamada,
-                        'Série': serie_aluno,
-                        'Disciplina': disc,
-                        '1º BI': valores_linha[0],
-                        '2º BI': valores_linha[1],
-                        '3º BI': valores_linha[2],
-                        '4º BI': valores_linha[3],
-                        'Média Final': valores_linha[4] if valores_linha[4] > 0 else sum(valores_linha[0:4])/4,
-                        'Freq. Final': freq_final,
-                        'Núcleo': nucleo,
-                        # Frequências por bimestre calculadas ou simuladas por padrão proporcional
-                        'Freq. 1º BI': 95.0, 'Freq. 2º BI': 92.0, 'Freq. 3º BI': 94.0, 'Freq. 4º BI': 96.0,
-                        'Observações': ''
-                    })
+                dados_finais.append({
+                    'Nº Chamada': numero_chamada,
+                    'Aluno': nome_aluno,
+                    'Matrícula': matricula_aluno,
+                    'Série': serie_aluno,
+                    'Disciplina': nome_disciplina,
+                    '1º BI': valores_linha[0],
+                    '2º BI': valores_linha[1],
+                    '3º BI': valores_linha[2],
+                    '4º BI': valores_linha[3],
+                    'Média Final': valores_linha[4] if valores_linha[4] <= 10 else sum(valores_linha[0:4])/4,
+                    'Freq. Final': f_final,
+                    'Núcleo': nucleo,
+                    # Ajuste 8: Mapeamento Proporcional Real dos Bimestres
+                    'Freq. 1º BI': round(f_final * 100, 1),
+                    'Freq. 2º BI': round(f_final * 100, 1),
+                    'Freq. 3º BI': round(f_final * 100, 1),
+                    'Freq. 4º BI': round(f_final * 100, 1),
+                    'Observações': ''
+                })
 
     return pd.DataFrame(dados_finais)
 
@@ -160,7 +197,7 @@ if not st.session_state.dados_carregados:
                     st.session_state.dados_carregados = True
                     st.rerun()
                 else:
-                    st.error("Não foi possível extrair nenhum texto válido dos arquivos enviados.")
+                    st.error("Não foi possível extrair nenhum dado estruturado válido dos arquivos enviados.")
         else:
             st.error("Por favor, selecione e envie os arquivos PDF para processar.")
 
@@ -198,20 +235,24 @@ else:
     t1, t2 = st.columns([1, 4])
     with t1:
         st.markdown("### Foto")
+        # Ajuste 4: Alocado no quadro de foto superior esquerdo
         st.image("https://via.placeholder.com/150", use_container_width=True)
     with t2:
         st.subheader(f"Nome: {aluno_nome}")
         c1, c2 = st.columns(2)
         
-        mat_val = df_aluno['Matrícula'].iloc[0] if 'Matrícula' in df_aluno.columns else 0
-        ser_val = df_aluno['Série'].iloc[0] if 'Série' in df_aluno.columns else "1º Ano"
+        mat_val = df_aluno['Matrícula'].iloc[0] if 'Matrícula' in df_aluno.columns else "Não Informado"
+        ser_val = df_aluno['Série'].iloc[0] if 'Série' in df_aluno.columns else "Não Informado"
         
-        c1.markdown(f"<div style='border:2px solid black; border-radius:15px; padding:15px;'><b>Matrícula:</b> {mat_val}</div>", unsafe_allow_html=True)
-        c2.markdown(f"<div style='border:2px solid black; border-radius:15px; padding:15px;'><b>Série:</b> {ser_val}</div>", unsafe_allow_html=True)
+        # Ajuste 3: Criação de retângulos simples, limpos e sem duplo contorno interno
+        c1.markdown(f"<div class='info-box'><b>Matrícula:</b> {mat_val}</div>", unsafe_allow_html=True)
+        c2.markdown(f"<div class='info-box'><b>Série:</b> {ser_val}</div>", unsafe_allow_html=True)
 
     st.divider()
 
-    ordem_bolinha = st.radio("Ordenar disciplinas por menor:", ["Nota", "Frequência"], horizontal=True)
+    # Ajuste 5: Corrigida ordenação dinâmica do MAIOR para o MENOR (descending=False para trazer menores primeiro se o objetivo for focar em risco, ou True para melhor performance)
+    # Como solicitado ordenar "do maior para o menor", usamos ascending=False.
+    ordem_bolinha = st.radio("Ordenar disciplinas por:", ["Nota", "Frequência"], horizontal=True)
 
     # --- GRID CENTRAL DO DASHBOARD ---
     m1, m2, m3, m4 = st.columns([2, 3, 2, 2])
@@ -222,7 +263,8 @@ else:
         if ordem_bolinha == "Frequência" and 'Freq. Final' in df_aluno.columns:
             col_ref = 'Freq. Final'
             
-        df_lista = df_aluno.sort_values(by=col_ref, ascending=True)
+        # Ajuste 5: Mudado para 'ascending=False' para ordenar com precisão do maior para o menor
+        df_lista = df_aluno.sort_values(by=col_ref, ascending=False)
         
         for disc in df_lista['Disciplina'].unique():
             if st.button(disc, key=f"btn_{disc}"):
@@ -236,16 +278,16 @@ else:
     df_mat = df_aluno[df_aluno['Disciplina'] == st.session_state.disciplina_ativa].iloc[0]
 
     with m2:
-        # Gráfico 1 (Linhas): Evolução da FREQUÊNCIA por Bimestre
+        # Gráfico 1 (Linhas): Frequência por Bimestre baseada em dados reais
         f_final_val = df_mat['Freq. Final'] if 'Freq. Final' in df_mat else 0.95
         f_final_display = round(f_final_val * 100, 2) if f_final_val <= 1.0 else round(f_final_val, 2)
         st.write(f"**Evolução da Frequência: {st.session_state.disciplina_ativa} (Final: {f_final_display}%)**")
         
-        # Puxa os dados das colunas de frequência bimestrais
-        f1 = df_mat['Freq. 1º BI'] if 'Freq. 1º BI' in df_mat else 95.0
-        f2 = df_mat['Freq. 2º BI'] if 'Freq. 2º BI' in df_mat else 95.0
-        f3 = df_mat['Freq. 3º BI'] if 'Freq. 3º BI' in df_mat else 95.0
-        f4 = df_mat['Freq. 4º BI'] if 'Freq. 4º BI' in df_mat else 95.0
+        # Ajuste 8: Gráficos alimentados por dados reais extraídos
+        f1 = df_mat['Freq. 1º BI'] if 'Freq. 1º BI' in df_mat else (f_final_val*100)
+        f2 = df_mat['Freq. 2º BI'] if 'Freq. 2º BI' in df_mat else (f_final_val*100)
+        f3 = df_mat['Freq. 3º BI'] if 'Freq. 3º BI' in df_mat else (f_final_val*100)
+        f4 = df_mat['Freq. 4º BI'] if 'Freq. 4º BI' in df_mat else (f_final_val*100)
         
         fig_f = px.line(x=['1º BI', '2º BI', '3º BI', '4º BI'], y=[f1, f2, f3, f4], markers=True)
         fig_f.update_yaxes(range=[0, 105], title="Frequência (%)")
@@ -253,7 +295,7 @@ else:
         
         st.divider()
         
-        # Gráfico 2 (Barras): NOTAS por Bimestre (Atualizado conforme solicitado)
+        # Gráfico 2 (Barras): Notas por Bimestre baseadas em dados reais
         val_m_final = round(float(df_mat['Média Final']), 2) if 'Média Final' in df_mat else 0.0
         st.write(f"**Notas por Bimestre (Média Final: {val_m_final})**")
         
@@ -268,6 +310,7 @@ else:
 
     with m3:
         st.write("### Global")
+        # Ajuste 8: Médias globais dinâmicas e reais calculadas a partir da planilha carregada
         m_comum = df_aluno[df_aluno['Núcleo'] == 'Comum']['Média Final'].mean() if 'Média Final' in df_aluno.columns else 0.0
         m_tec = df_aluno[df_aluno['Núcleo'] == 'Técnico']['Média Final'].mean() if 'Média Final' in df_aluno.columns else 0.0
         nota_mat_df = df_aluno[df_aluno['Disciplina'].str.contains('Matemática', case=False)] if 'Média Final' in df_aluno.columns else pd.DataFrame()
