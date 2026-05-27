@@ -33,9 +33,12 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =========================================================================
-# 2. CONEXÃO DIRETA COM O GSHEETS
+# 2. CONEXÃO E CAPTURA COMPATÍVEL DO LINK DA PLANILHA (SECRETS)
 # =========================================================================
 conn = st.connection("gsheets", type=GSheetsConnection)
+
+# Captura a URL configurada no seu secrets de forma explícita para evitar o erro de None
+LINK_PLANILHA = st.secrets["connections"]["gsheets"]["spreadsheet"]
 
 # =========================================================================
 # 3. ESTADOS DE SESSÃO LOCAL PARA NAVEGAÇÃO
@@ -49,15 +52,15 @@ if 'disciplina_ativa' not in st.session_state:
 if 'reset_obs' not in st.session_state: 
     st.session_state.reset_obs = 0
 
-# Leitura direta sem cache para sincronização entre usuários
+# Leitura utilizando explicitamente o link capturado do segredo
 try:
-    df = conn.read(ttl="0")
+    df = conn.read(spreadsheet=LINK_PLANILHA, ttl="0")
     df.columns = df.columns.str.strip()
 except Exception:
     df = pd.DataFrame()
 
 # =========================================================================
-# 4. FUNÇÃO DE EXTRAÇÃO REAL DE DADOS DO PDF (SEM DADOS SIMULADOS)
+# 4. FUNÇÃO DE EXTRAÇÃO REAL DE DADOS DO PDF
 # =========================================================================
 def extrair_dados_pdf(arquivos_pdf):
     dados_finais = []
@@ -78,7 +81,6 @@ def extrair_dados_pdf(arquivos_pdf):
         matricula_aluno = 0
         serie_aluno = ""
         
-        # Procura metadados do aluno nas linhas
         for linha in linhas:
             if "Aluno" in linha or "Nome" in linha:
                 partes = linha.split(":")
@@ -94,7 +96,6 @@ def extrair_dados_pdf(arquivos_pdf):
         if not nome_aluno:
             nome_aluno = arquivo.name.replace(".pdf", "").replace("Boletim", "").replace("_", " ").strip()
 
-        # Procura linhas de disciplinas e extrai apenas números existentes
         for linha in linhas:
             for disc in lista_disciplinas_padrao:
                 if disc.lower() in linha.lower():
@@ -107,7 +108,6 @@ def extrair_dados_pdf(arquivos_pdf):
                         except ValueError:
                             pass
                     
-                    # Se não houver valores numéricos na linha da disciplina, ela não é processada incorretamente
                     if not valores_linha:
                         continue
                         
@@ -127,7 +127,6 @@ def extrair_dados_pdf(arquivos_pdf):
                         'Observações': ''
                     }
                     
-                    # Associa as frequências mensais sequenciais se existirem no texto
                     idx_mes = 6
                     for m in meses_cols:
                         registro[m] = valores_linha[idx_mes] if len(valores_linha) > idx_mes else 0.0
@@ -157,7 +156,6 @@ if st.session_state.tela_atual == "Fazer Upload de PDFs":
                 
                 if not df_novos.empty:
                     if not df.empty and 'Aluno' in df.columns:
-                        # Substituição de linhas duplicadas baseada em Aluno e Disciplina
                         df['chave_id'] = df['Aluno'].astype(str) + "_" + df['Disciplina'].astype(str)
                         df_novos['chave_id'] = df_novos['Aluno'].astype(str) + "_" + df_novos['Disciplina'].astype(str)
                         
@@ -167,7 +165,8 @@ if st.session_state.tela_atual == "Fazer Upload de PDFs":
                     else:
                         df_final = df_novos
                     
-                    conn.update(data=df_final)
+                    # CORREÇÃO CRÍTICA: Passando explicitamente o link da planilha no update
+                    conn.update(spreadsheet=LINK_PLANILHA, data=df_final)
                     st.success("Planilha atualizada com sucesso!")
                     st.session_state.tela_atual = "Ver Dashboard"
                     st.rerun()
@@ -297,7 +296,8 @@ else:
                         idx = df[(df['Aluno'] == aluno_nome) & (df['Disciplina'] == st.session_state.disciplina_ativa)].index
                         if not idx.empty:
                             df.at[idx[0], 'Observações'] = str(texto_final)
-                            conn.update(data=df)
+                            # CORREÇÃO CRÍTICA: Passando explicitamente o link da planilha no update das observações também
+                            conn.update(spreadsheet=LINK_PLANILHA, data=df)
                             st.session_state.reset_obs += 1
                             st.success("Salvo!")
                             st.rerun()
