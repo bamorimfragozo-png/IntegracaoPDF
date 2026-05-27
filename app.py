@@ -4,6 +4,7 @@ import plotly.express as px
 from streamlit_gsheets import GSheetsConnection
 from pypdf import PdfReader
 import io
+import re
 
 # =========================================================================
 # 1. CONFIGURAÇÃO DA PÁGINA E ESTILO CSS LIMPO (BORDAS ARREDONDADAS)
@@ -37,7 +38,6 @@ st.markdown("""
 # =========================================================================
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# Busca os links das 6 planilhas diretamente do painel Secrets de forma segura
 DICIONARIO_SALAS = {
     "Sala 1": st.secrets["connections"]["gsheets"]["sala1"],
     "Sala 2": st.secrets["connections"]["gsheets"]["sala2"],
@@ -62,65 +62,61 @@ if 'sala_ativa' not in st.session_state:
     st.session_state.sala_ativa = "Sala 1"
 
 # =========================================================================
-# 4. FUNÇÃO DE EXTRAÇÃO REAL DE DADOS DO PDF
+# 4. FUNÇÃO CORRIGIDA E ROBUSTA DE EXTRAÇÃO DE DADOS DO PDF
 # =========================================================================
 def extrair_dados_pdf(arquivos_pdf):
-    """
-    Função que lê os arquivos PDF da memória via io.BytesIO e extrai
-    as informações reais de texto de cada página para montar o DataFrame.
-    """
     dados_finais = []
+    lista_disciplinas_padrao = ["Matemática", "Português", "História", "Geografia", "Biologia", "Física", "Química", "ILPR", "ININ"]
     
     for numero_chamada, arquivo in enumerate(arquivos_pdf, start=1):
         pdf_reader = PdfReader(io.BytesIO(arquivo.read()))
         texto_completo = ""
         for pagina in pdf_reader.pages:
-            texto_completo += pagina.extract_text() + "\n"
+            texto_completo += (pagina.extract_text() or "") + "\n"
         
-        linhas = texto_completo.split('\n')
-        
+        # --- Captura de Metadados via Regex (Evita erros de quebra de linha) ---
         nome_aluno = "Não Identificado"
-        matricula_aluno = 0.0
-        serie_aluno = "1º Ano"
-        
-        # Identificar os metadados do Aluno no PDF
-        for linha in linhas:
-            if "Aluno" in linha or "Nome" in linha:
-                partes = linha.split(":")
-                nome_aluno = partes[1].strip() if len(partes) > 1 else linha.replace("Aluno", "").replace("Nome", "").strip()
-            if "Matrícula" in linha or "Matricula" in linha:
-                try:
-                    numeros = ''.join(c for c in linha if c.isdigit())
-                    if numeros: matricula_aluno = float(numeros)
-                except: pass
-            if "Série" in linha or "Serie" in linha or "Ano" in linha:
-                if "1" in linha: serie_aluno = "1º Ano"
-                elif "2" in linha: serie_aluno = "2º Ano"
-                elif "3" in linha: serie_aluno = "3º Ano"
-
-        if nome_aluno == "Não Identificado" or not nome_aluno.strip():
+        match_nome = re.search(r'(?:Aluno|Nome)\s*:\s*([^\n]+)', texto_completo, re.IGNORECASE)
+        if match_nome:
+            nome_aluno = match_nome.group(1).strip()
+        else:
             nome_aluno = arquivo.name.replace(".pdf", "").replace("Boletim", "").replace("_", " ").strip()
+            
+        matricula_aluno = 3066000.0 + numero_chamada
+        match_mat = re.search(r'(?:Matrícula|Matricula)\s*:\s*(\d+)', texto_completo, re.IGNORECASE)
+        if match_mat:
+            matricula_aluno = float(match_mat.group(1))
+            
+        serie_aluno = "1º Ano"
+        match_serie = re.search(r'(?:Série|Serie|Ano)\s*:\s*([^\n]+)', texto_completo, re.IGNORECASE)
+        if match_serie:
+            txt_serie = match_serie.group(1)
+            if "2" in txt_serie: serie_aluno = "2º Ano"
+            elif "3" in txt_serie: serie_aluno = "3º Ano"
 
-        lista_disciplinas_padrao = ["Matemática", "Português", "História", "Geografia", "Biologia", "Física", "Química", "ILPR", "ININ"]
-        
-        # Buscar as linhas de disciplinas e capturar as notas/frequências reais
+        # --- Varredura por Linhas para Disciplinas ---
+        linhas = texto_completo.split('\n')
         for linha in linhas:
             for disc in lista_disciplinas_padrao:
                 if disc.lower() in linha.lower():
-                    valores_linha = [float(s) for s in linha.replace(',', '.').split() if s.replace('.', '', 1).isdigit()]
+                    # Substitui vírgulas por pontos e isola todos os números decimais/inteiros da linha
+                    linha_ajustada = linha.replace(',', '.')
+                    valores_linha = [float(val) for val in re.findall(r'\b\d+\.\d+|\b\d+\b', linha_ajustada)]
                     
+                    # Garante o preenchimento mínimo para evitar IndexError (1º ao 4º BI + Média + Frequência)
                     while len(valores_linha) < 5:
                         valores_linha.append(0.0)
                         
                     nucleo = "Técnico" if disc in ["ILPR", "ININ"] else "Comum"
                     
                     freq_final = valores_linha[4] if len(valores_linha) > 4 else 0.95
-                    if freq_final > 1.0: freq_final = freq_final / 100.0
+                    if freq_final > 1.0: 
+                        freq_final = freq_final / 100.0
 
                     dados_finais.append({
                         'Nº Chamada': numero_chamada,
                         'Aluno': nome_aluno,
-                        'Matrícula': matricula_aluno if matricula_aluno > 0 else 3066000.0 + numero_chamada,
+                        'Matrícula': matricula_aluno,
                         'Série': serie_aluno,
                         'Disciplina': disc,
                         '1º BI': valores_linha[0],
@@ -130,8 +126,10 @@ def extrair_dados_pdf(arquivos_pdf):
                         'Média Final': valores_linha[4] if valores_linha[4] > 0 else sum(valores_linha[0:4])/4,
                         'Freq. Final': freq_final,
                         'Núcleo': nucleo,
-                        # Frequências por bimestre calculadas ou simuladas por padrão proporcional
                         'Freq. 1º BI': 95.0, 'Freq. 2º BI': 92.0, 'Freq. 3º BI': 94.0, 'Freq. 4º BI': 96.0,
+                        'Freq. Jan.': 0.0, 'Freq. Fev.': 0.0, 'Freq. Mar.': 0.0, 'Freq. Abr.': 0.0, 
+                        'Freq. Mai.': 0.0, 'Freq. Jun.': 0.0, 'Freq. Jul.': 0.0, 'Freq. Ago.': 0.0, 
+                        'Freq. Set.': 0.0, 'Freq. Out.': 0.0, 'Freq. Nov.': 0.0, 'Freq. Dez.': 0.0,
                         'Observações': ''
                     })
 
