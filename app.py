@@ -47,7 +47,7 @@ SCOPES = [
 ]
 
 creds = Credentials.from_service_account_info(
-    st.secrets["gcp_service_account"],
+    st.secrets["connections"]["gsheets"],
     scopes=SCOPES
 )
 
@@ -61,27 +61,27 @@ client = gspread.authorize(creds)
 PLANILHAS = {
 
     "Sala 1": client.open_by_url(
-        "COLE_AQUI_URL_SALA1"
+        "https://docs.google.com/spreadsheets/d/1AHJl32OV7dw5XoNvxCLWvdjEZCVEuuxCm91LbOk3RUI/edit?usp=sharing"
     ),
 
     "Sala 2": client.open_by_url(
-        "COLE_AQUI_URL_SALA2"
+        "https://docs.google.com/spreadsheets/d/19Vq5dinFVch39zl4ECEx97qKCsQ5HjP58SBcwrUFNUM/edit?usp=sharing"
     ),
 
     "Sala 3": client.open_by_url(
-        "COLE_AQUI_URL_SALA3"
+        "https://docs.google.com/spreadsheets/d/19BQ-zpl78NnMZTH2d9JdgtDaLE2xQblR65VgrsxaNIM/edit?usp=sharing"
     ),
 
     "Sala 4": client.open_by_url(
-        "COLE_AQUI_URL_SALA4"
+        "https://docs.google.com/spreadsheets/d/1-GUoRPAvLMGZPYbg-dwP-7C--I4ZxFI3yj7AjO62-5w/edit?usp=sharing"
     ),
 
     "Sala 5": client.open_by_url(
-        "COLE_AQUI_URL_SALA5"
+        "https://docs.google.com/spreadsheets/d/1CDTOojkHV65gqXlB7zEDJQUyJlYb-T-rLqgFiu9MTVU/edit?usp=sharing"
     ),
 
     "Sala 6": client.open_by_url(
-        "COLE_AQUI_URL_SALA6"
+        "https://docs.google.com/spreadsheets/d/1TZqPXPp0172r-x9DrZAZ9J39WUP8KxfzKk4MRe2g_yA/edit?usp=sharing"
     )
 }
 
