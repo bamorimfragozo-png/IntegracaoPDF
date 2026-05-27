@@ -4,4 +4,4 @@ plotly
 pypdf
 gspread
 google-auth
-GSheetsConnection
+st-gsheets-connection
