@@ -4,7 +4,6 @@ import plotly.express as px
 from streamlit_gsheets import GSheetsConnection
 from pypdf import PdfReader
 import io
-from datetime import datetime
 
 # =========================================================================
 # 1. CONFIGURAÇÃO DA PÁGINA E ESTILO CSS
@@ -47,8 +46,6 @@ DICIONARIO_SALAS = {
     "Sala 6": st.secrets["connections"]["gsheets"].get("sala6")
 }
 
-ANO_ATUAL = str(datetime.now().year)
-
 # =========================================================================
 # 3. CONTROLE DE ESTADOS DE SESSÃO
 # =========================================================================
@@ -64,7 +61,7 @@ if 'sala_selecionada_visualizacao' not in st.session_state:
     st.session_state.sala_selecionada_visualizacao = "Sala 1"
 
 # =========================================================================
-# 4. FUNÇÃO DE EXTRAÇÃO DINÂMICA (COLUNAS CRIADAS PELO PDF)
+# 4. FUNÇÃO DE EXTRAÇÃO 100% REAL DO PDF (SEM VARIÁVEIS FIXAS/INVENTADAS)
 # =========================================================================
 def extrair_dados_pdf(arquivos_pdf):
     dados_finais = []
@@ -81,8 +78,31 @@ def extrair_dados_pdf(arquivos_pdf):
             nome_aluno = ""
             matricula_aluno = ""
             serie_aluno = ""
+            ano_letivo_pdf = ""
             
-            # Captura metadados básicos do PDF se existirem
+            # Busca o Ano Letivo real varrendo o texto do PDF por padrões de 4 dígitos (Ex: 2024, 2025)
+            for linha in linhas:
+                if "Ano Letivo" in linha or "Ano" in linha or "Exercício" in linha:
+                    palavras = linha.split()
+                    for p in palavras:
+                        p_limpa = ''.join(c for c in p if c.isdigit())
+                        if len(p_limpa) == 4:
+                            ano_letivo_pdf = p_limpa
+                            break
+            
+            # Se não achou no texto, tenta extrair se houver um ano de 4 dígitos no nome do arquivo do boletim
+            if not ano_letivo_pdf:
+                numeros_nome = ''.join(c if c.isdigit() else ' ' for c in arquivo.name).split()
+                for n in numeros_nome:
+                    if len(n) == 4:
+                        ano_letivo_pdf = n
+                        break
+            
+            # Caso ainda assim permaneça vazio, define como "Sem Ano" para não inventar dados
+            if not ano_letivo_pdf:
+                ano_letivo_pdf = "Indefinido"
+
+            # Captura metadados básicos reais do PDF
             for linha in linhas:
                 if "Aluno" in linha or "Nome" in linha:
                     partes = linha.split(":")
@@ -90,7 +110,7 @@ def extrair_dados_pdf(arquivos_pdf):
                 if "Matrícula" in linha or "Matricula" in linha:
                     numeros = ''.join(c for c in linha if c.isdigit())
                     if numeros: matricula_aluno = numeros
-                if "Série" in linha or "Serie" in linha or "Ano" in linha:
+                if "Série" in linha or "Serie" in linha or "Turma" in linha:
                     if "1" in linha: serie_aluno = "1º Ano"
                     elif "2" in linha: serie_aluno = "2º Ano"
                     elif "3" in linha: serie_aluno = "3º Ano"
@@ -98,20 +118,18 @@ def extrair_dados_pdf(arquivos_pdf):
             if not nome_aluno:
                 nome_aluno = arquivo.name.replace(".pdf", "").replace("Boletim", "").replace("_", " ").strip()
 
-            # Mapeamento estrito das disciplinas que constam no arquivo
             lista_disciplinas_padrao = ["Matemática", "Português", "História", "Geografia", "Biologia", "Física", "Química", "ILPR", "ININ"]
             
             for linha in linhas:
                 for disc in lista_disciplinas_padrao:
                     if disc.lower() in linha.lower():
-                        # Pega apenas os números reais que estão na linha da disciplina do PDF
+                        # Extrai os números puros daquela linha do componente curricular
                         valores_linha = [float(s) for s in linha.replace(',', '.').split() if s.replace('.', '', 1).isdigit()]
                         
                         nucleo = "Técnico" if disc in ["ILPR", "ININ"] else "Comum"
                         
-                        # Monta a linha com base dinâmica na quantidade de colunas que vieram do PDF
                         registro = {
-                            'Ano Letivo': int(ANO_ATUAL),
+                            'Ano Letivo': ano_letivo_pdf,
                             'Nº Chamada': int(numero_chamada),
                             'Aluno': nome_aluno,
                             'Matrícula': matricula_aluno,
@@ -120,20 +138,20 @@ def extrair_dados_pdf(arquivos_pdf):
                             'Núcleo': nucleo
                         }
                         
-                        # Atribui dinamicamente as notas encontradas no PDF
+                        # Atribui as notas se elas existirem na linha lida
                         if len(valores_linha) > 0: registro['Nota 1º BI'] = valores_linha[0]
                         if len(valores_linha) > 1: registro['Nota 2º BI'] = valores_linha[1]
                         if len(valores_linha) > 2: registro['Nota 3º BI'] = valores_linha[2]
                         if len(valores_linha) > 3: registro['Nota 4º BI'] = valores_linha[3]
                         if len(valores_linha) > 4: registro['Média Final'] = valores_linha[4]
                         
-                        # Atribui dinamicamente as frequências encontradas no PDF
+                        # Atribui as frequências bimestrais se existirem na linha lida
                         if len(valores_linha) > 5: registro['Freq. 1º BI'] = valores_linha[5]
                         if len(valores_linha) > 6: registro['Freq. 2º BI'] = valores_linha[6]
                         if len(valores_linha) > 7: registro['Freq. 3º BI'] = valores_linha[7]
                         if len(valores_linha) > 8: registro['Freq. 4º BI'] = valores_linha[8]
                         if len(valores_linha) > 9: registro['Freq. Final'] = valores_linha[9]
-                        elif len(valores_linha) > 5: registro['Freq. Final'] = valores_linha[5] # se houver apenas uma freq geral
+                        elif len(valores_linha) > 5: registro['Freq. Final'] = valores_linha[5]
                         
                         registro['Observações'] = ''
                         dados_finais.append(registro)
@@ -143,7 +161,7 @@ def extrair_dados_pdf(arquivos_pdf):
     return pd.DataFrame(dados_finais)
 
 # =========================================================================
-# 5. LÓGICA DE SALVAMENTO ADAPTATIVA COM BASE NAS COLUNAS DO PDF
+# 5. LÓGICA DE SALVAMENTO ADAPTATIVA
 # =========================================================================
 def salvar_dados_na_planilha(sala, df_novos_dados):
     spreadsheet_url = DICIONARIO_SALAS[sala]
@@ -160,10 +178,9 @@ def salvar_dados_na_planilha(sala, df_novos_dados):
     if df_existente.empty:
         df_resultado = df_novos_dados
     else:
-        # Garante que as colunas chaves do PDF existam na planilha antiga para evitar o KeyError
         for col in ['Ano Letivo', 'Aluno', 'Disciplina']:
             if col not in df_existente.columns:
-                df_existente[col] = ""
+                df_existente[col] = "Indefinido"
 
         chaves_novas = df_novos_dados['Ano Letivo'].astype(str) + "_" + df_novos_dados['Aluno'] + "_" + df_novos_dados['Disciplina']
         chaves_existentes = df_existente['Ano Letivo'].astype(str) + "_" + df_existente['Aluno'] + "_" + df_existente['Disciplina']
@@ -171,7 +188,6 @@ def salvar_dados_na_planilha(sala, df_novos_dados):
         df_existente_filtrado = df_existente[~chaves_existentes.isin(chaves_novas)]
         df_resultado = pd.concat([df_existente_filtrado, df_novos_dados], ignore_index=True)
 
-    # Adiciona na planilha final quaisquer novas colunas estruturais detectadas no PDF
     for col in df_novos_dados.columns:
         if col not in df_resultado.columns:
             df_resultado[col] = "" if col == 'Observações' else 0.0
@@ -190,24 +206,24 @@ st.session_state.tela_atual = st.sidebar.radio("Ir para:", ["Upload de Dados", "
 # =========================================================================
 if st.session_state.tela_atual == "Upload de Dados":
     st.title("📂 Inicialização de Dados - Upload de PDFs")
-    st.subheader(f"Os dados extraídos estruturarão a planilha automaticamente para o Ano Letivo: {ANO_ATUAL}")
+    st.subheader("O sistema irá estruturar a planilha usando puramente as colunas e anos identificados no PDF.")
     
     sala_selecionada = st.selectbox("Selecione a Sala de Destino:", list(DICIONARIO_SALAS.keys()))
     arquivos_enviados = st.file_uploader("Arraste e solte os relatórios em PDF:", type=["pdf"], accept_multiple_files=True)
     
     if st.button("PROCESSAR E ATUALIZAR BANCO DE DADOS"):
         if arquivos_enviados:
-            with st.spinner("Extraindo a estrutura nativa do PDF e aplicando regras na planilha..."):
+            with st.spinner("Extraindo a estrutura nativa e real do PDF..."):
                 df_novo = extrair_dados_pdf(arquivos_enviados)
                 
                 if not df_novo.empty:
                     sucesso = salvar_dados_na_planilha(sala_selecionada, df_novo)
                     if sucesso:
-                        st.success(f"Tabela da {sala_selecionada} adaptada e atualizada com base nos dados do PDF!")
+                        st.success(f"Tabela da {sala_selecionada} atualizada com sucesso com os dados brutos do arquivo!")
                         st.session_state.sala_selecionada_visualizacao = sala_selecionada
                         st.balloons()
                 else:
-                    st.error("Nenhum dado estruturado foi localizado dentro dos PDFs anexados.")
+                    st.error("Nenhum dado legível foi extraído dos arquivos anexados.")
         else:
             st.error("Por favor, anexe pelo menos um arquivo PDF.")
 
@@ -238,18 +254,20 @@ else:
     if df.empty or 'Aluno' not in df.columns:
         st.warning(f"Não há dados estruturados para a **{sala_ativa}**. Faça o upload de arquivos PDF para esta sala.")
     else:
+        # --- FILTRO DINÂMICO DE ANO LETIVO BASEADO NO BANCO REAL ---
         if 'Ano Letivo' in df.columns:
-            df = df[df['Ano Letivo'].astype(str) == ANO_ATUAL].copy()
+            lista_anos_disponiveis = sorted(df['Ano Letivo'].astype(str).unique().tolist())
+            ano_selecionado = st.sidebar.selectbox("Filtrar por Ano Letivo:", lista_anos_disponiveis, index=len(lista_anos_disponiveis)-1)
+            df = df[df['Ano Letivo'].astype(str) == ano_selecionado].copy()
         
         if df.empty:
-            st.warning(f"Nenhum registro encontrado para a **{sala_ativa}** no ano de {ANO_ATUAL}.")
+            st.warning(f"Nenhum registro encontrado para os critérios selecionados na {sala_ativa}.")
         else:
             if 'Observações' in df.columns:
                 df['Observações'] = df['Observações'].astype(str).replace('nan', '')
             else:
                 df['Observações'] = ""
 
-            # Ordenação de chamada segura
             if 'Nº Chamada' in df.columns:
                 df_ordem_chamada = df.sort_values(by='Nº Chamada', ascending=True)
             else:
@@ -269,7 +287,8 @@ else:
                 st.markdown("### Foto")
                 st.image("https://via.placeholder.com/150", use_container_width=True)
             with t2:
-                st.subheader(f"Estudante: {aluno_nome} (Ano Letivo: {ANO_ATUAL})")
+                ano_display = ano_selecionado if 'Ano Letivo' in df_aluno.columns else "Não Informado"
+                st.subheader(f"Estudante: {aluno_nome} (Ano Letivo: {ano_display})")
                 c1, c2 = st.columns(2)
                 
                 mat_val = df_aluno['Matrícula'].iloc[0] if 'Matrícula' in df_aluno.columns else "Não Informado"
@@ -280,9 +299,8 @@ else:
 
             st.divider()
 
-            # Filtro dinâmico de ordenação baseado na existência das colunas
             opcoes_radio = ["Nota"]
-            if 'Freq. Final' in df.columns:
+            if any(col for col in df.columns if "Freq." in col):
                 opcoes_radio.append("Frequência")
                 
             ordem_bolinha = st.radio("Ordenar disciplinas por menor:", opcoes_radio, horizontal=True)
@@ -375,7 +393,7 @@ else:
                                 df_completo_salvamento.columns = df_completo_salvamento.columns.str.strip()
                                 
                                 idx_alvo = df_completo_salvamento[
-                                    (df_completo_salvamento['Ano Letivo'].astype(str) == ANO_ATUAL) & 
+                                    (df_completo_salvamento['Ano Letivo'].astype(str) == ano_selecionado) & 
                                     (df_completo_salvamento['Aluno'] == aluno_nome) & 
                                     (df_completo_salvamento['Disciplina'] == st.session_state.disciplina_ativa)
                                 ].index
