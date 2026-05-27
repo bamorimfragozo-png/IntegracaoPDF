@@ -15,6 +15,10 @@ st.set_page_config(
     layout="wide"
 )
 
+# =========================================================
+# CSS
+# =========================================================
+
 st.markdown("""
 <style>
 
@@ -43,7 +47,7 @@ SCOPES = [
 ]
 
 creds = Credentials.from_service_account_info(
-    st.secrets["connections"]["gsheets"],
+    st.secrets["gcp_service_account"],
     scopes=SCOPES
 )
 
@@ -51,32 +55,35 @@ client = gspread.authorize(creds)
 
 # =========================================================
 # PLANILHAS
+# USE URLS REAIS
 # =========================================================
 
 PLANILHAS = {
-    "Sala 1": client.open("Sala_1"),
-    "Sala 2": client.open("Sala_2"),
-    "Sala 3": client.open("Sala_3"),
-    "Sala 4": client.open("Sala_4"),
-    "Sala 5": client.open("Sala_5"),
-    "Sala 6": client.open("Sala_6"),
+
+    "Sala 1": client.open_by_url(
+        "COLE_AQUI_URL_SALA1"
+    ),
+
+    "Sala 2": client.open_by_url(
+        "COLE_AQUI_URL_SALA2"
+    ),
+
+    "Sala 3": client.open_by_url(
+        "COLE_AQUI_URL_SALA3"
+    ),
+
+    "Sala 4": client.open_by_url(
+        "COLE_AQUI_URL_SALA4"
+    ),
+
+    "Sala 5": client.open_by_url(
+        "COLE_AQUI_URL_SALA5"
+    ),
+
+    "Sala 6": client.open_by_url(
+        "COLE_AQUI_URL_SALA6"
+    )
 }
-
-# =========================================================
-# DISCIPLINAS
-# =========================================================
-
-DISCIPLINAS = [
-    "Matemática",
-    "Português",
-    "História",
-    "Geografia",
-    "Biologia",
-    "Física",
-    "Química",
-    "ILPR",
-    "ININ"
-]
 
 # =========================================================
 # SESSION
@@ -92,42 +99,29 @@ if "disciplina_ativa" not in st.session_state:
     st.session_state.disciplina_ativa = None
 
 # =========================================================
-# FUNÇÕES
+# FUNÇÃO ABA
 # =========================================================
 
 def obter_ou_criar_aba(planilha, ano):
 
+    nome_aba = str(ano)
+
     try:
-        aba = planilha.worksheet(str(ano))
+
+        aba = planilha.worksheet(nome_aba)
 
     except:
 
         aba = planilha.add_worksheet(
-            title=str(ano),
-            rows=2000,
-            cols=30
+            title=nome_aba,
+            rows=5000,
+            cols=50
         )
-
-        cabecalho = [
-            "Nº Chamada",
-            "Aluno",
-            "Matrícula",
-            "Série",
-            "Disciplina",
-            "1º BI",
-            "2º BI",
-            "3º BI",
-            "4º BI",
-            "Média Final",
-            "Freq. Final",
-            "Núcleo",
-            "Observações"
-        ]
-
-        aba.append_row(cabecalho)
 
     return aba
 
+# =========================================================
+# EXTRAÇÃO PDF
 # =========================================================
 
 def extrair_dados_pdf(arquivos):
@@ -155,6 +149,10 @@ def extrair_dados_pdf(arquivos):
             matricula = ""
             serie = ""
 
+            # =================================================
+            # METADADOS
+            # =================================================
+
             for linha in linhas:
 
                 linha_limpa = linha.strip()
@@ -166,14 +164,22 @@ def extrair_dados_pdf(arquivos):
                     if len(partes) > 1:
                         aluno = partes[1].strip()
 
-                if "Matrícula" in linha_limpa or "Matricula" in linha_limpa:
+                if (
+                    "Matrícula" in linha_limpa
+                    or
+                    "Matricula" in linha_limpa
+                ):
 
                     nums = re.findall(r"\d+", linha_limpa)
 
                     if nums:
                         matricula = nums[0]
 
-                if "Série" in linha_limpa or "Serie" in linha_limpa:
+                if (
+                    "Série" in linha_limpa
+                    or
+                    "Serie" in linha_limpa
+                ):
 
                     partes = linha_limpa.split(":")
 
@@ -183,46 +189,80 @@ def extrair_dados_pdf(arquivos):
             if not aluno:
                 aluno = arquivo.name.replace(".pdf", "")
 
+            # =================================================
+            # LINHAS COM NÚMEROS
+            # =================================================
+
             for linha in linhas:
 
-                for disc in DISCIPLINAS:
+                numeros = re.findall(
+                    r"\d+[.,]?\d*",
+                    linha
+                )
 
-                    if disc.lower() in linha.lower():
+                numeros_convertidos = []
 
-                        numeros = re.findall(
-                            r"\d+[.,]?\d*",
-                            linha
+                for n in numeros:
+
+                    try:
+                        numeros_convertidos.append(
+                            float(
+                                n.replace(",", ".")
+                            )
                         )
 
-                        numeros = [
-                            float(n.replace(",", "."))
-                            for n in numeros
-                        ]
+                    except:
+                        pass
 
-                        registro = {
-                            "Nº Chamada": numero_chamada,
-                            "Aluno": aluno,
-                            "Matrícula": matricula,
-                            "Série": serie,
-                            "Disciplina": disc,
-                            "1º BI": numeros[0] if len(numeros) > 0 else None,
-                            "2º BI": numeros[1] if len(numeros) > 1 else None,
-                            "3º BI": numeros[2] if len(numeros) > 2 else None,
-                            "4º BI": numeros[3] if len(numeros) > 3 else None,
-                            "Média Final": numeros[4] if len(numeros) > 4 else None,
-                            "Freq. Final": numeros[5] if len(numeros) > 5 else None,
-                            "Núcleo": "Técnico" if disc in ["ILPR", "ININ"] else "Comum",
-                            "Observações": ""
-                        }
+                # ignora linhas sem números úteis
+                if len(numeros_convertidos) < 2:
+                    continue
 
-                        registros.append(registro)
+                # tenta descobrir nome da disciplina
+                texto_sem_numeros = re.sub(
+                    r"\d+[.,]?\d*",
+                    "",
+                    linha
+                ).strip()
+
+                # ignora linhas vazias
+                if not texto_sem_numeros:
+                    continue
+
+                registro = {
+
+                    "Nº Chamada": numero_chamada,
+
+                    "Aluno": aluno,
+
+                    "Matrícula": matricula,
+
+                    "Série": serie,
+
+                    "Disciplina": texto_sem_numeros,
+
+                    "Observações": ""
+                }
+
+                # adiciona valores dinamicamente
+                for i, valor in enumerate(
+                    numeros_convertidos
+                ):
+
+                    registro[f"Valor {i+1}"] = valor
+
+                registros.append(registro)
 
         except Exception as e:
 
-            st.error(f"Erro no PDF {arquivo.name}: {e}")
+            st.error(
+                f"Erro no PDF {arquivo.name}: {e}"
+            )
 
     return pd.DataFrame(registros)
 
+# =========================================================
+# UPDATE PLANILHA
 # =========================================================
 
 def atualizar_planilha(aba, novos_dados):
@@ -230,20 +270,40 @@ def atualizar_planilha(aba, novos_dados):
     dados_existentes = aba.get_all_records()
 
     if dados_existentes:
-        df_existente = pd.DataFrame(dados_existentes)
+
+        df_existente = pd.DataFrame(
+            dados_existentes
+        )
+
     else:
+
         df_existente = pd.DataFrame()
 
     if not df_existente.empty:
 
         for _, row in novos_dados.iterrows():
 
-            df_existente = df_existente[
-                ~(
-                    (df_existente["Aluno"] == row["Aluno"]) &
-                    (df_existente["Disciplina"] == row["Disciplina"])
-                )
-            ]
+            if (
+                "Aluno" in df_existente.columns
+                and
+                "Disciplina" in df_existente.columns
+            ):
+
+                df_existente = df_existente[
+                    ~(
+                        (
+                            df_existente["Aluno"]
+                            ==
+                            row["Aluno"]
+                        )
+                        &
+                        (
+                            df_existente["Disciplina"]
+                            ==
+                            row["Disciplina"]
+                        )
+                    )
+                ]
 
         df_final = pd.concat(
             [df_existente, novos_dados],
@@ -251,6 +311,7 @@ def atualizar_planilha(aba, novos_dados):
         )
 
     else:
+
         df_final = novos_dados
 
     df_final = df_final.fillna("")
@@ -258,10 +319,15 @@ def atualizar_planilha(aba, novos_dados):
     aba.clear()
 
     aba.update(
-        [df_final.columns.values.tolist()] +
+        [
+            df_final.columns.values.tolist()
+        ]
+        +
         df_final.values.tolist()
     )
 
+# =========================================================
+# CARREGAR DF
 # =========================================================
 
 def carregar_dataframe(aba):
@@ -289,18 +355,22 @@ ano = st.sidebar.selectbox(
     [2026, 2027, 2028, 2029]
 )
 
-if st.sidebar.button("Tela Upload"):
+if st.sidebar.button("Upload"):
     st.session_state.tela = "upload"
 
-if st.sidebar.button("Tela Dashboard"):
+if st.sidebar.button("Dashboard"):
     st.session_state.tela = "dashboard"
 
 # =========================================================
-# ABA
+# PLANILHA
 # =========================================================
 
 planilha = PLANILHAS[sala]
-aba = obter_ou_criar_aba(planilha, ano)
+
+aba = obter_ou_criar_aba(
+    planilha,
+    ano
+)
 
 # =========================================================
 # UPLOAD
@@ -308,7 +378,7 @@ aba = obter_ou_criar_aba(planilha, ano)
 
 if st.session_state.tela == "upload":
 
-    st.title("Upload de PDFs")
+    st.title("Upload PDFs")
 
     arquivos = st.file_uploader(
         "Envie os PDFs",
@@ -316,13 +386,17 @@ if st.session_state.tela == "upload":
         accept_multiple_files=True
     )
 
-    if st.button("PROCESSAR PDFs"):
+    if st.button("PROCESSAR"):
 
         if arquivos:
 
-            with st.spinner("Processando..."):
+            with st.spinner(
+                "Lendo PDFs..."
+            ):
 
-                novos_dados = extrair_dados_pdf(arquivos)
+                novos_dados = extrair_dados_pdf(
+                    arquivos
+                )
 
                 if not novos_dados.empty:
 
@@ -331,10 +405,15 @@ if st.session_state.tela == "upload":
                         novos_dados
                     )
 
-                    st.success("Dados atualizados!")
+                    st.success(
+                        "Dados atualizados!"
+                    )
 
                 else:
-                    st.warning("Nenhum dado encontrado.")
+
+                    st.warning(
+                        "Nenhum dado encontrado."
+                    )
 
 # =========================================================
 # DASHBOARD
@@ -352,16 +431,25 @@ else:
 
         st.stop()
 
-    df.columns = df.columns.str.strip()
-
     alunos_lista = (
-        df.sort_values(by="Nº Chamada")
-        ["Aluno"]
+        df["Aluno"]
+        .dropna()
         .unique()
         .tolist()
     )
 
-    if st.session_state.aluno_idx >= len(alunos_lista):
+    if not alunos_lista:
+
+        st.warning("Sem alunos.")
+
+        st.stop()
+
+    if (
+        st.session_state.aluno_idx
+        >=
+        len(alunos_lista)
+    ):
+
         st.session_state.aluno_idx = 0
 
     aluno_nome = alunos_lista[
@@ -370,223 +458,140 @@ else:
 
     df_aluno = df[
         df["Aluno"] == aluno_nome
-    ].copy()
+    ]
 
     # =====================================================
     # TOPO
     # =====================================================
 
-    t1, t2 = st.columns([1, 4])
-
-    with t1:
-
-        st.image(
-            "https://via.placeholder.com/150",
-            use_container_width=True
-        )
-
-    with t2:
-
-        st.subheader(aluno_nome)
-
-        c1, c2 = st.columns(2)
-
-        matricula = (
-            df_aluno["Matrícula"].iloc[0]
-            if "Matrícula" in df_aluno.columns
-            else ""
-        )
-
-        serie = (
-            df_aluno["Série"].iloc[0]
-            if "Série" in df_aluno.columns
-            else ""
-        )
-
-        c1.write(f"**Matrícula:** {matricula}")
-        c2.write(f"**Série:** {serie}")
-
-    st.divider()
-
-    # =====================================================
-    # ORDEM
-    # =====================================================
-
-    ordem = st.radio(
-        "Ordenar disciplinas por:",
-        ["Nota", "Frequência"],
-        horizontal=True
-    )
-
-    col_ref = (
-        "Média Final"
-        if ordem == "Nota"
-        else "Freq. Final"
-    )
-
-    # =====================================================
-    # COLUNAS
-    # =====================================================
-
-    m1, m2, m3, m4 = st.columns([2,3,2,2])
+    st.subheader(aluno_nome)
 
     # =====================================================
     # DISCIPLINAS
     # =====================================================
 
-    with m1:
+    disciplinas = (
+        df_aluno["Disciplina"]
+        .dropna()
+        .unique()
+        .tolist()
+    )
 
-        st.write("### Disciplinas")
+    cols = st.columns(4)
 
-        df_lista = df_aluno.sort_values(
-            by=col_ref,
-            ascending=True
-        )
+    for i, disc in enumerate(disciplinas):
 
-        for disc in df_lista["Disciplina"].unique():
+        with cols[i % 4]:
 
-            if st.button(disc):
+            if st.button(
+                disc,
+                key=disc
+            ):
 
                 st.session_state.disciplina_ativa = disc
 
                 st.rerun()
 
     if (
-        st.session_state.disciplina_ativa is None
-        or
         st.session_state.disciplina_ativa
-        not in df_aluno["Disciplina"].values
+        is None
     ):
 
-        st.session_state.disciplina_ativa = (
-            df_aluno["Disciplina"].iloc[0]
-        )
+        st.session_state.disciplina_ativa = disciplinas[0]
 
-    df_mat = df_aluno[
-        df_aluno["Disciplina"] ==
+    df_disc = df_aluno[
+        df_aluno["Disciplina"]
+        ==
         st.session_state.disciplina_ativa
-    ].iloc[0]
+    ]
+
+    linha = df_disc.iloc[0]
 
     # =====================================================
-    # GRAFICOS
+    # VALORES
     # =====================================================
 
-    with m2:
+    valores = []
 
-        st.write(
-            f"### {st.session_state.disciplina_ativa}"
-        )
+    labels = []
 
-        notas = [
-            df_mat["1º BI"],
-            df_mat["2º BI"],
-            df_mat["3º BI"],
-            df_mat["4º BI"]
-        ]
+    for col in df.columns:
 
-        fig_n = px.line(
-            x=["1º","2º","3º","4º"],
-            y=notas,
+        if "Valor" in col:
+
+            try:
+
+                val = float(linha[col])
+
+                valores.append(val)
+
+                labels.append(col)
+
+            except:
+                pass
+
+    if valores:
+
+        fig = px.line(
+            x=labels,
+            y=valores,
             markers=True
         )
 
-        fig_n.update_yaxes(
-            range=[0,10]
-        )
-
         st.plotly_chart(
-            fig_n,
+            fig,
             use_container_width=True
         )
-
-        freq = df_mat["Freq. Final"]
-
-        if freq != "":
-
-            fig_f = px.bar(
-                x=["Frequência"],
-                y=[float(freq)]
-            )
-
-            fig_f.update_yaxes(
-                range=[0,100]
-            )
-
-            st.plotly_chart(
-                fig_f,
-                use_container_width=True
-            )
-
-    # =====================================================
-    # GLOBAL
-    # =====================================================
-
-    with m3:
-
-        st.write("### Global")
-
-        try:
-
-            media_global = pd.to_numeric(
-                df_aluno["Média Final"],
-                errors="coerce"
-            ).mean()
-
-            st.metric(
-                "Média Global",
-                round(media_global, 2)
-            )
-
-        except:
-            st.metric("Média Global", 0)
 
     # =====================================================
     # OBS
     # =====================================================
 
-    with m4:
+    obs = str(
+        linha["Observações"]
+    )
 
-        st.write("### Observações")
+    nova_obs = st.text_area(
+        "Observações",
+        value=obs
+    )
 
-        obs = str(
-            df_mat["Observações"]
-        )
+    if st.button("Salvar Observação"):
 
-        nova_obs = st.text_area(
-            "Nova observação",
-            value=obs
-        )
+        idx = df[
+            (
+                df["Aluno"]
+                ==
+                aluno_nome
+            )
+            &
+            (
+                df["Disciplina"]
+                ==
+                st.session_state.disciplina_ativa
+            )
+        ].index
 
-        if st.button("Salvar Observação"):
+        if not idx.empty:
 
-            idx = df[
-                (df["Aluno"] == aluno_nome)
-                &
-                (
-                    df["Disciplina"]
-                    ==
-                    st.session_state.disciplina_ativa
-                )
-            ].index
+            df.at[
+                idx[0],
+                "Observações"
+            ] = nova_obs
 
-            if not idx.empty:
+            aba.clear()
 
-                df.at[
-                    idx[0],
-                    "Observações"
-                ] = nova_obs
+            aba.update(
+                [
+                    df.columns.values.tolist()
+                ]
+                +
+                df.values.tolist()
+            )
 
-                aba.clear()
+            st.success("Salvo!")
 
-                aba.update(
-                    [df.columns.values.tolist()]
-                    +
-                    df.values.tolist()
-                )
-
-                st.success("Salvo!")
-
-                st.rerun()
+            st.rerun()
 
     # =====================================================
     # NAVEGAÇÃO
@@ -594,34 +599,41 @@ else:
 
     st.divider()
 
-    b1, b2, b3 = st.columns([1,1,1])
+    b1, b2, b3 = st.columns(3)
 
     with b1:
 
         if st.button("⬅️"):
 
-            st.session_state.aluno_idx = (
-                st.session_state.aluno_idx - 1
-            ) % len(alunos_lista)
+            st.session_state.aluno_idx -= 1
 
-            st.session_state.disciplina_ativa = None
+            if st.session_state.aluno_idx < 0:
+
+                st.session_state.aluno_idx = (
+                    len(alunos_lista) - 1
+                )
 
             st.rerun()
 
     with b2:
 
         escolha = st.selectbox(
-            "Aluno Nº",
-            list(range(1, len(alunos_lista)+1))
+            "Aluno",
+            alunos_lista,
+            index=st.session_state.aluno_idx
         )
 
-        novo_idx = escolha - 1
+        novo_idx = alunos_lista.index(
+            escolha
+        )
 
-        if novo_idx != st.session_state.aluno_idx:
+        if (
+            novo_idx
+            !=
+            st.session_state.aluno_idx
+        ):
 
             st.session_state.aluno_idx = novo_idx
-
-            st.session_state.disciplina_ativa = None
 
             st.rerun()
 
@@ -629,10 +641,14 @@ else:
 
         if st.button("➡️"):
 
-            st.session_state.aluno_idx = (
-                st.session_state.aluno_idx + 1
-            ) % len(alunos_lista)
+            st.session_state.aluno_idx += 1
 
-            st.session_state.disciplina_ativa = None
+            if (
+                st.session_state.aluno_idx
+                >=
+                len(alunos_lista)
+            ):
+
+                st.session_state.aluno_idx = 0
 
             st.rerun()
