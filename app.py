@@ -5,12 +5,10 @@ from streamlit_gsheets import GSheetsConnection
 from pypdf import PdfReader
 import io
 
-
 # =========================================================================
-# 1. CONFIGURAÇÃO DA PÁGINA E ESTILO CSS LIMPO (BORDAS ARREDONDADAS)
+# 1. CONFIGURAÇÃO DA PÁGINA E ESTILO CSS LIMPO
 # =========================================================================
 st.set_page_config(page_title="Dashboard Acadêmico Integrado", layout="wide")
-
 
 st.markdown("""
 <style>
@@ -34,14 +32,11 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-
 # =========================================================================
 # 2. CONEXÃO E DICIONÁRIO DINÂMICO CONECTADO AO SECRETS DO STREAMLIT
 # =========================================================================
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-
-# Busca os links das 6 planilhas diretamente do painel Secrets de forma segura
 DICIONARIO_SALAS = {
     "Sala 1": st.secrets["connections"]["gsheets"]["sala1"],
     "Sala 2": st.secrets["connections"]["gsheets"]["sala2"],
@@ -50,7 +45,6 @@ DICIONARIO_SALAS = {
     "Sala 5": st.secrets["connections"]["gsheets"]["sala5"],
     "Sala 6": st.secrets["connections"]["gsheets"]["sala6"]
 }
-
 
 # =========================================================================
 # 3. ESTADOS DE SESSÃO (SESSION STATE)
@@ -66,16 +60,16 @@ if 'reset_obs' not in st.session_state:
 if 'sala_ativa' not in st.session_state:
     st.session_state.sala_ativa = "Sala 1"
 
-
 # =========================================================================
-# 4. FUNÇÃO DE EXTRAÇÃO REAL DE DADOS DO PDF
+# 4. FUNÇÃO DE EXTRAÇÃO REAL DE DADOS DO PDF (SEM DADOS SIMULADOS)
 # =========================================================================
 def extrair_dados_pdf(arquivos_pdf):
     """
-    Função que lê os arquivos PDF da memória via io.BytesIO e extrai
-    as informações reais de texto de cada página para montar o DataFrame.
+    Extrai os dados do PDF de forma estritamente dependente do conteúdo do arquivo.
+    Não gera frequências ou notas fictícias se não existirem no texto.
     """
     dados_finais = []
+    lista_disciplinas_padrao = ["Matemática", "Português", "História", "Geografia", "Biologia", "Física", "Química", "ILPR", "ININ"]
     
     for numero_chamada, arquivo in enumerate(arquivos_pdf, start=1):
         pdf_reader = PdfReader(io.BytesIO(arquivo.read()))
@@ -86,67 +80,63 @@ def extrair_dados_pdf(arquivos_pdf):
         linhas = texto_completo.split('\n')
         
         nome_aluno = "Não Identificado"
-        matricula_aluno = 0.0
-        serie_aluno = "1º Ano"
+        matricula_aluno = ""
+        serie_aluno = "Não Identificada"
         
-        # Identificar os metadados do Aluno no PDF
+        # Identificar os metadados do Aluno no PDF de forma dinâmica
         for linha in linhas:
-            if "Aluno" in linha or "Nome" in linha:
+            if any(k in linha for k in ["Aluno:", "Nome:"]):
                 partes = linha.split(":")
                 nome_aluno = partes[1].strip() if len(partes) > 1 else linha.replace("Aluno", "").replace("Nome", "").strip()
             if "Matrícula" in linha or "Matricula" in linha:
-                try:
-                    numeros = ''.join(c for c in linha if c.isdigit())
-                    if numeros: matricula_aluno = float(numeros)
-                except: pass
-            if "Série" in linha or "Serie" in linha or "Ano" in linha:
-                if "1" in linha: serie_aluno = "1º Ano"
-                elif "2" in linha: serie_aluno = "2º Ano"
-                elif "3" in linha: serie_aluno = "3º Ano"
-
+                matricula_aluno = ''.join(c for c in linha if c.isdigit() or c == '-')
+            if any(k in linha for k in ["Série", "Serie", "Ano"]):
+                serie_aluno = linha.split(":")[-1].strip()
 
         if nome_aluno == "Não Identificado" or not nome_aluno.strip():
             nome_aluno = arquivo.name.replace(".pdf", "").replace("Boletim", "").replace("_", " ").strip()
 
-
-        lista_disciplinas_padrao = ["Matemática", "Português", "História", "Geografia", "Biologia", "Física", "Química", "ILPR", "ININ"]
-        
-        # Buscar as linhas de disciplinas e capturar as notas/frequências reais
+        # Buscar as linhas de disciplinas e capturar estritamente os números encontrados
         for linha in linhas:
             for disc in lista_disciplinas_padrao:
                 if disc.lower() in linha.lower():
+                    # Captura números decimais e inteiros da linha (ex: notas e frequências)
                     valores_linha = [float(s) for s in linha.replace(',', '.').split() if s.replace('.', '', 1).isdigit()]
                     
+                    # Preenche com 0.0 apenas se faltarem colunas básicas para o DataFrame não quebrar
                     while len(valores_linha) < 5:
                         valores_linha.append(0.0)
                         
                     nucleo = "Técnico" if disc in ["ILPR", "ININ"] else "Comum"
                     
-                    freq_final = valores_linha[4] if len(valores_linha) > 4 else 0.95
-                    if freq_final > 1.0: freq_final = freq_final / 100.0
-
+                    # Se houver dados de frequência na linha, converte proporcionalmente
+                    freq_final = valores_linha[4]
+                    if freq_final > 1.0 and freq_final <= 100.0: 
+                        freq_final = freq_final / 100.0
 
                     dados_finais.append({
                         'Nº Chamada': numero_chamada,
                         'Aluno': nome_aluno,
-                        'Matrícula': matricula_aluno if matricula_aluno > 0 else 3066000.0 + numero_chamada,
+                        'Matrícula': matricula_aluno if matricula_aluno else str(3066000 + numero_chamada),
                         'Série': serie_aluno,
                         'Disciplina': disc,
                         '1º BI': valores_linha[0],
                         '2º BI': valores_linha[1],
                         '3º BI': valores_linha[2],
                         '4º BI': valores_linha[3],
-                        'Média Final': valores_linha[4] if valores_linha[4] > 0 else sum(valores_linha[0:4])/4,
+                        'Média Final': valores_linha[4],
                         'Freq. Final': freq_final,
                         'Núcleo': nucleo,
-                        # Frequências por bimestre calculadas ou simuladas por padrão proporcional
-                        'Freq. 1º BI': 95.0, 'Freq. 2º BI': 92.0, 'Freq. 3º BI': 94.0, 'Freq. 4º BI': 96.0,
+                        # Frequências bimestrais agora vêm zeradas por padrão para serem preenchidas via planilha,
+                        # ou adaptadas caso o seu PDF traga esses dados na linha.
+                        'Freq. 1º BI': valores_linha[5] if len(valores_linha) > 5 else 0.0,
+                        'Freq. 2º BI': valores_linha[6] if len(valores_linha) > 6 else 0.0,
+                        'Freq. 3º BI': valores_linha[7] if len(valores_linha) > 7 else 0.0,
+                        'Freq. 4º BI': valores_linha[8] if len(valores_linha) > 8 else 0.0,
                         'Observações': ''
                     })
 
-
     return pd.DataFrame(dados_finais)
-
 
 # =========================================================================
 # TELA 1: UPLOAD DOS RELATÓRIOS EM PDF
@@ -165,6 +155,7 @@ if not st.session_state.dados_carregados:
                 
                 if not df_novo.empty:
                     link_da_sala_ativa = DICIONARIO_SALAS[sala_selecionada]
+                    # Envia os dados extraídos brutos e reais do PDF para a planilha correspondente
                     conn.update(spreadsheet=link_da_sala_ativa, data=df_novo) 
                     
                     st.session_state.sala_ativa = sala_selecionada
@@ -175,9 +166,8 @@ if not st.session_state.dados_carregados:
         else:
             st.error("Por favor, selecione e envie os arquivos PDF para processar.")
 
-
 # =========================================================================
-# TELA 2: EXIBIÇÃO VISUAL DO DASHBOARD ACADÊMICO
+# TELA 2: EXIBIÇÃO VISUAL DO DASHBOARD ACADÊMICO (100% BASEADO NA PLANILHA)
 # =========================================================================
 else:
     if st.sidebar.button("🔄 Voltar para Tela de Upload"):
@@ -186,32 +176,27 @@ else:
         st.session_state.disciplina_ativa = None
         st.rerun()
 
-
     st.sidebar.write(f"📊 Visualizando: **{st.session_state.sala_ativa}**")
 
-
+    # Leitura em tempo real e estrita da planilha Google Sheets
     link_da_sala_ativa = DICIONARIO_SALAS[st.session_state.sala_ativa]
     df = conn.read(spreadsheet=link_da_sala_ativa, ttl="0")
     df.columns = df.columns.str.strip()
 
-
+    # Sanitização de colunas obrigatórias vindas da planilha
     if 'Observações' in df.columns:
         df['Observações'] = df['Observações'].astype(str).replace('nan', '')
     else:
         df['Observações'] = ""
 
-
     df_ordem_chamada = df.sort_values(by='Nº Chamada', ascending=True)
     alunos_lista = df_ordem_chamada['Aluno'].unique().tolist()
-
 
     if st.session_state.aluno_idx >= len(alunos_lista):
         st.session_state.aluno_idx = 0
 
-
     aluno_nome = alunos_lista[st.session_state.aluno_idx]
     df_aluno = df[df['Aluno'] == aluno_nome].copy()
-
 
     # --- BLOCO TOPO: FOTO E IDENTIFICAÇÃO DO ESTUDANTE ---
     t1, t2 = st.columns([1, 4])
@@ -222,26 +207,22 @@ else:
         st.subheader(f"Nome: {aluno_nome}")
         c1, c2 = st.columns(2)
         
-        mat_val = df_aluno['Matrícula'].iloc[0] if 'Matrícula' in df_aluno.columns else 0
-        ser_val = df_aluno['Série'].iloc[0] if 'Série' in df_aluno.columns else "1º Ano"
+        mat_val = df_aluno['Matrícula'].iloc[0] if 'Matrícula' in df_aluno.columns else "N/A"
+        ser_val = df_aluno['Série'].iloc[0] if 'Série' in df_aluno.columns else "N/A"
         
         c1.markdown(f"<div style='border:2px solid black; border-radius:15px; padding:15px;'><b>Matrícula:</b> {mat_val}</div>", unsafe_allow_html=True)
         c2.markdown(f"<div style='border:2px solid black; border-radius:15px; padding:15px;'><b>Série:</b> {ser_val}</div>", unsafe_allow_html=True)
 
-
     st.divider()
 
-
     ordem_bolinha = st.radio("Ordenar disciplinas por menor:", ["Nota", "Frequência"], horizontal=True)
-
 
     # --- GRID CENTRAL DO DASHBOARD ---
     m1, m2, m3, m4 = st.columns([2, 3, 2, 2])
 
-
     with m1:
         st.write("### Disciplinas")
-        col_ref = 'Média Final' if 'Média Final' in df_aluno.columns else '1º BI'
+        col_ref = 'Média Final' if 'Média Final' in df_aluno.columns else df_aluno.columns[5]
         if ordem_bolinha == "Frequência" and 'Freq. Final' in df_aluno.columns:
             col_ref = 'Freq. Final'
             
@@ -253,25 +234,21 @@ else:
                 st.session_state.reset_obs += 1
                 st.rerun()
 
-
     if st.session_state.disciplina_ativa is None or st.session_state.disciplina_ativa not in df_aluno['Disciplina'].unique():
         st.session_state.disciplina_ativa = df_aluno['Disciplina'].iloc[0]
 
-
     df_mat = df_aluno[df_aluno['Disciplina'] == st.session_state.disciplina_ativa].iloc[0]
 
-
     with m2:
-        # Gráfico 1 (Linhas): Evolução da FREQUÊNCIA por Bimestre
-        f_final_val = df_mat['Freq. Final'] if 'Freq. Final' in df_mat else 0.95
+        # Gráfico 1 (Linhas): Evolução da FREQUÊNCIA por Bimestre (Puxado direto da planilha)
+        f_final_val = df_mat['Freq. Final'] if 'Freq. Final' in df_mat else 0.0
         f_final_display = round(f_final_val * 100, 2) if f_final_val <= 1.0 else round(f_final_val, 2)
         st.write(f"**Evolução da Frequência: {st.session_state.disciplina_ativa} (Final: {f_final_display}%)**")
         
-        # Puxa os dados das colunas de frequência bimestrais
-        f1 = df_mat['Freq. 1º BI'] if 'Freq. 1º BI' in df_mat else 95.0
-        f2 = df_mat['Freq. 2º BI'] if 'Freq. 2º BI' in df_mat else 95.0
-        f3 = df_mat['Freq. 3º BI'] if 'Freq. 3º BI' in df_mat else 95.0
-        f4 = df_mat['Freq. 4º BI'] if 'Freq. 4º BI' in df_mat else 95.0
+        f1 = df_mat['Freq. 1º BI'] if 'Freq. 1º BI' in df_mat else 0.0
+        f2 = df_mat['Freq. 2º BI'] if 'Freq. 2º BI' in df_mat else 0.0
+        f3 = df_mat['Freq. 3º BI'] if 'Freq. 3º BI' in df_mat else 0.0
+        f4 = df_mat['Freq. 4º BI'] if 'Freq. 4º BI' in df_mat else 0.0
         
         fig_f = px.line(x=['1º BI', '2º BI', '3º BI', '4º BI'], y=[f1, f2, f3, f4], markers=True)
         fig_f.update_yaxes(range=[0, 105], title="Frequência (%)")
@@ -279,7 +256,7 @@ else:
         
         st.divider()
         
-        # Gráfico 2 (Barras): NOTAS por Bimestre (Atualizado conforme solicitado)
+        # Gráfico 2 (Barras): NOTAS por Bimestre (Puxado direto da planilha)
         val_m_final = round(float(df_mat['Média Final']), 2) if 'Média Final' in df_mat else 0.0
         st.write(f"**Notas por Bimestre (Média Final: {val_m_final})**")
         
@@ -291,7 +268,6 @@ else:
         fig_n = px.bar(x=['1º BI', '2º BI', '3º BI', '4º BI'], y=[n1, n2, n3, n4])
         fig_n.update_yaxes(range=[0, 10.5], title="Notas")
         st.plotly_chart(fig_n, use_container_width=True)
-
 
     with m3:
         st.write("### Global")
@@ -308,13 +284,11 @@ else:
         m_global = df_aluno['Média Final'].mean() if 'Média Final' in df_aluno.columns else 0.0
         st.metric("Média Global", f"{round(m_global, 1)}")
 
-
     with m4:
         st.write("### Observações")
         chave_base = f"{aluno_nome}_{st.session_state.disciplina_ativa}_{st.session_state.reset_obs}".replace(" ", "_")
         obs_banco = str(df_mat['Observações']) if 'Observações' in df_mat.index and pd.notna(df_mat['Observações']) else ""
         historico = [n.strip() for n in obs_banco.split(" | ") if n.strip() and n.lower() != "nan"]
-
 
         with st.form(key=f"form_{chave_base}"):
             entradas_atuais = []
@@ -336,7 +310,6 @@ else:
                         st.session_state.reset_obs += 1
                         st.success("Salvo com sucesso!")
                         st.rerun()
-
 
     # --- BARRA INFERIOR DE NAVEGAÇÃO DOS ALUNOS ---
     st.divider()
