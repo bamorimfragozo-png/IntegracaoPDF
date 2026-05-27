@@ -54,12 +54,12 @@ client = gspread.authorize(creds)
 # =========================================================
 
 PLANILHAS = {
-    "Sala 1": client.open("Sala 1"),
-    "Sala 2": client.open("Sala 2"),
-    "Sala 3": client.open("Sala 3"),
-    "Sala 4": client.open("Sala 4"),
-    "Sala 5": client.open("Sala 5"),
-    "Sala 6": client.open("Sala 6"),
+    "Sala 1": client.open("Sala_1"),
+    "Sala 2": client.open("Sala_2"),
+    "Sala 3": client.open("Sala_3"),
+    "Sala 4": client.open("Sala_4"),
+    "Sala 5": client.open("Sala_5"),
+    "Sala 6": client.open("Sala_6"),
 }
 
 # =========================================================
