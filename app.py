@@ -43,7 +43,7 @@ SCOPES = [
 ]
 
 creds = Credentials.from_service_account_info(
-    st.secrets["connections.gsheets"],
+    st.secrets["connections"]["gsheets"],
     scopes=SCOPES
 )
 
