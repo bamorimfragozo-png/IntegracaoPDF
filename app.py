@@ -33,12 +33,23 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =========================================================================
-# 2. CONEXÃO E CAPTURA COMPATÍVEL DO LINK DA PLANILHA (SECRETS)
+# 2. CONEXÃO E CAPTURA AUTOMÁTICA E SEGURA DO LINK DA PLANILHA (SECRETS)
 # =========================================================================
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# Captura a URL configurada no seu secrets de forma explícita para evitar o erro de None
-LINK_PLANILHA = st.secrets["connections"]["gsheets"]["spreadsheet"]
+# Captura o link testando as variações comuns do gsheets no Secrets para evitar KeyError
+LINK_PLANILHA = None
+try:
+    if "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
+        g_secrets = st.secrets["connections"]["gsheets"]
+        if "spreadsheet" in g_secrets:
+            LINK_PLANILHA = g_secrets["spreadsheet"]
+        elif "spreadsheet_id" in g_secrets:
+            LINK_PLANILHA = g_secrets["spreadsheet_id"]
+        elif "url" in g_secrets:
+            LINK_PLANILHA = g_secrets["url"]
+except Exception:
+    LINK_PLANILHA = None
 
 # =========================================================================
 # 3. ESTADOS DE SESSÃO LOCAL PARA NAVEGAÇÃO
@@ -52,15 +63,18 @@ if 'disciplina_ativa' not in st.session_state:
 if 'reset_obs' not in st.session_state: 
     st.session_state.reset_obs = 0
 
-# Leitura utilizando explicitamente o link capturado do segredo
+# Leitura tratando o link dinamicamente para evitar erro de Planilha nula (Spreadsheet None)
 try:
-    df = conn.read(spreadsheet=LINK_PLANILHA, ttl="0")
+    if LINK_PLANILHA:
+        df = conn.read(spreadsheet=LINK_PLANILHA, ttl="0")
+    else:
+        df = conn.read(ttl="0")
     df.columns = df.columns.str.strip()
 except Exception:
     df = pd.DataFrame()
 
 # =========================================================================
-# 4. FUNÇÃO DE EXTRAÇÃO REAL DE DADOS DO PDF
+# 4. FUNÇÃO DE EXTRAÇÃO REAL DE DADOS DO PDF (SEM DADOS INVENTADOS)
 # =========================================================================
 def extrair_dados_pdf(arquivos_pdf):
     dados_finais = []
@@ -165,8 +179,12 @@ if st.session_state.tela_atual == "Fazer Upload de PDFs":
                     else:
                         df_final = df_novos
                     
-                    # CORREÇÃO CRÍTICA: Passando explicitamente o link da planilha no update
-                    conn.update(spreadsheet=LINK_PLANILHA, data=df_final)
+                    # Salva aplicando a condicional de segurança para evitar erro de Spreadsheet None
+                    if LINK_PLANILHA:
+                        conn.update(spreadsheet=LINK_PLANILHA, data=df_final)
+                    else:
+                        conn.update(data=df_final)
+                        
                     st.success("Planilha atualizada com sucesso!")
                     st.session_state.tela_atual = "Ver Dashboard"
                     st.rerun()
@@ -296,8 +314,13 @@ else:
                         idx = df[(df['Aluno'] == aluno_nome) & (df['Disciplina'] == st.session_state.disciplina_ativa)].index
                         if not idx.empty:
                             df.at[idx[0], 'Observações'] = str(texto_final)
-                            # CORREÇÃO CRÍTICA: Passando explicitamente o link da planilha no update das observações também
-                            conn.update(spreadsheet=LINK_PLANILHA, data=df)
+                            
+                            # Salva as observações tratando a condicional de link
+                            if LINK_PLANILHA:
+                                conn.update(spreadsheet=LINK_PLANILHA, data=df)
+                            else:
+                                conn.update(data=df)
+                                
                             st.session_state.reset_obs += 1
                             st.success("Salvo!")
                             st.rerun()
