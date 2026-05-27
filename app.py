@@ -49,14 +49,6 @@ DICIONARIO_SALAS = {
 
 ANO_ATUAL = str(datetime.now().year)
 
-# ESTRUTURA DE COLUNAS PADRONIZADA (Montada puramente com os dados extraídos)
-COLUNAS_PADRAO = [
-    'Ano Letivo', 'Nº Chamada', 'Aluno', 'Matrícula', 'Série', 'Disciplina', 'Núcleo',
-    'Nota 1º BI', 'Nota 2º BI', 'Nota 3º BI', 'Nota 4º BI', 'Média Final',
-    'Freq. 1º BI', 'Freq. 2º BI', 'Freq. 3º BI', 'Freq. 4º BI', 'Freq. Final',
-    'Observações'
-]
-
 # =========================================================================
 # 3. CONTROLE DE ESTADOS DE SESSÃO
 # =========================================================================
@@ -72,7 +64,7 @@ if 'sala_selecionada_visualizacao' not in st.session_state:
     st.session_state.sala_selecionada_visualizacao = "Sala 1"
 
 # =========================================================================
-# 4. FUNÇÃO DE EXTRAÇÃO REAL DE DADOS DO PDF (SEM DADOS INVENTADOS)
+# 4. FUNÇÃO DE EXTRAÇÃO DINÂMICA (COLUNAS CRIADAS PELO PDF)
 # =========================================================================
 def extrair_dados_pdf(arquivos_pdf):
     dados_finais = []
@@ -87,16 +79,17 @@ def extrair_dados_pdf(arquivos_pdf):
             linhas = texto_completo.split('\n')
             
             nome_aluno = ""
-            matricula_aluno = 0
+            matricula_aluno = ""
             serie_aluno = ""
             
+            # Captura metadados básicos do PDF se existirem
             for linha in linhas:
                 if "Aluno" in linha or "Nome" in linha:
                     partes = linha.split(":")
                     nome_aluno = partes[1].strip() if len(partes) > 1 else linha.replace("Aluno", "").replace("Nome", "").strip()
                 if "Matrícula" in linha or "Matricula" in linha:
                     numeros = ''.join(c for c in linha if c.isdigit())
-                    if numeros: matricula_aluno = int(numeros)
+                    if numeros: matricula_aluno = numeros
                 if "Série" in linha or "Serie" in linha or "Ano" in linha:
                     if "1" in linha: serie_aluno = "1º Ano"
                     elif "2" in linha: serie_aluno = "2º Ano"
@@ -105,47 +98,52 @@ def extrair_dados_pdf(arquivos_pdf):
             if not nome_aluno:
                 nome_aluno = arquivo.name.replace(".pdf", "").replace("Boletim", "").replace("_", " ").strip()
 
+            # Mapeamento estrito das disciplinas que constam no arquivo
             lista_disciplinas_padrao = ["Matemática", "Português", "História", "Geografia", "Biologia", "Física", "Química", "ILPR", "ININ"]
             
             for linha in linhas:
                 for disc in lista_disciplinas_padrao:
                     if disc.lower() in linha.lower():
+                        # Pega apenas os números reais que estão na linha da disciplina do PDF
                         valores_linha = [float(s) for s in linha.replace(',', '.').split() if s.replace('.', '', 1).isdigit()]
                         
-                        # Se não houver valores suficientes na linha do PDF, preenche estritamente com 0.0
-                        while len(valores_linha) < 6:
-                            valores_linha.append(0.0)
-                            
                         nucleo = "Técnico" if disc in ["ILPR", "ININ"] else "Comum"
                         
-                        # Extrai puramente o que estiver na linha do PDF, sem preenchimentos artificiais
-                        dados_finais.append({
+                        # Monta a linha com base dinâmica na quantidade de colunas que vieram do PDF
+                        registro = {
                             'Ano Letivo': int(ANO_ATUAL),
                             'Nº Chamada': int(numero_chamada),
                             'Aluno': nome_aluno,
                             'Matrícula': matricula_aluno,
                             'Série': serie_aluno,
                             'Disciplina': disc,
-                            'Núcleo': nucleo,
-                            'Nota 1º BI': valores_linha[0],
-                            'Nota 2º BI': valores_linha[1],
-                            'Nota 3º BI': valores_linha[2],
-                            'Nota 4º BI': valores_linha[3],
-                            'Média Final': valores_linha[4],
-                            'Freq. 1º BI': valores_linha[5] if len(valores_linha) > 5 else 0.0,
-                            'Freq. 2º BI': valores_linha[6] if len(valores_linha) > 6 else 0.0,
-                            'Freq. 3º BI': valores_linha[7] if len(valores_linha) > 7 else 0.0,
-                            'Freq. 4º BI': valores_linha[8] if len(valores_linha) > 8 else 0.0,
-                            'Freq. Final': valores_linha[5] if len(valores_linha) > 5 else 0.0,
-                            'Observações': ''
-                        })
+                            'Núcleo': nucleo
+                        }
+                        
+                        # Atribui dinamicamente as notas encontradas no PDF
+                        if len(valores_linha) > 0: registro['Nota 1º BI'] = valores_linha[0]
+                        if len(valores_linha) > 1: registro['Nota 2º BI'] = valores_linha[1]
+                        if len(valores_linha) > 2: registro['Nota 3º BI'] = valores_linha[2]
+                        if len(valores_linha) > 3: registro['Nota 4º BI'] = valores_linha[3]
+                        if len(valores_linha) > 4: registro['Média Final'] = valores_linha[4]
+                        
+                        # Atribui dinamicamente as frequências encontradas no PDF
+                        if len(valores_linha) > 5: registro['Freq. 1º BI'] = valores_linha[5]
+                        if len(valores_linha) > 6: registro['Freq. 2º BI'] = valores_linha[6]
+                        if len(valores_linha) > 7: registro['Freq. 3º BI'] = valores_linha[7]
+                        if len(valores_linha) > 8: registro['Freq. 4º BI'] = valores_linha[8]
+                        if len(valores_linha) > 9: registro['Freq. Final'] = valores_linha[9]
+                        elif len(valores_linha) > 5: registro['Freq. Final'] = valores_linha[5] # se houver apenas uma freq geral
+                        
+                        registro['Observações'] = ''
+                        dados_finais.append(registro)
         except Exception as e:
             st.error(f"Erro ao processar o arquivo {arquivo.name}: {e}")
 
     return pd.DataFrame(dados_finais)
 
 # =========================================================================
-# 5. LÓGICA DE TRATAMENTO DE COLUNAS E UPSERT
+# 5. LÓGICA DE SALVAMENTO ADAPTATIVA COM BASE NAS COLUNAS DO PDF
 # =========================================================================
 def salvar_dados_na_planilha(sala, df_novos_dados):
     spreadsheet_url = DICIONARIO_SALAS[sala]
@@ -157,23 +155,27 @@ def salvar_dados_na_planilha(sala, df_novos_dados):
         df_existente = conn.read(spreadsheet=spreadsheet_url, ttl="0")
         df_existente.columns = df_existente.columns.str.strip()
     except:
-        df_existente = pd.DataFrame(columns=COLUNAS_PADRAO)
+        df_existente = pd.DataFrame()
 
     if df_existente.empty:
         df_resultado = df_novos_dados
     else:
+        # Garante que as colunas chaves do PDF existam na planilha antiga para evitar o KeyError
+        for col in ['Ano Letivo', 'Aluno', 'Disciplina']:
+            if col not in df_existente.columns:
+                df_existente[col] = ""
+
         chaves_novas = df_novos_dados['Ano Letivo'].astype(str) + "_" + df_novos_dados['Aluno'] + "_" + df_novos_dados['Disciplina']
         chaves_existentes = df_existente['Ano Letivo'].astype(str) + "_" + df_existente['Aluno'] + "_" + df_existente['Disciplina']
         
         df_existente_filtrado = df_existente[~chaves_existentes.isin(chaves_novas)]
         df_resultado = pd.concat([df_existente_filtrado, df_novos_dados], ignore_index=True)
 
-    # Cria estruturalmente as colunas vazias se não existirem na planilha original do Drive
-    for col in COLUNAS_PADRAO:
+    # Adiciona na planilha final quaisquer novas colunas estruturais detectadas no PDF
+    for col in df_novos_dados.columns:
         if col not in df_resultado.columns:
             df_resultado[col] = "" if col == 'Observações' else 0.0
 
-    df_resultado = df_resultado[COLUNAS_PADRAO]
     conn.update(spreadsheet=spreadsheet_url, data=df_resultado)
     return True
 
@@ -188,24 +190,24 @@ st.session_state.tela_atual = st.sidebar.radio("Ir para:", ["Upload de Dados", "
 # =========================================================================
 if st.session_state.tela_atual == "Upload de Dados":
     st.title("📂 Inicialização de Dados - Upload de PDFs")
-    st.subheader(f"Os dados extraídos serão configurados automaticamente para o Ano Letivo: {ANO_ATUAL}")
+    st.subheader(f"Os dados extraídos estruturarão a planilha automaticamente para o Ano Letivo: {ANO_ATUAL}")
     
     sala_selecionada = st.selectbox("Selecione a Sala de Destino:", list(DICIONARIO_SALAS.keys()))
     arquivos_enviados = st.file_uploader("Arraste e solte os relatórios em PDF:", type=["pdf"], accept_multiple_files=True)
     
     if st.button("PROCESSAR E ATUALIZAR BANCO DE DADOS"):
         if arquivos_enviados:
-            with st.spinner("Estruturando colunas e aplicando regras de Upsert..."):
+            with st.spinner("Extraindo a estrutura nativa do PDF e aplicando regras na planilha..."):
                 df_novo = extrair_dados_pdf(arquivos_enviados)
                 
                 if not df_novo.empty:
                     sucesso = salvar_dados_na_planilha(sala_selecionada, df_novo)
                     if sucesso:
-                        st.success(f"Tabela da {sala_selecionada} padronizada e atualizada com sucesso!")
+                        st.success(f"Tabela da {sala_selecionada} adaptada e atualizada com base nos dados do PDF!")
                         st.session_state.sala_selecionada_visualizacao = sala_selecionada
                         st.balloons()
                 else:
-                    st.error("Nenhum padrão de dados válido foi localizado nos PDFs anexados.")
+                    st.error("Nenhum dado estruturado foi localizado dentro dos PDFs anexados.")
         else:
             st.error("Por favor, anexe pelo menos um arquivo PDF.")
 
@@ -236,7 +238,8 @@ else:
     if df.empty or 'Aluno' not in df.columns:
         st.warning(f"Não há dados estruturados para a **{sala_ativa}**. Faça o upload de arquivos PDF para esta sala.")
     else:
-        df = df[df['Ano Letivo'].astype(str) == ANO_ATUAL].copy()
+        if 'Ano Letivo' in df.columns:
+            df = df[df['Ano Letivo'].astype(str) == ANO_ATUAL].copy()
         
         if df.empty:
             st.warning(f"Nenhum registro encontrado para a **{sala_ativa}** no ano de {ANO_ATUAL}.")
@@ -246,7 +249,12 @@ else:
             else:
                 df['Observações'] = ""
 
-            df_ordem_chamada = df.sort_values(by='Nº Chamada', ascending=True)
+            # Ordenação de chamada segura
+            if 'Nº Chamada' in df.columns:
+                df_ordem_chamada = df.sort_values(by='Nº Chamada', ascending=True)
+            else:
+                df_ordem_chamada = df
+                
             alunos_lista = df_ordem_chamada['Aluno'].unique().tolist()
 
             if st.session_state.aluno_idx >= len(alunos_lista):
@@ -272,14 +280,19 @@ else:
 
             st.divider()
 
-            ordem_bolinha = st.radio("Ordenar disciplinas por menor:", ["Nota", "Frequência"], horizontal=True)
+            # Filtro dinâmico de ordenação baseado na existência das colunas
+            opcoes_radio = ["Nota"]
+            if 'Freq. Final' in df.columns:
+                opcoes_radio.append("Frequência")
+                
+            ordem_bolinha = st.radio("Ordenar disciplinas por menor:", opcoes_radio, horizontal=True)
 
             # --- GRID CENTRAL DO DASHBOARD ---
             m1, m2, m3, m4 = st.columns([2, 3, 2, 2])
 
             with m1:
                 st.write("### Disciplinas")
-                col_ref = 'Média Final' if ordem_bolinha == "Nota" else 'Freq. Final'
+                col_ref = 'Média Final' if (ordem_bolinha == "Nota" and 'Média Final' in df_aluno.columns) else ('Freq. Final' if 'Freq. Final' in df_aluno.columns else 'Disciplina')
                 df_lista = df_aluno.sort_values(by=col_ref, ascending=True)
                 
                 for disc in df_lista['Disciplina'].unique():
@@ -294,7 +307,7 @@ else:
             df_mat = df_aluno[df_aluno['Disciplina'] == st.session_state.disciplina_ativa].iloc[0]
 
             with m2:
-                # GRÁFICO 1 (AGORA EM BARRAS): Notas por Bimestre 
+                # GRÁFICO 1 (BARRAS): Notas por Bimestre Reais do PDF
                 val_m_final = round(float(df_mat['Média Final']), 2) if 'Média Final' in df_mat else 0.0
                 st.write(f"**Notas por Bimestre: {st.session_state.disciplina_ativa} (Média Final: {val_m_final})**")
                 
@@ -309,7 +322,7 @@ else:
                 
                 st.divider()
                 
-                # GRÁFICO 2 (AGORA EM LINHAS): Frequência Bimestral da Disciplina
+                # GRÁFICO 2 (LINHAS): Frequências por Bimestre Reais do PDF
                 f_final_val = df_mat['Freq. Final'] if 'Freq. Final' in df_mat else 0.0
                 st.write(f"**Evolução da Frequência: {st.session_state.disciplina_ativa} (Média Retida: {round(f_final_val, 1)}%)**")
                 
@@ -324,10 +337,11 @@ else:
 
             with m3:
                 st.write("### Global")
-                m_comum = df_aluno[df_aluno['Núcleo'] == 'Comum']['Média Final'].mean() if 'Núcleo' in df_aluno.columns else 0.0
-                m_tec = df_aluno[df_aluno['Núcleo'] == 'Técnico']['Média Final'].mean() if 'Núcleo' in df_aluno.columns else 0.0
+                m_comum = df_aluno[df_aluno['Núcleo'] == 'Comum']['Média Final'].mean() if ('Núcleo' in df_aluno.columns and 'Média Final' in df_aluno.columns) else 0.0
+                m_tec = df_aluno[df_aluno['Núcleo'] == 'Técnico']['Média Final'].mean() if ('Núcleo' in df_aluno.columns and 'Média Final' in df_aluno.columns) else 0.0
+                
                 nota_mat_df = df_aluno[df_aluno['Disciplina'].str.contains('Matemática', case=False)] if 'Disciplina' in df_aluno.columns else pd.DataFrame()
-                nota_mat = nota_mat_df['Média Final'].values[0] if not nota_mat_df.empty else 0.0
+                nota_mat = nota_mat_df['Média Final'].values[0] if (not nota_mat_df.empty and 'Média Final' in nota_mat_df.columns) else 0.0
                 
                 st.write(f"Média Núcleo Comum: **{round(m_comum, 2) if pd.notna(m_comum) else 0.0}**")
                 st.write(f"Média Núcleo Técnico: **{round(m_tec, 2) if pd.notna(m_tec) else 0.0}**")
@@ -367,6 +381,8 @@ else:
                                 ].index
                                 
                                 if not idx_alvo.empty:
+                                    if 'Observações' not in df_completo_salvamento.columns:
+                                        df_completo_salvamento['Observações'] = ""
                                     df_completo_salvamento.at[idx_alvo[0], 'Observações'] = str(texto_final)
                                     conn.update(spreadsheet=spreadsheet_url, data=df_completo_salvamento)
                                     st.session_state.reset_obs += 1
@@ -383,21 +399,28 @@ else:
                     st.session_state.reset_obs += 1
                     st.rerun()
             with b2:
-                dict_chamada = {df[df['Aluno'] == a]['Nº Chamada'].iloc[0]: i for i, a in enumerate(alunos_lista)}
-                num_atual = df_aluno['Nº Chamada'].iloc[0]
-                opcoes_ordenadas = sorted(list(dict_chamada.keys()))
-                
-                escolha_num = st.selectbox(
-                    "Aluno Nº:", 
-                    options=opcoes_ordenadas, 
-                    index=opcoes_ordenadas.index(num_atual)
-                )
-                
-                if dict_chamada[escolha_num] != st.session_state.aluno_idx:
-                    st.session_state.aluno_idx = dict_chamada[escolha_num]
-                    st.session_state.disciplina_ativa = None
-                    st.session_state.reset_obs += 1
-                    st.rerun()
+                if 'Nº Chamada' in df.columns:
+                    dict_chamada = {df[df['Aluno'] == a]['Nº Chamada'].iloc[0]: i for i, a in enumerate(alunos_lista)}
+                    num_atual = df_aluno['Nº Chamada'].iloc[0]
+                    opcoes_ordenadas = sorted(list(dict_chamada.keys()))
+                    
+                    escolha_num = st.selectbox(
+                        "Aluno Nº:", 
+                        options=opcoes_ordenadas, 
+                        index=opcoes_ordenadas.index(num_atual)
+                    )
+                    if dict_chamada[escolha_num] != st.session_state.aluno_idx:
+                        st.session_state.aluno_idx = dict_chamada[escolha_num]
+                        st.session_state.disciplina_ativa = None
+                        st.session_state.reset_obs += 1
+                        st.rerun()
+                else:
+                    escolha_aluno = st.selectbox("Selecione o Aluno:", options=alunos_lista, index=st.session_state.aluno_idx)
+                    if alunos_lista.index(escolha_aluno) != st.session_state.aluno_idx:
+                        st.session_state.aluno_idx = alunos_lista.index(escolha_aluno)
+                        st.session_state.disciplina_ativa = None
+                        st.session_state.reset_obs += 1
+                        st.rerun()
             with b3:
                 if st.button("Próximo ➡️"):
                     st.session_state.aluno_idx = (st.session_state.aluno_idx + 1) % len(alunos_lista)
