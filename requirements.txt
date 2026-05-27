@@ -3,5 +3,4 @@ pandas
 plotly
 pypdf
 gspread
-google-auth
 st-gsheets-connection
