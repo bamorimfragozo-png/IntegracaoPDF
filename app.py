@@ -75,7 +75,7 @@ def extrair_dados_pdf(arquivos_pdf):
         pdf_reader = PdfReader(io.BytesIO(arquivo.read()))
         texto_completo = ""
         for pagina in pdf_reader.pages:
-            texto_completo += (pagina.extract_text() or "") + "\n"
+            texto_completo += pagina.extract_text() + "\n"
         
         linhas = texto_completo.split('\n')
         
@@ -85,10 +85,9 @@ def extrair_dados_pdf(arquivos_pdf):
         
         # Identificar os metadados do Aluno no PDF
         for linha in linhas:
-            linha_clean = linha.strip()
             if "Aluno" in linha or "Nome" in linha:
                 partes = linha.split(":")
-                nome_aluno = partes[1].strip() if len(partes) > 1 else linha_clean.replace("Aluno", "").replace("Nome", "").strip()
+                nome_aluno = partes[1].strip() if len(partes) > 1 else linha.replace("Aluno", "").replace("Nome", "").strip()
             if "Matrícula" in linha or "Matricula" in linha:
                 try:
                     numeros = ''.join(c for c in linha if c.isdigit())
@@ -108,7 +107,7 @@ def extrair_dados_pdf(arquivos_pdf):
         for linha in linhas:
             for disc in lista_disciplinas_padrao:
                 if disc.lower() in linha.lower():
-                    valores_linha = [float(s) for s in linha.replace(',', '.').split() if s.replace('.', '', 1).isdigit() or (s.startswith('-') and s.replace('-', '', 1).replace('.', '', 1).isdigit())]
+                    valores_linha = [float(s) for s in linha.replace(',', '.').split() if s.replace('.', '', 1).isdigit()]
                     
                     while len(valores_linha) < 5:
                         valores_linha.append(0.0)
@@ -118,20 +117,7 @@ def extrair_dados_pdf(arquivos_pdf):
                     freq_final = valores_linha[4] if len(valores_linha) > 4 else 0.95
                     if freq_final > 1.0: freq_final = freq_final / 100.0
 
-                    # Coleta de frequências mensais adicionais se existirem na linha do PDF
-                    meses_f_valores = {}
-                    meses_nomes = ['Freq. Jan.', 'Freq. Fev.', 'Freq. Mar.', 'Freq. Abr.', 'Freq. Mai.', 'Freq. Jun.', 
-                                   'Freq. Jul.', 'Freq. Ago.', 'Freq. Set.', 'Freq. Out.', 'Freq. Nov.', 'Freq. Dez.']
-                    
-                    # Preenche as colunas mensais com base no que foi extraído após as notas estruturadas
-                    for idx_m, m_nome in enumerate(meses_nomes):
-                        pos_idx = 5 + idx_m
-                        if len(valores_linha) > pos_idx:
-                            meses_f_valores[m_nome] = valores_linha[pos_idx]
-                        else:
-                            meses_f_valores[m_nome] = 0.0
-
-                    registro = {
+                    dados_finais.append({
                         'Nº Chamada': numero_chamada,
                         'Aluno': nome_aluno,
                         'Matrícula': matricula_aluno if matricula_aluno > 0 else 3066000.0 + numero_chamada,
@@ -144,13 +130,10 @@ def extrair_dados_pdf(arquivos_pdf):
                         'Média Final': valores_linha[4] if valores_linha[4] > 0 else sum(valores_linha[0:4])/4,
                         'Freq. Final': freq_final,
                         'Núcleo': nucleo,
+                        # Frequências por bimestre calculadas ou simuladas por padrão proporcional
                         'Freq. 1º BI': 95.0, 'Freq. 2º BI': 92.0, 'Freq. 3º BI': 94.0, 'Freq. 4º BI': 96.0,
                         'Observações': ''
-                    }
-                    
-                    # Mescla os valores dos meses mapeados diretamente do PDF
-                    registro.update(meses_f_valores)
-                    dados_finais.append(registro)
+                    })
 
     return pd.DataFrame(dados_finais)
 
@@ -253,23 +236,18 @@ else:
     df_mat = df_aluno[df_aluno['Disciplina'] == st.session_state.disciplina_ativa].iloc[0]
 
     with m2:
-        # Gráfico 1: Evolução das NOTAS por Bimestre (Estilo Barras como solicitado na modificação)
-        val_m_final = round(float(df_mat['Média Final']), 2) if 'Média Final' in df_mat else 0.0
-        st.write(f"**Notas por Bimestre: {st.session_state.disciplina_ativa} (Média Final: {val_m_final})**")
-        
-        n1 = df_mat['1º BI'] if '1º BI' in df_mat else 0.0
-        n2 = df_mat['2º BI'] if '2º BI' in df_mat else 0.0
-        n3 = df_mat['3º BI'] if '3º BI' in df_mat else 0.0
-        n4 = df_mat['4º BI'] if '4º BI' in df_mat else 0.0
-        
-        fig_n = px.bar(x=['1º BI', '2º BI', '3º BI', '4º BI'], y=[n1, n2, n3, n4])
-        fig_n.update_yaxes(range=[0, 10.5], title="Notas")
+        # Notas
+        val_m_final = round(float(df_mat['Média Final']), 2)
+        st.write(f"**Evolução: {st.session_state.disciplina_ativa} (Média Final: {val_m_final})**")
+        fig_n = px.line(x=['1º BI', '2º BI', '3º BI', '4º BI'], 
+                        y=[df_mat['1º BI'], df_mat['2º BI'], df_mat['3º BI'], df_mat['4º BI']], markers=True)
+        fig_n.update_yaxes(range=[0, 10.5])
         st.plotly_chart(fig_n, use_container_width=True)
         
         st.divider()
         
-        # Gráfico 2: Evolução da FREQUÊNCIA por Meses (Estilo Linha/Barras integrado)
-        f_final_val = df_mat['Freq. Final'] if 'Freq. Final' in df_mat else 0.95
+        # Frequência
+        f_final_val = df_mat['Freq. Final']
         f_final_display = round(f_final_val * 100, 2) if f_final_val <= 1.0 else round(f_final_val, 2)
         st.write(f"**Frequência Mensal (Final: {f_final_display}%)**")
         
@@ -278,12 +256,14 @@ else:
         
         valores_f = []
         for m in meses_cols:
-            val = df_mat[m] if m in df_mat else 0.0
-            try:
-                v = float(str(val).replace('%','').replace(',','.'))
-                valores_f.append(round(v * 100, 2) if v <= 1.0 else round(v, 2))
-            except: 
-                valores_f.append(0.0)
+            if m in df_mat.index:
+                val = df_mat[m]
+                try:
+                    v = float(str(val).replace('%','').replace(',','.'))
+                    valores_f.append(round(v * 100, 2) if v <= 1.0 else round(v, 2))
+                except: valores_f.append(0)
+            else:
+                valores_f.append(0)
             
         fig_f = px.bar(x=[mes.split('.')[1].strip() for mes in meses_cols], y=valores_f)
         fig_f.update_yaxes(range=[0, 105], title="Porcentagem (%)")
@@ -294,15 +274,13 @@ else:
         m_comum = df_aluno[df_aluno['Núcleo'] == 'Comum']['Média Final'].mean() if 'Média Final' in df_aluno.columns else 0.0
         m_tec = df_aluno[df_aluno['Núcleo'] == 'Técnico']['Média Final'].mean() if 'Média Final' in df_aluno.columns else 0.0
         nota_mat_df = df_aluno[df_aluno['Disciplina'].str.contains('Matemática', case=False)] if 'Média Final' in df_aluno.columns else pd.DataFrame()
-        nota_mat = nota_mat_df['Média Final'].values[0] if not nota_mat_df.empty else 0.0
+        nota_mat = nota_mat_df['Média Final'].values[0] if not nota_mat_df.empty else 0
         
-        st.write(f"Média Núcleo Comum: **{round(m_comum, 2) if pd.notna(m_comum) else 0}**")
-        st.write(f"Média Núcleo Técnico: **{round(m_tec, 2) if pd.notna(m_tec) else 0}**")
+        st.write(f"Média Núcleo Comum: **{round(m_comum, 2)}**")
+        st.write(f"Média Núcleo Técnico: **{round(m_tec, 2)}**")
         st.write(f"Média Matemática: **{round(float(nota_mat), 2)}**")
         st.divider()
-        
-        m_global = df_aluno['Média Final'].mean() if 'Média Final' in df_aluno.columns else 0.0
-        st.metric("Média Global", f"{round(m_global, 1)}")
+        st.metric("Média Global", f"{round(df_aluno['Média Final'].mean(), 1) if 'Média Final' in df_aluno.columns else 0.0}")
 
     with m4:
         st.write("### Observações")
@@ -325,7 +303,6 @@ else:
                     idx = df[(df['Aluno'] == aluno_nome) & (df['Disciplina'] == st.session_state.disciplina_ativa)].index
                     if not idx.empty:
                         df.at[idx[0], 'Observações'] = str(texto_final)
-                        
                         conn.update(spreadsheet=link_da_sala_ativa, data=df)
                         st.session_state.reset_obs += 1
                         st.success("Salvo com sucesso!")
