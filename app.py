@@ -7,12 +7,13 @@ import io
 import re
 
 # =========================================================================
-# 1. CONFIGURAÇÃO DA PÁGINA E ESTILO CSS ATUALIZADO (REMOVIDO DUPLO CONTORNO)
+# 1. CONFIGURAÇÃO DA PÁGINA E ESTILO CSS CORRIGIDO (SEM BORDAS DUPLICADAS)
 # =========================================================================
 st.set_page_config(page_title="Dashboard Acadêmico Integrado", layout="wide")
 
 st.markdown("""
 <style>
+/* Apenas as colunas principais do grid recebem a borda arredondada */
 [data-testid="stColumn"] {
     border: 2px solid black !important;
     border-radius: 15px !important;
@@ -29,12 +30,6 @@ st.markdown("""
 .stRadio > div { 
     flex-direction: row; 
     gap: 20px; 
-}
-/* Caixa de informação simples - sem borda interna para não duplicar com a coluna */
-.info-box {
-    background-color: #fdfdfd;
-    font-size: 16px;
-    padding: 5px 0px;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -68,7 +63,7 @@ if 'sala_ativa' not in st.session_state:
     st.session_state.sala_ativa = "Sala 1"
 
 # =========================================================================
-# 4. FUNÇÃO DE EXTRAÇÃO MELHORADA (DADOS REAIS DO PDF)
+# 4. FUNÇÃO DE EXTRAÇÃO REFEITA (DADOS REAIS DO PDF)
 # =========================================================================
 def extrair_dados_pdf(arquivos_pdf):
     dados_finais = []
@@ -79,104 +74,100 @@ def extrair_dados_pdf(arquivos_pdf):
         for pagina in pdf_reader.pages:
             texto_completo += pagina.extract_text() + "\n"
         
-        linhas = texto_completo.split('\n')
+        linhas = [linha.strip() for linha in texto_completo.split('\n') if linha.strip()]
         
         nome_aluno = "Não Identificado"
         matricula_aluno = "Não Identificada"
         serie_aluno = "Não Identificada"
         
-        # Captura de Metadados do Aluno
+        # 1. Captura Limpa de Metadados (Nome, Matrícula BT, Série)
         for linha in linhas:
             if "Aluno" in linha or "Nome" in linha:
                 partes = linha.split(":")
                 val_nome = partes[1].strip() if len(partes) > 1 else linha.replace("Aluno", "").replace("Nome", "").strip()
-                # Ajuste 1: Remove a palavra 'Matrícula' residual do nome do aluno
                 nome_aluno = re.sub(r'\bMatrícula\b.*', '', val_nome, flags=re.IGNORECASE).strip()
                 
-            # Ajuste 1: Captura a matrícula real que começa com 'BT'
-            if "Matrícula" in linha or "Matricula" in linha or "Prontuário" in linha:
-                match_bt = re.search(r'\bBT\d+[-\d]*\b|\b\d{7,}\b', linha, re.IGNORECASE)
-                if match_bt:
-                    matricula_aluno = match_bt.group(0)
-                else:
-                    partes = linha.split(":")
-                    if len(partes) > 1 and partes[1].strip():
-                        matricula_aluno = partes[1].strip()
+            # Busca o padrão de prontuário/matrícula do IFSP (ex: BT301234-5 ou BT301234)
+            match_bt = re.search(r'\bBT\d+[-\d\w]*\b', linha, re.IGNORECASE)
+            if match_bt:
+                matricula_aluno = match_bt.group(0).upper()
 
             if "Série" in linha or "Serie" in linha or "Ano" in linha or "Turma" in linha:
                 partes = linha.split(":")
-                if len(partes) > 1:
-                    serie_aluno = partes[1].strip()
-                else:
-                    serie_aluno = linha.replace("Série", "").replace("Serie", "").strip()
+                serie_aluno = partes[1].strip() if len(partes) > 1 else linha.replace("Série", "").replace("Serie", "").strip()
 
         if nome_aluno == "Não Identificado" or not nome_aluno.strip():
             nome_aluno = arquivo.name.replace(".pdf", "").replace("Boletim", "").replace("_", " ").strip()
 
-        # Listas para guardar temporariamente os blocos encontrados
+        # 2. Processamento das Disciplinas e Notas/Faltas Reais
         mapeamento_disciplinas = {}
-
-        # Ajuste 4 e 5: Varredura estruturada de Notas (N1-N4) e Faltas (F1-F4)
+        
         for i, linha in enumerate(linhas):
-            # Ignora meta-legendas informativas do PDF
-            if "Notas das etapas" in linha or "Faltas nas etapas" in linha:
+            # Filtro Estrito: ignora linhas de cabeçalho, rodapé ou metadados de etapas (N1, F1...)
+            if any(termo in linha for termo in ["Notas das etapas", "Faltas nas etapas", "Aluno", "Matrícula", "Série", "Boletim", "Componente Curricular"]):
+                continue
+            
+            # Uma linha de disciplina válida costuma começar com letras (o nome dela ou o código)
+            # Vamos pegar o nome exato até encontrar os números de notas/faltas
+            partes_palavras = linha.split()
+            if not partes_palavras:
                 continue
                 
-            # Detecta linhas de matérias ignorando códigos soltos
-            valores_linha = [float(s) for s in linha.replace(',', '.').split() if s.replace('.', '', 1).isdigit()]
+            partes_texto = []
+            for palavra in partes_palavras:
+                # Se a palavra for puramente numérica ou contiver padrões de notas, paramos de ler o nome
+                if palavra.replace(',', '.').replace('.', '', 1).isdigit() or any(x in palavra for x in ["N1", "F1", "N2", "F2"]):
+                    break
+                partes_texto.append(palavra)
+                
+            nome_disciplina = " ".join(partes_texto).strip()
             
-            if len(valores_linha) >= 1:
-                # Extrai o nome exato da disciplina preservando códigos nativos do PDF
-                partes_texto = []
-                for palavra in linha.split():
-                    if palavra.replace(',', '.').replace('.', '', 1).isdigit() or palavra in ["N1,", "F1,"]:
-                        break
-                    partes_texto.append(palavra)
+            # Validação para evitar lixo ou falsas disciplinas registradas
+            if len(nome_disciplina) < 4 or any(p in nome_disciplina.upper() for p in ["NOTA", "FALTA", "ETAPA", "TOTAL", "RESULTADO", "N1", "F1"]):
+                continue
                 
-                nome_disciplina = " ".join(partes_texto).strip()
+            if nome_disciplina not in mapeamento_disciplinas:
+                mapeamento_disciplinas[nome_disciplina] = {
+                    'notas': [0.0, 0.0, 0.0, 0.0],
+                    'faltas': [0.0, 0.0, 0.0, 0.0],
+                    'media_final': 0.0
+                }
                 
-                # Ajuste 4: Limpeza rigorosa para remover falsas disciplinas
-                if not nome_disciplina or len(nome_disciplina) < 3 or any(p in nome_disciplina for p in ["N1", "N2", "N3", "N4", "F1", "F2", "F3", "F4", "Faltas", "Notas"]):
-                    continue
-                
-                # Inicializa a estrutura da disciplina se não existir
-                if nome_disciplina not in mapeamento_disciplinas:
-                    mapeamento_disciplinas[nome_disciplina] = {
-                        'notas': [0.0, 0.0, 0.0, 0.0],
-                        'faltas': [0.0, 0.0, 0.0, 0.0],
-                        'media_final': 0.0
-                    }
-                
-                # Se a linha seguinte ou o contexto indicar que são as notas (abaixo de N1, N2...)
-                if i + 1 < len(linhas):
-                    linha_segunda = linhas[i+1].replace(',', '.')
-                    valores_segunda = [float(s) for s in linha_segunda.split() if s.replace('.', '', 1).isdigit()]
+            # Extrai os números da linha atual e das próximas para achar notas (N1-N4) e faltas (F1-F4)
+            numeros_contexto = []
+            for offset in [0, 1, 2]:
+                if i + offset < len(linhas):
+                    linha_analise = linhas[i + offset].replace(',', '.')
+                    # Extrai floats válidos da linha
+                    valores = [float(s) for s in linha_analise.split() if s.replace('.', '', 1).isdigit()]
+                    if valores:
+                        numeros_contexto.append(valores)
+            
+            # Atribui os dados reais encontrados nas sublinhas
+            if len(numeros_contexto) >= 1:
+                # Primeira sequência de números encontrada geralmente são as Notas (N1, N2, N3, N4, Média)
+                lista_notas = numeros_contexto[0]
+                for idx in range(4):
+                    if idx < len(lista_notas):
+                        mapeamento_disciplinas[nome_disciplina]['notas'][idx] = lista_notas[idx]
+                if len(lista_notas) >= 5:
+                    mapeamento_disciplinas[nome_disciplina]['media_final'] = lista_notas[4]
+                else:
+                    mapeamento_disciplinas[nome_disciplina]['media_final'] = sum(mapeamento_disciplinas[nome_disciplina]['notas'])/4
                     
-                    # Mapeia até 4 bimestres de notas. Se faltar, preenche com 0.0
-                    for idx_b in range(4):
-                        if idx_b < len(valores_segunda):
-                            mapeamento_disciplinas[nome_disciplina]['notas'][idx_b] = valores_segunda[idx_b]
-                    
-                    if len(valores_segunda) >= 5:
-                        mapeamento_disciplinas[nome_disciplina]['media_final'] = valores_segunda[4]
-                    else:
-                        mapeamento_disciplinas[nome_disciplina]['media_final'] = sum(mapeamento_disciplinas[nome_disciplina]['notas'])/4
+            if len(numeros_contexto) >= 2:
+                # Segunda sequência de números encontrada geralmente são as Faltas (F1, F2, F3, F4)
+                lista_faltas = numeros_contexto[1]
+                for idx in range(4):
+                    if idx < len(lista_faltas):
+                        mapeamento_disciplinas[nome_disciplina]['faltas'][idx] = lista_faltas[idx]
 
-                # Varre buscando faltas associadas no bloco subsequente próximo
-                if i + 2 < len(linhas):
-                    linha_terceira = linhas[i+2].replace(',', '.')
-                    valores_terceira = [float(s) for s in linha_terceira.split() if s.replace('.', '', 1).isdigit()]
-                    for idx_f in range(4):
-                        if idx_f < len(valores_terceira):
-                            mapeamento_disciplinas[nome_disciplina]['faltas'][idx_f] = valores_terceira[idx_f]
-
-        # Consolida o dicionário estruturado para o DataFrame
+        # 3. Construção do dicionário final para salvar na planilha
         for nome_disp, blocos in mapeamento_disciplinas.items():
             tecnicas_keywords = ["ILPR", "ININ", "SISTEMAS", "DESENVOLVIMENTO", "BANCO", "LOGICA", "PROGRAMAÇÃO", "TECNICO", "TÉCNICO", "REDES", "INFRAESTRUTURA"]
             is_tecnico = any(kw in nome_disp.upper() for kw in tecnicas_keywords)
             nucleo = "Técnico" if is_tecnico else "Comum"
             
-            # Cálculo de Frequência Real Inversa baseada em faltas registradas por etapa
             total_faltas = sum(blocos['faltas'])
             freq_final_calc = max(0.0, (100.0 - total_faltas) / 100.0)
 
@@ -268,17 +259,18 @@ else:
     with t2:
         st.subheader(f"Nome: {aluno_nome}")
         
-        # Ajuste 2: Removido duplo contorno. Cada um fica em um único retângulo limpo da coluna.
+        # Ajuste 2: Removido st.markdown interno com bordas. Cada coluna atua como o único retângulo.
         c1, c2 = st.columns(2)
         mat_val = df_aluno['Matrícula'].iloc[0] if 'Matrícula' in df_aluno.columns else "Não Informado"
         ser_val = df_aluno['Série'].iloc[0] if 'Série' in df_aluno.columns else "Não Informado"
         
-        c1.markdown(f"<div class='info-box'><b>Matrícula:</b> {mat_val}</div>", unsafe_allow_html=True)
-        c2.markdown(f"<div class='info-box'><b>Série:</b> {ser_val}</div>", unsafe_allow_html=True)
+        with c1:
+            st.write(f"**Matrícula:** {mat_val}")
+        with c2:
+            st.write(f"**Série:** {ser_val}")
 
     st.divider()
 
-    # Ajuste 5: Ordenação Correta do maior para o menor notas/frequência
     ordem_bolinha = st.radio("Ordenar disciplinas por:", ["Nota", "Frequência"], horizontal=True)
 
     # --- GRID CENTRAL DO DASHBOARD ---
@@ -304,7 +296,7 @@ else:
     df_mat = df_aluno[df_aluno['Disciplina'] == st.session_state.disciplina_ativa].iloc[0]
 
     with m2:
-        # Ajuste 6: Mantido Gráfico de Linha para Frequência
+        # Mantido Gráfico de Linha para Frequência
         f_final_val = df_mat['Freq. Final'] if 'Freq. Final' in df_mat else 1.0
         f_final_display = round(f_final_val * 100, 2) if f_final_val <= 1.0 else round(f_final_val, 2)
         st.write(f"**Evolução da Frequência: {st.session_state.disciplina_ativa} (Final: {f_final_display}%)**")
@@ -320,7 +312,7 @@ else:
         
         st.divider()
         
-        # Ajuste 6: Mantido Gráfico de Barras para Notas
+        # Mantido Gráfico de Barras para Notas
         val_m_final = round(float(df_mat['Média Final']), 2) if 'Média Final' in df_mat else 0.0
         st.write(f"**Notas por Bimestre (Média Final: {val_m_final})**")
         
@@ -387,12 +379,12 @@ else:
     with b2:
         dict_chamada = {df[df['Aluno'] == a]['Nº Chamada'].iloc[0]: i for i, a in enumerate(alunos_lista)}
         num_atual = df_aluno['Nº Chamada'].iloc[0]
-        opcoes_ordenadas = sorted(list(dict_chamada.keys()))
+        options_ordenadas = sorted(list(dict_chamada.keys()))
         
         escolha_num = st.selectbox(
             "Aluno Nº:", 
-            options=opcoes_ordenadas, 
-            index=opcoes_ordenadas.index(num_atual)
+            options=options_ordenadas, 
+            index=options_ordenadas.index(num_atual)
         )
         
         if dict_chamada[escolha_num] != st.session_state.aluno_idx:
