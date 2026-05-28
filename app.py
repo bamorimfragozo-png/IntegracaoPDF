@@ -227,7 +227,7 @@ def extrair_dados_pdf(arquivos_pdf):
                 'Freq. 4º BI': max(0.0, 100.0 - blocos['faltas'][3]),
                 'Observações': ''
             })
-    dados_finais.sort(key=lambda x: x['Média Final'], reverse=True)
+    dados_finais.sort(key=lambda x: -x['Média Final'])
     return pd.DataFrame(dados_finais)
 
 
