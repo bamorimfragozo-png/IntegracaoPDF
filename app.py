@@ -70,7 +70,7 @@ if 'sala_ativa' not in st.session_state:
 # =========================================================================
 # 4. FUNÇÃO DE EXTRAÇÃO MELHORADA (DADOS REAIS DO PDF)
 # =========================================================================
-ef extrair_dados_pdf(arquivos_pdf):
+def extrair_dados_pdf(arquivos_pdf):
     dados_finais = []
     
     for numero_chamada, arquivo in enumerate(arquivos_pdf, start=1):
