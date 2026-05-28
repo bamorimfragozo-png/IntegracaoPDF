@@ -84,8 +84,8 @@ def extrair_dados_pdf(arquivos_pdf):
         nome_aluno = "Não Identificado"
         matricula_aluno = "Não Identificada"
         serie_aluno = "Não Identificada"
-
-        #print(linhas)
+        for linha in linhas:
+            print(linha)
         
         # 1. Captura de Metadados do Aluno
         for linha in linhas:
@@ -98,12 +98,13 @@ def extrair_dados_pdf(arquivos_pdf):
                 # Procura padrões comuns do IFSP: 
                 # 1. Letras (SP, BT, BV, etc) seguidas de números e hifens opcionais: ex: SP2345678, BT-12345
                 # 2. Apenas números sequenciais (de 5 a 9 dígitos)
-                match_bt = re.search(r'\b[A-Z]{2}\d+[-\d]*\b|\b\d{5,9}\b', linha, re.IGNORECASE)
+                match_bt = re.search(r"cula:\s*(.{9})", linha, re.IGNORECASE)
                 if match_bt:
                     matricula_aluno = match_bt.group(0)
+                    print("-------------",matricula_aluno)
                 else:
                     # Se a regex falhou mas a linha diz "Matrícula:", pegamos tudo após os dois pontos
-                    partes_matr = linha.split(":")
+                    partes_matr = linha.split("BT")
                     if len(partes_matr) > 1:
                         # Pega os primeiros números/letras que encontrar após os dois pontos
                         resgate = re.search(r'([A-Z0-9-]{5,})', partes_matr[1].upper())
