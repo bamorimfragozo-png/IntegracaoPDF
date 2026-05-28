@@ -84,8 +84,7 @@ def extrair_dados_pdf(arquivos_pdf):
         nome_aluno = "Não Identificado"
         matricula_aluno = "Não Identificada"
         serie_aluno = "Não Identificada"
-        for linha in linhas:
-            print(linha)
+        
         
         # 1. Captura de Metadados do Aluno
         for linha in linhas:
