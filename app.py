@@ -70,7 +70,7 @@ if 'sala_ativa' not in st.session_state:
 # =========================================================================
 # 4. FUNÇÃO DE EXTRAÇÃO MELHORADA (DADOS REAIS DO PDF)
 # =========================================================================
-def extrair_dados_pdf(arquivos_pdf):
+ef extrair_dados_pdf(arquivos_pdf):
     dados_finais = []
     
     for numero_chamada, arquivo in enumerate(arquivos_pdf, start=1):
@@ -84,6 +84,8 @@ def extrair_dados_pdf(arquivos_pdf):
         nome_aluno = "Não Identificado"
         matricula_aluno = "Não Identificada"
         serie_aluno = "Não Identificada"
+
+        #print(linhas)
         
         # 1. Captura de Metadados do Aluno
         for linha in linhas:
@@ -92,10 +94,21 @@ def extrair_dados_pdf(arquivos_pdf):
                 val_nome = partes[1].strip() if len(partes) > 1 else linha.replace("Aluno", "").replace("Nome", "").strip()
                 nome_aluno = re.sub(r'\bMatrícula\b.*', '', val_nome, flags=re.IGNORECASE).strip()
                 
-            if "Matrícula" in linha or "Matricula" in linha or "Prontuário" in linha:
-                match_bt = re.search(r'\bBT\d+[-\d]*\b|\b\d{7,}\b', linha, re.IGNORECASE)
+            if any(termo in linha.lower() for termo in ["matrícula", "matricula", "prontuário", "prontuario"]):
+                # Procura padrões comuns do IFSP: 
+                # 1. Letras (SP, BT, BV, etc) seguidas de números e hifens opcionais: ex: SP2345678, BT-12345
+                # 2. Apenas números sequenciais (de 5 a 9 dígitos)
+                match_bt = re.search(r'\b[A-Z]{2}\d+[-\d]*\b|\b\d{5,9}\b', linha, re.IGNORECASE)
                 if match_bt:
                     matricula_aluno = match_bt.group(0)
+                else:
+                    # Se a regex falhou mas a linha diz "Matrícula:", pegamos tudo após os dois pontos
+                    partes_matr = linha.split(":")
+                    if len(partes_matr) > 1:
+                        # Pega os primeiros números/letras que encontrar após os dois pontos
+                        resgate = re.search(r'([A-Z0-9-]{5,})', partes_matr[1].upper())
+                        if resgate:
+                            matricula_aluno = resgate.group(0)
 
             if "Série" in linha or "Serie" in linha or "Ano" in linha or "Turma" in linha:
                 partes = linha.split(":")
@@ -222,6 +235,7 @@ def extrair_dados_pdf(arquivos_pdf):
             })
 
     return pd.DataFrame(dados_finais)
+
 
 # =========================================================================
 # TELA 1: UPLOAD DOS RELATÓRIOS EM PDF
