@@ -84,7 +84,8 @@ def extrair_dados_pdf(arquivos_pdf):
         nome_aluno = "Não Identificado"
         matricula_aluno = "Não Identificada"
         serie_aluno = "Não Identificada"
-        
+        #for linha in linhas:
+        #    print(linha)
         
         # 1. Captura de Metadados do Aluno
         for linha in linhas:
@@ -99,21 +100,14 @@ def extrair_dados_pdf(arquivos_pdf):
                 # 2. Apenas números sequenciais (de 5 a 9 dígitos)
                 match_bt = re.search(r"cula:\s*(.{9})", linha, re.IGNORECASE)
                 if match_bt:
-                    matricula_aluno = match_bt.group(0)
+                    matricula_aluno = match_bt.group(0)[6:]
                     print("-------------",matricula_aluno)
-                else:
-                    # Se a regex falhou mas a linha diz "Matrícula:", pegamos tudo após os dois pontos
-                    partes_matr = linha.split("BT")
-                    if len(partes_matr) > 1:
-                        # Pega os primeiros números/letras que encontrar após os dois pontos
-                        resgate = re.search(r'([A-Z0-9-]{5,})', partes_matr[1].upper())
-                        if resgate:
-                            matricula_aluno = resgate.group(0)
+                
 
             if "Série" in linha or "Serie" in linha or "Ano" in linha or "Turma" in linha:
                 partes = linha.split(":")
                 if len(partes) > 1:
-                    serie_aluno = partes[1].strip()
+                    serie_aluno = partes[1].strip()[:27]
 
         if nome_aluno == "Não Identificado" or not nome_aluno.strip():
             nome_aluno = arquivo.name.replace(".pdf", "").replace("Boletim", "").replace("_", " ").strip()
