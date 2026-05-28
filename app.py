@@ -96,46 +96,36 @@ def extrair_dados_pdf(arquivos_pdf):
                 match_bt = re.search(r'\bBT\d+[-\d]*\b|\b\d{7,}\b', linha, re.IGNORECASE)
                 if match_bt:
                     matricula_aluno = match_bt.group(0)
-                else:
-                    partes = linha.split(":")
-                    if len(partes) > 1 and partes[1].strip():
-                        matricula_aluno = partes[1].strip()
 
             if "Série" in linha or "Serie" in linha or "Ano" in linha or "Turma" in linha:
                 partes = linha.split(":")
                 if len(partes) > 1:
                     serie_aluno = partes[1].strip()
-                else:
-                    serie_aluno = linha.replace("Série", "").replace("Serie", "").strip()
 
         if nome_aluno == "Não Identificado" or not nome_aluno.strip():
             nome_aluno = arquivo.name.replace(".pdf", "").replace("Boletim", "").replace("_", " ").strip()
 
         mapeamento_disciplinas = {}
 
-        # 2. Varredura HORIZONTAL das Disciplinas
+        # 2. Varredura e Tratamento da Linha Horizontal
         for linha in linhas:
-            # Ignora cabeçalhos, legendas e totais do PDF
             if any(p in linha for p in ["Notas das etapas", "Faltas nas etapas", "Diário", "Disciplina", "Total", "Este documento"]):
                 continue
             
-            # Remove o código do diário no início se houver (ex: 384835) para não misturar com as notas
+            # Remove o código do diário (ex: 384835) do início da linha para não virar "nota"
             linha_limpa = re.sub(r'^\d{5,6}\s+', '', linha.strip())
             
-            # Procura pelo padrão de siglas do IFSP (ex: INT.11293 ou BTVGCLI) para validar que é uma matéria
+            # Valida se a linha de fato contém uma disciplina do IFSP
             if not re.search(r'[A-Z]{3,4}\.\d{4,5}|\([A-Z0-9]{5,}\)', linha_limpa):
                 continue
                 
-            # Divide a linha por espaços para processar os blocos
             tokens = linha_limpa.split()
-            
-            # Vamos separar o texto (nome da matéria) dos dados numéricos da direita
             partes_texto = []
             partes_dados = []
-            
             passou_da_materia = False
+            
             for token in tokens:
-                # O nome da matéria acaba quando começam os dados de Carga Horária (ex: 60,00 ou 90,00)
+                # Identifica onde termina o nome da matéria (na Carga Horária, ex: 60,00 ou 90,00)
                 if (',' in token and token.replace(',', '').isdigit()) and not passou_da_materia:
                     passou_da_materia = True
                 
@@ -146,63 +136,54 @@ def extrair_dados_pdf(arquivos_pdf):
             
             nome_disciplina = " ".join(partes_texto).strip()
             
-            # Se não conseguiu capturar os dados da linha adequadamente, pula
             if not nome_disciplina or len(partes_dados) < 5:
                 continue
 
-            # Estrutura padrão para armazenar o que encontramos no sentido horizontal
+            # Isolando apenas os blocos de Notas e Faltas (N1, F1, N2, F2...)
+            # Remove os dados iniciais fixos: CH Horas, CH Aulas, T. Aulas, T. Faltas, % Freq e a Situação
+            tokens_filtrados = []
+            for t in partes_dados:
+                if t in ["Cursando", "(Aguarda", "Carga", "Horária)", "Horária", "Aprovado", "Retido"] or "%" in t:
+                    continue
+                # Se for um número puro, número com vírgula ou o hífen '-', é dado de nota/falta
+                if t == "-" or t.replace(',', '.').replace('.', '', 1).isdigit():
+                    tokens_filtrados.append(t)
+            
+            # Como pulamos os 4 primeiros dados de cabeçalho da linha (CH e Totais)
+            # O que sobra a partir do índice 4 são os pares de Notas e Faltas
+            dados_tabela = tokens_filtrados[4:] 
+
             notas = [0.0, 0.0, 0.0, 0.0]
             faltas = [0.0, 0.0, 0.0, 0.0]
             
-            # Alinhamento dos blocos numéricos da direita:
-            # partes_dados[0] = C.H Horas (ex: 60,00)
-            # partes_dados[1] = C.H Aulas (ex: 80)
-            # partes_dados[2] = T. Aulas (ex: 26)
-            # partes_dados[3] = T. Faltas (ex: 0)
-            # partes_dados[4] = % Freq (ex: 100%)
-            # partes_dados[5] e partes_dados[6] = Situação (ex: 'Cursando', '(Aguarda')
-            
-            # Vamos localizar onde começam os blocos N1, N2, N3, N4
-            # No SUAP, após a situação "Cursando (Aguarda Carga Horária)", vêm as notas/faltas em pares.
-            # Vamos rastrear os tokens que restaram focando no final da linha
-            tokens_finais = []
-            for t in partes_dados:
-                # Limpa tokens puramente textuais da situação para isolar a tabela de notas
-                if t in ["Cursando", "(Aguarda", "Carga", "Horária)", "Horária", "Aprovado", "Retido"]:
-                    continue
-                tokens_finais.append(t)
-            
-            # Agora processamos os pares de Nota e Falta (N1, N2, N3, N4)
-            # Cada bimestre ocupa 2 slots na lista (Nota, Falta)
-            idx_token = 0
+            # Preenche os 4 Bimestres sequencialmente par por par (Nota, Falta)
+            idx_dado = 0
             for b in range(4):
-                if idx_token < len(tokens_finais):
-                    # Tratamento da Nota
-                    val_nota = tokens_finais[idx_token].replace(',', '.')
-                    notas[b] = float(val_nota) if val_nota.replace('.', '', 1).isdigit() else 0.0
-                    idx_token += 1
+                # Nota do Bimestre
+                if idx_dado < len(dados_tabela):
+                    val_n = dados_tabela[idx_dado].replace(',', '.')
+                    notas[b] = float(val_n) if val_n.replace('.', '', 1).isdigit() else 0.0
+                    idx_dado += 1
                 
-                if idx_token < len(tokens_finais):
-                    # Tratamento da Falta
-                    val_falta = tokens_finais[idx_token]
-                    faltas[b] = float(val_falta) if val_falta.isdigit() else 0.0
-                    idx_token += 1
+                # Falta do Bimestre
+                if idx_dado < len(dados_tabela):
+                    val_f = dados_tabela[idx_dado]
+                    faltas[b] = float(val_f) if val_f.isdigit() else 0.0
+                    idx_dado += 1
 
-            # Captura a Média Final (MD) se já houver no final da linha, senão calcula a média das notas preenchidas
+            # Captura a Média Final (MD) ou calcula com base nos bimestres ativos
             media_final = 0.0
-            if idx_token < len(tokens_finais):
-                val_md = tokens_finais[idx_token].replace(',', '.')
+            if idx_dado < len(dados_tabela):
+                val_md = dados_tabela[idx_dado].replace(',', '.')
                 if val_md.replace('.', '', 1).isdigit():
                     media_final = float(val_md)
                 else:
-                    # Se for hífen ou vazio, faz a média das notas maiores que zero
-                    notas_validas = [n for n in notas if n > 0]
-                    media_final = sum(notas_validas) / len(notas_validas) if notas_validas else sum(notas)/4
+                    notas_lancadas = [n for n in notas if n > 0]
+                    media_final = sum(notas_lancadas) / len(notas_lancadas) if notas_lancadas else 0.0
             else:
-                notas_validas = [n for n in notas if n > 0]
-                media_final = sum(notas_validas) / len(notas_validas) if notas_validas else sum(notas)/4
+                notas_lancadas = [n for n in notas if n > 0]
+                media_final = sum(notas_lancadas) / len(notas_lancadas) if notas_lancadas else 0.0
 
-            # Se a disciplina já foi filtrada e está correta, salva no mapa
             if len(nome_disciplina) > 3:
                 mapeamento_disciplinas[nome_disciplina] = {
                     'notas': notas,
@@ -210,12 +191,13 @@ def extrair_dados_pdf(arquivos_pdf):
                     'media_final': media_final
                 }
 
-        # 3. Consolidação para o DataFrame
+        # 3. Formatação Final da Tabela
         for nome_disp, blocos in mapeamento_disciplinas.items():
             tecnicas_keywords = ["ILPR", "ININ", "SISTEMAS", "DESENVOLVIMENTO", "BANCO", "LOGICA", "PROGRAMAÇÃO", "TECNICO", "TÉCNICO", "REDES", "INFRAESTRUTURA", "INTEGRADOR"]
             is_tecnico = any(kw in nome_disp.upper() for kw in tecnicas_keywords)
             nucleo = "Técnico" if is_tecnico else "Comum"
             
+            # Frequência calculada em escala de 0.0 a 1.0 para o componente gráfico
             total_faltas = sum(blocos['faltas'])
             freq_final_calc = max(0.0, (100.0 - total_faltas) / 100.0)
 
