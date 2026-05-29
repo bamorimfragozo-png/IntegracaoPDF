@@ -7,7 +7,7 @@ import io
 import re
 
 # =========================================================================
-# 1. CONFIGURAÇÃO DA PÁGINA E ESTILO CSS ATUALIZADO (REMOVIDO DUPLO CONTORNO)
+# 1. CONFIGURAÇÃO DA PÁGINA E ESTILO CSS
 # =========================================================================
 st.set_page_config(page_title="Dashboard Acadêmico Integrado", layout="wide")
 
@@ -30,7 +30,6 @@ st.markdown("""
     flex-direction: row; 
     gap: 20px; 
 }
-/* Caixa de informação simples - sem borda interna para não duplicar com a coluna */
 .info-box {
     background-color: #fdfdfd;
     font-size: 16px;
@@ -66,45 +65,55 @@ if 'reset_obs' not in st.session_state:
     st.session_state.reset_obs = 0
 if 'sala_ativa' not in st.session_state:
     st.session_state.sala_ativa = "Sala 1"
+# Dicionário na sessão para persistir as fotos na memória enquanto o app estiver aberto
+if 'fotos_alunos' not in st.session_state:
+    st.session_state.fotos_alunos = {}
 
 # =========================================================================
-# 4. FUNÇÃO DE EXTRAÇÃO MELHORADA (DADOS REAIS DO PDF)
+# 4. FUNÇÃO DE EXTRAÇÃO COM RETORNO DE FOTOS CORRIGIDO
 # =========================================================================
 def extrair_dados_pdf(arquivos_pdf):
     dados_finais = []
     
     for numero_chamada, arquivo in enumerate(arquivos_pdf, start=1):
-        pdf_reader = PdfReader(io.BytesIO(arquivo.read()))
-        texto_completo = ""
-        for pagina in pdf_reader.pages:
-            texto_completo += pagina.extract_text() + "\n"
+        pdf_buffer = io.BytesIO(arquivo.getvalue())
+        try:
+            pdf_reader = PdfReader(pdf_buffer)
+            texto_completo = ""
+            for pagina in pdf_reader.pages:
+                texto_completo += pagina.extract_text() + "\n"
+        except Exception as e:
+            st.error(f"Erro ao ler o arquivo {arquivo.name}: {e}")
+            continue
+        
+        # --- EXTRAÇÃO DA FOTO DO PDF ---
+        foto_bytes = None
+        try:
+            primeira_pagina = pdf_reader.pages[0]
+            if "/XObject" in primeira_pagina["/Resources"]:
+                xobject = primeira_pagina["/Resources"]["/XObject"].get_object()
+                for obj in xobject:
+                    if xobject[obj]["/Subtype"] == "/Image":
+                        foto_bytes = xobject[obj].get_data()
+                        break 
+        except Exception:
+            foto_bytes = None
         
         linhas = texto_completo.split('\n')
-        
         nome_aluno = "Não Identificado"
         matricula_aluno = "Não Identificada"
         serie_aluno = "Não Identificada"
-        #for linha in linhas:
-        #    print(linha)
-
-
         
-        # 1. Captura de Metadados do Aluno
         for linha in linhas:
             if "Aluno" in linha or "Nome" in linha:
-                partes = linha.split(":")
+                partes = inline = linha.split(":")
                 val_nome = partes[1].strip() if len(partes) > 1 else linha.replace("Aluno", "").replace("Nome", "").strip()
                 nome_aluno = re.sub(r'\bMatrícula\b.*', '', val_nome, flags=re.IGNORECASE).strip()
                 
             if any(termo in linha.lower() for termo in ["matrícula", "matricula", "prontuário", "prontuario"]):
-                # Procura padrões comuns do IFSP: 
-                # 1. Letras (SP, BT, BV, etc) seguidas de números e hifens opcionais: ex: SP2345678, BT-12345
-                # 2. Apenas números sequenciais (de 5 a 9 dígitos)
-                match_bt = re.search(r"cula:\s*(.{9})", linha, re.IGNORECASE)
+                match_bt = re.search(r"(?:cula|ário):\s*([A-Za-z0-9\-]+)", linha, re.IGNORECASE)
                 if match_bt:
-                    matricula_aluno = match_bt.group(0)[6:]
-                    print("-------------",matricula_aluno)
-                
+                    matricula_aluno = match_bt.group(1).strip()
 
             if "Série" in linha or "Serie" in linha or "Ano" in linha or "Turma" in linha:
                 partes = linha.split(":")
@@ -114,17 +123,17 @@ def extrair_dados_pdf(arquivos_pdf):
         if nome_aluno == "Não Identificado" or not nome_aluno.strip():
             nome_aluno = arquivo.name.replace(".pdf", "").replace("Boletim", "").replace("_", " ").strip()
 
+        # Mapeia a foto diretamente para o nome do aluno na Session State (Evita mandar pro Sheets)
+        if foto_bytes:
+            st.session_state.fotos_alunos[nome_aluno] = foto_bytes
+
         mapeamento_disciplinas = {}
 
-        # 2. Varredura e Tratamento da Linha Horizontal
         for linha in linhas:
             if any(p in linha for p in ["Notas das etapas", "Faltas nas etapas", "Diário", "Disciplina", "Total", "Este documento"]):
                 continue
             
-            # Remove o código do diário (ex: 384835) do início da linha para não virar "nota"
             linha_limpa = re.sub(r'^\d{5,6}\s+', '', linha.strip())
-            
-            # Valida se a linha de fato contém uma disciplina do IFSP
             if not re.search(r'[A-Z]{3,4}\.\d{4,5}|\([A-Z0-9]{5,}\)', linha_limpa):
                 continue
                 
@@ -134,53 +143,40 @@ def extrair_dados_pdf(arquivos_pdf):
             passou_da_materia = False
             
             for token in tokens:
-                # Identifica onde termina o nome da matéria (na Carga Horária, ex: 60,00 ou 90,00)
                 if (',' in token and token.replace(',', '').isdigit()) and not passou_da_materia:
                     passou_da_materia = True
-                
                 if not passou_da_materia:
                     partes_texto.append(token)
                 else:
                     partes_dados.append(token)
             
             nome_disciplina = " ".join(partes_texto).strip()
-            
             if not nome_disciplina or len(partes_dados) < 5:
                 continue
 
-            # Isolando apenas os blocos de Notas e Faltas (N1, F1, N2, F2...)
-            # Remove os dados iniciais fixos: CH Horas, CH Aulas, T. Aulas, T. Faltas, % Freq e a Situação
             tokens_filtrados = []
             for t in partes_dados:
                 if t in ["Cursando", "(Aguarda", "Carga", "Horária)", "Horária", "Aprovado", "Retido"] or "%" in t:
                     continue
-                # Se for um número puro, número com vírgula ou o hífen '-', é dado de nota/falta
                 if t == "-" or t.replace(',', '.').replace('.', '', 1).isdigit():
                     tokens_filtrados.append(t)
             
-            # Como pulamos os 4 primeiros dados de cabeçalho da linha (CH e Totais)
-            # O que sobra a partir do índice 4 são os pares de Notas e Faltas
             dados_tabela = tokens_filtrados[4:] 
 
             notas = [0.0, 0.0, 0.0, 0.0]
             faltas = [0.0, 0.0, 0.0, 0.0]
             
-            # Preenche os 4 Bimestres sequencialmente par por par (Nota, Falta)
             idx_dado = 0
             for b in range(4):
-                # Nota do Bimestre
                 if idx_dado < len(dados_tabela):
                     val_n = dados_tabela[idx_dado].replace(',', '.')
                     notas[b] = float(val_n) if val_n.replace('.', '', 1).isdigit() else 0.0
                     idx_dado += 1
-                
-                # Falta do Bimestre
                 if idx_dado < len(dados_tabela):
                     val_f = dados_tabela[idx_dado]
                     faltas[b] = float(val_f) if val_f.isdigit() else 0.0
                     idx_dado += 1
 
-            # Captura a Média Final (MD) ou calcula com base nos bimestres ativos
             media_final = 0.0
             if idx_dado < len(dados_tabela):
                 val_md = dados_tabela[idx_dado].replace(',', '.')
@@ -200,18 +196,16 @@ def extrair_dados_pdf(arquivos_pdf):
                     'media_final': media_final
                 }
 
-        # 3. Formatação Final da Tabela
         for nome_disp, blocos in mapeamento_disciplinas.items():
             tecnicas_keywords = ["ILPR", "ININ", "SISTEMAS", "DESENVOLVIMENTO", "BANCO", "LOGICA", "PROGRAMAÇÃO", "TECNICO", "TÉCNICO", "REDES", "INFRAESTRUTURA", "INTEGRADOR"]
             is_tecnico = any(kw in nome_disp.upper() for kw in tecnicas_keywords)
             nucleo = "Técnico" if is_tecnico else "Comum"
             
-            # Frequência calculada em escala de 0.0 a 1.0 para o componente gráfico
             total_faltas = sum(blocos['faltas'])
             freq_final_calc = max(0.0, (100.0 - total_faltas) / 100.0)
 
             dados_finais.append({
-                'Nº Chamada': numero_chamada,
+                'Nº Chamada': int(numero_chamada),
                 'Aluno': nome_aluno,
                 'Matrícula': matricula_aluno,
                 'Série': serie_aluno,
@@ -229,7 +223,7 @@ def extrair_dados_pdf(arquivos_pdf):
                 'Freq. 4º BI': max(0.0, 100.0 - blocos['faltas'][3]),
                 'Observações': ''
             })
-    dados_finais.sort(key=lambda x: -x['Média Final'])
+            
     return pd.DataFrame(dados_finais)
 
 
@@ -245,18 +239,20 @@ if not st.session_state.dados_carregados:
     
     if st.button("PROCESSAR E ATUALIZAR DASHBOARD"):
         if arquivos_enviados:
-            with st.spinner("Processando arquivos de texto e injetando na planilha correspondente..."):
+            with st.spinner("Processando arquivos e atualizando planilhas de notas..."):
+                # O DataFrame retornado aqui já NÃO possui a coluna de fotos
                 df_novo = extrair_dados_pdf(arquivos_enviados)
                 
                 if not df_novo.empty:
                     link_da_sala_ativa = DICIONARIO_SALAS[sala_selecionada]
+                    # Envia dados limpos e seguros para o Google Sheets
                     conn.update(spreadsheet=link_da_sala_ativa, data=df_novo) 
                     
                     st.session_state.sala_ativa = sala_selecionada
                     st.session_state.dados_carregados = True
                     st.rerun()
                 else:
-                    st.error("Não foi possível extrair nenhum dado estruturado válido dos arquivos enviados.")
+                    st.error("Não foi possível extrair dados estruturados válidos.")
         else:
             st.error("Por favor, selecione e envie os arquivos PDF para processar.")
 
@@ -276,6 +272,11 @@ else:
     df = conn.read(spreadsheet=link_da_sala_ativa, ttl="0")
     df.columns = df.columns.str.strip()
 
+    colunas_numericas = ['1º BI', '2º BI', '3º BI', '4º BI', 'Média Final', 'Freq. Final', 'Freq. 1º BI', 'Freq. 2º BI', 'Freq. 3º BI', 'Freq. 4º BI']
+    for col in colunas_numericas:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col].astype(str).str.replace(',', '.'), errors='coerce').fillna(0.0)
+
     if 'Observações' in df.columns:
         df['Observações'] = df['Observações'].astype(str).replace('nan', '')
     else:
@@ -294,12 +295,17 @@ else:
     t1, t2 = st.columns([1, 4])
     with t1:
         st.markdown("### Foto")
-        st.image("https://via.placeholder.com/150", use_container_width=True)
+        
+        # Mapeia a foto diretamente a partir do estado de sessão usando o nome do Aluno atual
+        if aluno_nome in st.session_state.fotos_alunos:
+            st.image(st.session_state.fotos_alunos[aluno_nome], use_container_width=True)
+        else:
+            # Fallback limpo caso o PDF não tenha foto ou o app tenha sido recarregado do zero
+            st.image("https://via.placeholder.com/150", use_container_width=True)
         
     with t2:
         st.subheader(f"Nome: {aluno_nome}")
         
-        # Ajuste 2: Removido duplo contorno. Cada um fica em um único retângulo limpo da coluna.
         c1, c2 = st.columns(2)
         mat_val = df_aluno['Matrícula'].iloc[0] if 'Matrícula' in df_aluno.columns else "Não Informado"
         ser_val = df_aluno['Série'].iloc[0] if 'Série' in df_aluno.columns else "Não Informado"
@@ -309,7 +315,6 @@ else:
 
     st.divider()
 
-    # Ajuste 5: Ordenação Correta do maior para o menor notas/frequência
     ordem_bolinha = st.radio("Ordenar disciplinas por:", ["Nota", "Frequência"], horizontal=True)
 
     # --- GRID CENTRAL DO DASHBOARD ---
@@ -321,7 +326,7 @@ else:
         if ordem_bolinha == "Frequência" and 'Freq. Final' in df_aluno.columns:
             col_ref = 'Freq. Final'
             
-        df_lista = df_aluno.sort_values(by=col_ref, ascending=True)
+        df_lista = df_aluno.sort_values(by=col_ref, ascending=False)
         
         for disc in df_lista['Disciplina'].unique():
             if st.button(disc, key=f"btn_{disc}"):
@@ -330,81 +335,80 @@ else:
                 st.rerun()
 
     if st.session_state.disciplina_ativa is None or st.session_state.disciplina_ativa not in df_aluno['Disciplina'].unique():
-        st.session_state.disciplina_ativa = df_aluno['Disciplina'].iloc[0]
+        st.session_state.disciplina_ativa = df_aluno['Disciplina'].iloc[0] if not df_aluno.empty else ""
 
-    df_mat = df_aluno[df_aluno['Disciplina'] == st.session_state.disciplina_ativa].iloc[0]
+    if st.session_state.disciplina_ativa:
+        df_mat = df_aluno[df_aluno['Disciplina'] == st.session_state.disciplina_ativa].iloc[0]
 
-    with m2:
-        # Ajuste 6: Mantido Gráfico de Linha para Frequência
-        f_final_val = df_mat['Freq. Final'] if 'Freq. Final' in df_mat else 1.0
-        f_final_display = round(f_final_val * 100, 2) if f_final_val <= 1.0 else round(f_final_val, 2)
-        st.write(f"**Evolução da Frequência: {st.session_state.disciplina_ativa} (Final: {f_final_display}%)**")
-        
-        f1 = df_mat['Freq. 1º BI'] if 'Freq. 1º BI' in df_mat else (f_final_val*100)
-        f2 = df_mat['Freq. 2º BI'] if 'Freq. 2º BI' in df_mat else (f_final_val*100)
-        f3 = df_mat['Freq. 3º BI'] if 'Freq. 3º BI' in df_mat else (f_final_val*100)
-        f4 = df_mat['Freq. 4º BI'] if 'Freq. 4º BI' in df_mat else (f_final_val*100)
-        
-        fig_f = px.line(x=['1º BI', '2º BI', '3º BI', '4º BI'], y=[f1, f2, f3, f4], markers=True)
-        fig_f.update_yaxes(range=[0, 105], title="Frequência (%)")
-        st.plotly_chart(fig_f, use_container_width=True)
-        
-        st.divider()
-        
-        # Ajuste 6: Mantido Gráfico de Barras para Notas
-        val_m_final = round(float(df_mat['Média Final']), 2) if 'Média Final' in df_mat else 0.0
-        st.write(f"**Notas por Bimestre (Média Final: {val_m_final})**")
-        
-        n1 = df_mat['1º BI'] if '1º BI' in df_mat else 0.0
-        n2 = df_mat['2º BI'] if '2º BI' in df_mat else 0.0
-        n3 = df_mat['3º BI'] if '3º BI' in df_mat else 0.0
-        n4 = df_mat['4º BI'] if '4º BI' in df_mat else 0.0
-        
-        fig_n = px.bar(x=['1º BI', '2º BI', '3º BI', '4º BI'], y=[n1, n2, n3, n4])
-        fig_n.update_yaxes(range=[0, 10.5], title="Notas")
-        st.plotly_chart(fig_n, use_container_width=True)
-
-    with m3:
-        st.write("### Global")
-        m_comum = df_aluno[df_aluno['Núcleo'] == 'Comum']['Média Final'].mean() if 'Média Final' in df_aluno.columns else 0.0
-        m_tec = df_aluno[df_aluno['Núcleo'] == 'Técnico']['Média Final'].mean() if 'Média Final' in df_aluno.columns else 0.0
-        nota_mat_df = df_aluno[df_aluno['Disciplina'].str.contains('Matemática', case=False)] if 'Média Final' in df_aluno.columns else pd.DataFrame()
-        nota_mat = nota_mat_df['Média Final'].values[0] if not nota_mat_df.empty else 0.0
-        
-        st.write(f"Média Núcleo Comum: **{round(m_comum, 2) if pd.notna(m_comum) else 0}**")
-        st.write(f"Média Núcleo Técnico: **{round(m_tec, 2) if pd.notna(m_tec) else 0}**")
-        st.write(f"Média Matemática: **{round(float(nota_mat), 2)}**")
-        st.divider()
-        
-        m_global = df_aluno['Média Final'].mean() if 'Média Final' in df_aluno.columns else 0.0
-        st.metric("Média Global", f"{round(m_global, 1)}")
-
-    with m4:
-        st.write("### Observações")
-        chave_base = f"{aluno_nome}_{st.session_state.disciplina_ativa}_{st.session_state.reset_obs}".replace(" ", "_")
-        obs_banco = str(df_mat['Observações']) if 'Observações' in df_mat.index and pd.notna(df_mat['Observações']) else ""
-        historico = [n.strip() for n in obs_banco.split(" | ") if n.strip() and n.lower() != "nan"]
-
-        with st.form(key=f"form_{chave_base}"):
-            entradas_atuais = []
-            for i, texto in enumerate(historico):
-                st.text_area(f"Nota {i+1}", value=texto, key=f"hist_{chave_base}_{i}", disabled=True)
-                entradas_atuais.append(texto)
+        with m2:
+            f_final_val = float(df_mat['Freq. Final'])
+            f_final_display = round(f_final_val * 100, 2) if f_final_val <= 1.0 else round(f_final_val, 2)
+            st.write(f"**Evolução da Frequência: {st.session_state.disciplina_ativa} (Final: {f_final_display}%)**")
             
-            nova_nota = st.text_area("Nova anotação...", value="", key=f"nova_{chave_base}")
+            f1 = float(df_mat['Freq. 1º BI'])
+            f2 = float(df_mat['Freq. 2º BI'])
+            f3 = float(df_mat['Freq. 3º BI'])
+            f4 = float(df_mat['Freq. 4º BI'])
             
-            if st.form_submit_button("SALVAR"):
-                if nova_nota.strip():
-                    entradas_atuais.append(nova_nota.strip())
-                    texto_final = " | ".join(entradas_atuais)
-                    idx = df[(df['Aluno'] == aluno_nome) & (df['Disciplina'] == st.session_state.disciplina_ativa)].index
-                    if not idx.empty:
-                        df.at[idx[0], 'Observações'] = str(texto_final)
-                        
-                        conn.update(spreadsheet=link_da_sala_ativa, data=df)
-                        st.session_state.reset_obs += 1
-                        st.success("Salvo com sucesso!")
-                        st.rerun()
+            fig_f = px.line(x=['1º BI', '2º BI', '3º BI', '4º BI'], y=[f1, f2, f3, f4], markers=True)
+            fig_f.update_yaxes(range=[0, 105], title="Frequência (%)")
+            st.plotly_chart(fig_f, use_container_width=True)
+            
+            st.divider()
+            
+            val_m_final = round(float(df_mat['Média Final']), 2)
+            st.write(f"**Notas por Bimestre (Média Final: {val_m_final})**")
+            
+            n1 = float(df_mat['1º BI'])
+            n2 = float(df_mat['2º BI'])
+            n3 = float(df_mat['3º BI'])
+            n4 = float(df_mat['4º BI'])
+            
+            fig_n = px.bar(x=['1º BI', '2º BI', '3º BI', '4º BI'], y=[n1, n2, n3, n4])
+            fig_n.update_yaxes(range=[0, 10.5], title="Notas")
+            st.plotly_chart(fig_n, use_container_width=True)
+
+        with m3:
+            st.write("### Global")
+            m_comum = df_aluno[df_aluno['Núcleo'] == 'Comum']['Média Final'].mean()
+            m_tec = df_aluno[df_aluno['Núcleo'] == 'Técnico']['Média Final'].mean()
+            nota_mat_df = df_aluno[df_aluno['Disciplina'].str.contains('Matemática', case=False)]
+            nota_mat = nota_mat_df['Média Final'].values[0] if not nota_mat_df.empty else 0.0
+            
+            st.write(f"Média Núcleo Comum: **{round(m_comum, 2) if pd.notna(m_comum) else 0}**")
+            st.write(f"Média Núcleo Técnico: **{round(m_tec, 2) if pd.notna(m_tec) else 0}**")
+            st.write(f"Média Matemática: **{round(float(nota_mat), 2)}**")
+            st.divider()
+            
+            m_global = df_aluno['Média Final'].mean()
+            st.metric("Média Global", f"{round(m_global, 1) if pd.notna(m_global) else 0.0}")
+
+        with m4:
+            st.write("### Observações")
+            chave_base = f"{aluno_nome}_{st.session_state.disciplina_ativa}_{st.session_state.reset_obs}".replace(" ", "_")
+            obs_banco = str(df_mat['Observações']) if 'Observações' in df_mat.index and pd.notna(df_mat['Observações']) else ""
+            historico = [n.strip() for n in obs_banco.split(" | ") if n.strip() and n.lower() != "nan"]
+
+            with st.form(key=f"form_{chave_base}"):
+                entradas_atuais = []
+                for i, texto in enumerate(historico):
+                    st.text_area(f"Nota {i+1}", value=texto, key=f"hist_{chave_base}_{i}", disabled=True)
+                    entradas_atuais.append(texto)
+                
+                nova_nota = st.text_area("Nova anotação...", value="", key=f"nova_{chave_base}")
+                
+                if st.form_submit_button("SALVAR"):
+                    if nova_nota.strip():
+                        entradas_atuais.append(nova_nota.strip())
+                        texto_final = " | ".join(entradas_atuais)
+                        idx = df[(df['Aluno'] == aluno_nome) & (df['Disciplina'] == st.session_state.disciplina_ativa)].index
+                        if not idx.empty:
+                            df.at[idx[0], 'Observações'] = str(texto_final)
+                            
+                            conn.update(spreadsheet=link_da_sala_ativa, data=df)
+                            st.session_state.reset_obs += 1
+                            st.success("Salvo com sucesso!")
+                            st.rerun()
 
     # --- BARRA INFERIOR DE NAVEGAÇÃO DOS ALUNOS ---
     st.divider()
@@ -417,13 +421,15 @@ else:
             st.rerun()
     with b2:
         dict_chamada = {df[df['Aluno'] == a]['Nº Chamada'].iloc[0]: i for i, a in enumerate(alunos_lista)}
-        num_atual = df_aluno['Nº Chamada'].iloc[0]
+        num_atual = df_aluno['Nº Chamada'].iloc[0] if not df_aluno.empty else 1
         opcoes_ordenadas = sorted(list(dict_chamada.keys()))
+        
+        idx_selecao = opcoes_ordenadas.index(num_atual) if num_atual in opcoes_ordenadas else 0
         
         escolha_num = st.selectbox(
             "Aluno Nº:", 
             options=opcoes_ordenadas, 
-            index=opcoes_ordenadas.index(num_atual)
+            index=idx_selecao
         )
         
         if dict_chamada[escolha_num] != st.session_state.aluno_idx:
