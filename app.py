@@ -111,7 +111,7 @@ def extrair_dados_pdf(arquivos_pdf):
                 nome_aluno = re.sub(r'\bMatrícula\b.*', '', val_nome, flags=re.IGNORECASE).strip()
                 
             if any(termo in linha.lower() for termo in ["matrícula", "matricula", "prontuário", "prontuario"]):
-                match_bt = re.search(r"(?:cula|ário):\s*([A-Za-z0-9\-]+)", linha, re.IGNORECASE)
+                match_bt = re.search(r"cula:\s*(.{9})", linha, re.IGNORECASE)
                 if match_bt:
                     matricula_aluno = match_bt.group(1).strip()
 
