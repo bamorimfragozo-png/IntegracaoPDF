@@ -282,7 +282,7 @@ else:
     else:
         df['Observações'] = ""
 
-    df_ordem_chamada = df._values(by='Nº Chamada', ascending=True)
+    df_ordem_chamada = df.sort_values(by='Nº Chamada', ascending=True)
     alunos_lista = df_ordem_chamada['Aluno'].unique().tolist()
 
     if st.session_state.aluno_idx >= len(alunos_lista):
