@@ -87,26 +87,7 @@ def extrair_dados_pdf(arquivos_pdf):
         #for linha in linhas:
         #    print(linha)
 
-        #======================FOTO=======================
-        # --- NOVO: EXTRAÇÃO DA FOTO DO PDF ---
-        foto_bytes = None
-        try:
-            # Geralmente a foto do aluno fica na primeira página do relatório
-            primeira_pagina = pdf_reader.pages[0]
-            # Verifica se existem imagens declaradas na página
-            if "/XObject" in primeira_pagina["/Resources"]:
-                xobject = primeira_pagina["/Resources"]["/XObject"].get_object()
-                for obj in xobject:
-                    if xobject[obj]["/Subtype"] == "/Image":
-                        # Extrai os bytes brutos da imagem
-                        foto_bytes = xobject[obj].get_data()
-                        break # Pega a primeira imagem encontrada (normalmente a foto de perfil)
-        except Exception:
-            # Se falhar ao extrair a foto, mantém como None e não quebra o fluxo
-            foto_bytes = None
-        # -------------------------------------
 
-        #===================FIM FOTO======================
         
         # 1. Captura de Metadados do Aluno
         for linha in linhas:
@@ -246,8 +227,7 @@ def extrair_dados_pdf(arquivos_pdf):
                 'Freq. 2º BI': max(0.0, 100.0 - blocos['faltas'][1]),
                 'Freq. 3º BI': max(0.0, 100.0 - blocos['faltas'][2]),
                 'Freq. 4º BI': max(0.0, 100.0 - blocos['faltas'][3]),
-                'Observações': '',
-                'Foto_Bytes': foto_bytes # <- SALVA OS BYTES DA FOTO AQUI
+                'Observações': ''
             })
     dados_finais.sort(key=lambda x: -x['Média Final'])
     return pd.DataFrame(dados_finais)
@@ -314,18 +294,7 @@ else:
     t1, t2 = st.columns([1, 4])
     with t1:
         st.markdown("### Foto")
-
-        #========================FOTO CODIGO NOVO================================
-        # Verifica se existem bytes válidos da foto no DataFrame do aluno atual
-        if 'Foto_Bytes' in df_aluno.columns and pd.notna(df_aluno['Foto_Bytes'].iloc[0]) and df_aluno['Foto_Bytes'].iloc[0] is not None:
-            # Exibe a foto real extraída do PDF
-            st.image(df_aluno['Foto_Bytes'].iloc[0], use_container_width=True)
-        else:
-            # Fallback caso o aluno não tenha foto ou ocorra erro de extração
-            st.image("https://via.placeholder.com/150", use_container_width=True)
-        #=======================FIM FOTO CODIGO NOVO============================
-        
-       # st.image("https://via.placeholder.com/150", use_container_width=True)
+        st.image("https://via.placeholder.com/150", use_container_width=True)
         
     with t2:
         st.subheader(f"Nome: {aluno_nome}")
