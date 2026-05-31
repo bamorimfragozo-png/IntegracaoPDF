@@ -11,8 +11,7 @@ import re
 # =========================================================================
 st.set_page_config(page_title="Dashboard Acadêmico Integrado", layout="wide")
 
-tecnicas=["ILPR", "MAIN", "ININ", "LDPR", ""RDCO", "SOPE", "LPWE", "INSO", "IPRE", "BDDA", "PSCO", "GCLI", "PRIN", "CNVI", "SDRE", "ASRE", "RSFI", 
-"ELET", "DCAD", "CAUT", "PROG", "PCOE", "EDIG", "PRI1", "ELIN", "CISUT", "INTI", "MAPI", "CNCM", "CLPR", "REPI", "HIEP", "MIMP", "PRI2"]
+tecnicas=["ILPR", "MAIN", "ININ", "LDPR", ""RDCO", "SOPE", "LPWE", "INSO", "IPRE", "BDDA", "PSCO", "GCLI", "PRIN", "CNVI", "SDRE", "ASRE", "RSFI", "ELET", "DCAD", "CAUT", "PROG", "PCOE", "EDIG", "PRI1", "ELIN", "CISUT", "INTI", "MAPI", "CNCM", "CLPR", "REPI", "HIEP", "MIMP", "PRI2"]
 
 st.markdown("""
 <style>
