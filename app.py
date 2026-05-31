@@ -73,9 +73,11 @@ if 'reset_obs' not in st.session_state:
     st.session_state.reset_obs = 0
 if 'sala_ativa' not in st.session_state:
     st.session_state.sala_ativa = "Sala 1"
-# Dicionário na sessão para persistir as fotos na memória enquanto o app estiver aberto
 if 'fotos_alunos' not in st.session_state:
     st.session_state.fotos_alunos = {}
+# Força o controle do botão selecionador para não bugar em uploads seguidos
+if 'filtro_anterior' not in st.session_state:
+    st.session_state.filtro_anterior = "Nota"
 
 # =========================================================================
 # 4. FUNÇÃO DE EXTRAÇÃO COM RETORNO DE FOTOS CORRIGIDO
@@ -114,7 +116,7 @@ def extrair_dados_pdf(arquivos_pdf):
         
         for linha in linhas:
             if "Aluno" in linha or "Nome" in linha:
-                partes = inline = linha.split(":")
+                partes = linha.split(":")
                 val_nome = partes[1].strip() if len(partes) > 1 else linha.replace("Aluno", "").replace("Nome", "").strip()
                 nome_aluno = re.sub(r'\bMatrícula\b.*', '', val_nome, flags=re.IGNORECASE).strip()
                 
@@ -131,14 +133,13 @@ def extrair_dados_pdf(arquivos_pdf):
         if nome_aluno == "Não Identificado" or not nome_aluno.strip():
             nome_aluno = arquivo.name.replace(".pdf", "").replace("Boletim", "").replace("_", " ").strip()
 
-        # Mapeia a foto diretamente para o nome do aluno na Session State (Evita mandar pro Sheets)
         if foto_bytes:
             st.session_state.fotos_alunos[nome_aluno] = foto_bytes
 
         mapeamento_disciplinas = {}
 
         for linha in linhas:
-            if any(p in linha for p in ["Notas das etapas", "Faltas nas etapas", "Diário", "Disciplina", "Total", "Este documento"]):
+            if any(p in inline = linha for p in ["Notas das etapas", "Faltas nas etapas", "Diário", "Disciplina", "Total", "Este documento"]):
                 continue
             
             linha_limpa = re.sub(r'^\d{5,6}\s+', '', linha.strip())
@@ -250,16 +251,17 @@ if not st.session_state.dados_carregados:
     if st.button("PROCESSAR E ATUALIZAR DASHBOARD"):
         if arquivos_enviados:
             with st.spinner("Processando arquivos e atualizando planilhas de notas..."):
-                # O DataFrame retornado aqui já NÃO possui a coluna de fotos
                 df_novo = extrair_dados_pdf(arquivos_enviados)
                 
                 if not df_novo.empty:
                     link_da_sala_ativa = DICIONARIO_SALAS[sala_selecionada]
-                    # Envia dados limpos e seguros para o Google Sheets
                     conn.update(spreadsheet=link_da_sala_ativa, data=df_novo) 
                     
                     st.session_state.sala_ativa = sala_selecionada
                     st.session_state.dados_carregados = True
+                    # Limpa referências antigas para evitar erros de cache de index ou id de disciplina anterior
+                    st.session_state.disciplina_ativa = None
+                    st.session_state.aluno_idx = 0
                     st.rerun()
                 else:
                     st.error("Não foi possível extrair dados estruturados válidos.")
@@ -305,12 +307,9 @@ else:
     t1, t2 = st.columns([1, 4])
     with t1:
         st.markdown("### Foto")
-        
-        # Mapeia a foto diretamente a partir do estado de sessão usando o nome do Aluno atual
         if aluno_nome in st.session_state.fotos_alunos:
             st.image(st.session_state.fotos_alunos[aluno_nome], use_container_width=True)
         else:
-            # Fallback limpo caso o PDF não tenha foto ou o app tenha sido recarregado do zero
             st.image("https://via.placeholder.com/150", use_container_width=True)
         
     with t2:
@@ -326,6 +325,11 @@ else:
     st.divider()
 
     ordem_bolinha = st.radio("Ordenar disciplinas por:", ["Nota", "Frequência"], horizontal=True)
+    
+    # Se mudar o tipo de ordenação nas bolinhas, invalida a disciplina ativa para recalcular a primeira
+    if ordem_bolinha != st.session_state.filtro_anterior:
+        st.session_state.disciplina_ativa = None
+        st.session_state.filtro_anterior = ordem_bolinha
 
     # --- GRID CENTRAL DO DASHBOARD ---
     m1, m2, m3, m4 = st.columns([2, 3, 2, 2])
@@ -337,31 +341,51 @@ else:
             col_ref = 'Freq. Final'
             
         df_lista = df_aluno.sort_values(by=col_ref, ascending=True)
+        disciplinas_ordenadas = df_lista['Disciplina'].unique().tolist()
         
-        for disc in df_lista['Disciplina'].unique():
+        # DEFINIÇÃO DA DISCIPLINA ATIVA AUTOMÁTICA BASEADA NA ORDENAÇÃO
+        if st.session_state.disciplina_ativa is None or st.session_state.disciplina_ativa not in disciplinas_ordenadas:
+            if disciplinas_ordenadas:
+                st.session_state.disciplina_ativa = disciplinas_ordenadas[0]
+
+        for disc in disciplinas_ordenadas:
             if st.button(disc, key=f"btn_{disc}"):
                 st.session_state.disciplina_ativa = disc
                 st.session_state.reset_obs += 1
                 st.rerun()
-
-    if st.session_state.disciplina_ativa is None or st.session_state.disciplina_ativa not in df_aluno['Disciplina'].unique():
-        st.session_state.disciplina_ativa = df_aluno['Disciplina'].iloc[0] if not df_aluno.empty else ""
 
     if st.session_state.disciplina_ativa:
         df_mat = df_aluno[df_aluno['Disciplina'] == st.session_state.disciplina_ativa].iloc[0]
 
         with m2:
             f_final_val = float(df_mat['Freq. Final'])
-            f_final_display = round(f_final_val * 100, 2) if f_final_val <= 1.0 else round(f_final_val, 2)
-            st.write(f"**Evolução da Frequência: {st.session_state.disciplina_ativa} (Final: {f_final_display}%)**")
             
-            f1 = float(df_mat['Freq. 1º BI'])
-            f2 = float(df_mat['Freq. 2º BI'])
-            f3 = float(df_mat['Freq. 3º BI'])
-            f4 = float(df_mat['Freq. 4º BI'])
+            # Tratamento caso venha formato decimal (ex: 0.85) ou inteiro direto (ex: 85.0)
+            if f_final_val <= 1.0:
+                porcentagem_presenca = round(f_final_val * 100, 1)
+            else:
+                porcentagem_presenca = round(f_final_val, 1)
+                
+            porcentagem_presenca = min(100.0, max(0.0, porcentagem_presenca))
+            porcentagem_falta = round(100.0 - porcentagem_presenca, 1)
             
-            fig_f = px.line(x=['1º BI', '2º BI', '3º BI', '4º BI'], y=[f1, f2, f3, f4], markers=True)
-            fig_f.update_yaxes(range=[0, 105], title="Frequência (%)")
+            st.write(f"**Frequência Acumulada: {st.session_state.disciplina_ativa}**")
+            
+            # CRIAÇÃO DO GRÁFICO DE ROSCA (DONUT)
+            dados_rosca = pd.DataFrame({
+                "Status": ["Presença", "Ausência/Faltas"],
+                "Porcentagem": [porcentagem_presenca, porcentagem_falta]
+            })
+            fig_f = px.pie(
+                dados_rosca, 
+                values="Porcentagem", 
+                names="Status", 
+                hole=0.6,
+                color="Status",
+                color_discrete_map={"Presença": "#2ecc71", "Ausência/Faltas": "#e74c3c"}
+            )
+            fig_f.update_traces(textinfo="percent+label")
+            fig_f.update_layout(showlegend=False, height=220, margin=dict(t=10, b=10, l=10, r=10))
             st.plotly_chart(fig_f, use_container_width=True)
             
             st.divider()
@@ -376,6 +400,7 @@ else:
             
             fig_n = px.bar(x=['1º BI', '2º BI', '3º BI', '4º BI'], y=[n1, n2, n3, n4])
             fig_n.update_yaxes(range=[0, 10.5], title="Notas")
+            fig_n.update_layout(height=220, margin=dict(t=10, b=10, l=10, r=10))
             st.plotly_chart(fig_n, use_container_width=True)
 
         with m3:
