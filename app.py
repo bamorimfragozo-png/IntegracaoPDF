@@ -11,7 +11,13 @@ import re
 # =========================================================================
 st.set_page_config(page_title="Dashboard Acadêmico Integrado", layout="wide")
 
-tecnicas=["ILPR", "MAIN", "ININ", "LDPR", ""RDCO", "SOPE", "LPWE", "INSO", "IPRE", "BDDA", "PSCO", "GCLI", "PRIN", "CNVI", "SDRE", "ASRE", "RSFI", "ELET", "DCAD", "CAUT", "PROG", "PCOE", "EDIG", "PRI1", "ELIN", "CISUT", "INTI", "MAPI", "CNCM", "CLPR", "REPI", "HIEP", "MIMP", "PRI2"]
+tecnicas = [
+    "ILPR", "MAIN", "ININ", "LDPR", "RDCO", "SOPE", "LPWE", "INSO", 
+    "IPRE", "BDDA", "PSCO", "GCLI", "PRIN", "CNVI", "SDRE", "ASRE", 
+    "RSFI", "ELET", "DCAD", "CAUT", "PROG", "PCOE", "EDIG", "PRI1", 
+    "ELIN", "CISUT", "INTI", "MAPI", "CNCM", "CLPR", "REPI", "HIEP", 
+    "MIMP", "PRI2"
+]
 
 st.markdown("""
 <style>
@@ -200,7 +206,10 @@ def extrair_dados_pdf(arquivos_pdf):
 
         for nome_disp, blocos in mapeamento_disciplinas.items():
             is_tecnico = any(kw in nome_disp.upper() for kw in tecnicas)
-            nucleo = "Técnico" if is_tecnico else "Comum"
+            if is_tecnico:
+                nucleo = "Técnico"
+            else:
+                nucleo = "Comum"
             
             total_faltas = sum(blocos['faltas'])
             freq_final_calc = max(0.0, (100.0 - total_faltas) / 100.0)
