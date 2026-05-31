@@ -139,7 +139,7 @@ def extrair_dados_pdf(arquivos_pdf):
         mapeamento_disciplinas = {}
 
         for linha in linhas:
-            if any(p in inline = linha for p in ["Notas das etapas", "Faltas nas etapas", "Diário", "Disciplina", "Total", "Este documento"]):
+            if any(p in inline==linha for p in ["Notas das etapas", "Faltas nas etapas", "Diário", "Disciplina", "Total", "Este documento"]):
                 continue
             
             linha_limpa = re.sub(r'^\d{5,6}\s+', '', linha.strip())
