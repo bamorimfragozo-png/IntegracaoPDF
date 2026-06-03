@@ -250,10 +250,6 @@ def extrair_dados_pdf(arquivos_pdf):
                 'Média Final': blocos['media_final'],
                 'Freq. Final': freq_final_calc,
                 'Núcleo': nucleo,
-                'Freq. 1º BI': max(0.0, 100.0 - blocos['faltas'][0]),
-                'Freq. 2º BI': max(0.0, 100.0 - blocos['faltas'][1]),
-                'Freq. 3º BI': max(0.0, 100.0 - blocos['faltas'][2]),
-                'Freq. 4º BI': max(0.0, 100.0 - blocos['faltas'][3]),
                 'Observações': ''
             })
             
