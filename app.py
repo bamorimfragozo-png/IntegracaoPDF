@@ -307,7 +307,7 @@ else:
     df.columns = df.columns.str.strip()
 
 
-    colunas_numericas = ['1º BI', '2º BI', '3º BI', '4º BI', 'Média Final', 'Freq. Final', 'Freq. 1º BI', 'Freq. 2º BI', 'Freq. 3º BI', 'Freq. 4º BI']
+    colunas_numericas = ['1º BI', '2º BI', '3º BI', '4º BI', 'Média Final', 'Freq. Final']
     for col in colunas_numericas:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col].astype(str).str.replace(',', '.'), errors='coerce').fillna(0.0)
