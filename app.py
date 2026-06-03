@@ -245,7 +245,6 @@ if not st.session_state.dados_carregados:
     st.subheader("Selecione a sala correspondente e faça o upload dos relatórios em PDF.")
     
     sala_selecionada = st.selectbox("Selecione a Sala:", list(DICIONARIO_SALAS.keys()))
-    # Chave dinâmica baseada na sala limpa cache do uploader para evitar erros em uploads seguidos
     arquivos_enviados = st.file_uploader("Arraste e solte quantos PDFs desejar aqui:", type=["pdf"], accept_multiple_files=True, key=f"uploader_{sala_selecionada}")
     
     if st.button("PROCESSAR E ATUALIZAR DASHBOARD"):
@@ -259,7 +258,6 @@ if not st.session_state.dados_carregados:
                     
                     st.session_state.sala_ativa = sala_selecionada
                     st.session_state.dados_carregados = True
-                    # Reseta variáveis de navegação para evitar erros de index ou estados antigos na mesma sala
                     st.session_state.disciplina_ativa = None
                     st.session_state.aluno_idx = 0
                     st.rerun()
@@ -326,7 +324,6 @@ else:
 
     ordem_bolinha = st.radio("Ordenar disciplinas por:", ["Nota", "Frequência"], horizontal=True)
     
-    # Se mudar a ordenação nas bolinhas, invalida a disciplina ativa para recalcular a primeira da nova ordenação
     if ordem_bolinha != st.session_state.filtro_anterior:
         st.session_state.disciplina_ativa = None
         st.session_state.filtro_anterior = ordem_bolinha
@@ -343,7 +340,6 @@ else:
         df_lista = df_aluno.sort_values(by=col_ref, ascending=True)
         disciplinas_ordenadas = df_lista['Disciplina'].unique().tolist()
         
-        # Garante que os gráficos vão abrir sempre com a primeira disciplina da lista ordenada vigente
         if st.session_state.disciplina_ativa is None or st.session_state.disciplina_ativa not in disciplinas_ordenadas:
             if disciplinas_ordenadas:
                 st.session_state.disciplina_ativa = disciplinas_ordenadas[0]
@@ -359,16 +355,35 @@ else:
 
         with m2:
             f_final_val = float(df_mat['Freq. Final'])
-            f_final_display = round(f_final_val * 100, 2) if f_final_val <= 1.0 else round(f_final_val, 2)
-            st.write(f"**Evolução da Frequência: {st.session_state.disciplina_ativa} (Final: {f_final_display}%)**")
+            # Garante que tratamos a porcentagem se ela vier como decimal (ex: 0.85 -> 85% ou 85.0 -> 85%)
+            porcentagem_presenca = f_final_val * 100 if f_final_val <= 1.0 else f_final_val
+            porcentagem_faltas = max(0.0, 100.0 - porcentagem_presenca)
             
-            f1 = float(df_mat['Freq. 1º BI'])
-            f2 = float(df_mat['Freq. 2º BI'])
-            f3 = float(df_mat['Freq. 3º BI'])
-            f4 = float(df_mat['Freq. 4º BI'])
+            st.write(f"**Visão Anual de Frequência: {st.session_state.disciplina_ativa}**")
             
-            fig_f = px.line(x=['1º BI', '2º BI', '3º BI', '4º BI'], y=[f1, f2, f3, f4], markers=True)
-            fig_f.update_yaxes(range=[0, 105], title="Frequência (%)")
+            # Criação do DataFrame de dados para o gráfico de Rosca (Donut)
+            df_rosca = pd.DataFrame({
+                "Status": ["Presença", "Faltas"],
+                "Percentual": [porcentagem_presenca, porcentagem_faltas]
+            })
+            
+            # Gráfico de Rosca estilizado
+            fig_f = px.pie(
+                df_rosca, 
+                names="Status", 
+                values="Percentual", 
+                hole=0.6,
+                color="Status",
+                color_discrete_map={"Presença": "#2ecc71", "Faltas": "#e74c3c"}
+            )
+            
+            # Ajustes para exibir o rótulo interno perfeitamente
+            fig_f.update_traces(textinfo="percent+label", hoverinfo="label+percent")
+            fig_f.update_layout(
+                showlegend=False, 
+                margin=dict(t=10, b=10, l=10, r=10),
+                height=220
+            )
             st.plotly_chart(fig_f, use_container_width=True)
             
             st.divider()
