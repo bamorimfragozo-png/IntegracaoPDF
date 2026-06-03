@@ -228,9 +228,15 @@ def extrair_dados_pdf(arquivos_pdf):
             else:
                 nucleo = "Comum"
             
-            total_faltas = sum(blocos['faltas'])
-            freq_final_calc = max(0.0, (100.0 - total_faltas) / 100.0)
-
+            tables generator
+            freq_final_calc = 100.0
+            for token in tokens:
+                if "%" in token:
+                    try:
+                        freq_final_calc = float(token.replace("%", "").replace(",", "."))
+                    except ValueError:
+                        pass
+                    break
 
             dados_finais.append({
                 'Nº Chamada': int(numero_chamada),
