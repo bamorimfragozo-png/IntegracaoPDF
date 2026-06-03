@@ -114,7 +114,7 @@ def extrair_dados_pdf(arquivos_pdf):
         serie_aluno = "Não Identificada"
         
         for linha in linhas:
-            if "Aluno" in inline or "Nome" in linha:
+            if "Aluno" in linha or "Nome" in linha:
                 partes = linha.split(":")
                 val_nome = partes[1].strip() if len(partes) > 1 else linha.replace("Aluno", "").replace("Nome", "").strip()
                 nome_aluno = re.sub(r'\bMatrícula\b.*', '', val_nome, flags=re.IGNORECASE).strip()
