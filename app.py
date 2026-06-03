@@ -125,7 +125,7 @@ def extrair_dados_pdf(arquivos_pdf):
                     matricula_aluno = match_bt.group(1).strip()
 
             if "Série" in linha or "Serie" in linha or "Ano" in linha or "Turma" in linha:
-                partes = inline = linha.split(":")
+                partes = linha.split(":")
                 if len(partes) > 1:
                     serie_aluno = partes[1].strip()[:27]
 
@@ -135,8 +135,7 @@ def extrair_dados_pdf(arquivos_pdf):
         if foto_bytes:
             st.session_state.fotos_alunos[nome_aluno] = foto_bytes
 
-        mapeamento_disciplinas = {}
-
+        # --- PROCESSAMENTO DAS DISCIPLINAS ---
         for linha in linhas:
             if any(p in linha for p in ["Notas das etapas", "Faltas nas etapas", "Diário", "Disciplina", "Total", "Este documento"]):
                 continue
@@ -162,78 +161,62 @@ def extrair_dados_pdf(arquivos_pdf):
             if not nome_disciplina or len(partes_dados) < 5:
                 continue
 
-            tokens_filtrados = []
-            for t in partes_dados:
-                if t in ["Cursando", "(Aguarda", "Carga", "Horária)", "Horária", "Aprovado", "Retido"] or "%" in t:
-                    continue
-                if t == "-" or t.replace(',', '.').replace('.', '', 1).isdigit():
-                    tokens_filtrados.append(t)
-            
-            dados_tabela = tokens_filtrados[4:] 
+            # Captura a porcentagem de frequência real que está na linha do PDF (ex: "100%" ou "95,5%")
+            freq_final_calc = 100.0  # Valor padrão de segurança
+            for token in tokens:
+                if "%" in token:
+                    try:
+                        # Remove o sinal de % e troca a vírgula por ponto para converter em número
+                        freq_final_calc = float(token.replace("%", "").replace(",", "."))
+                        # Se o PDF trouxer em formato decimal (ex: 0.95 para 95%), ajustamos para escala 0-100
+                        if freq_final_calc <= 1.0:
+                            freq_final_calc = freq_final_calc * 100.0
+                    except ValueError:
+                        pass
+                    break
 
+            # Limpeza rápida para isolar apenas as notas bimestrais
+            tokens_filtrados = [t for t in partes_dados if "%" not in t and t not in ["Cursando", "Aprovado", "Retido"]]
+            
             notas = [0.0, 0.0, 0.0, 0.0]
-            faltas = [0.0, 0.0, 0.0, 0.0]
-            
-            idx_dado = 0
-            for b in range(4):
-                if idx_dado < len(dados_tabela):
-                    val_n = dados_tabela[idx_dado].replace(',', '.')
-                    notas[b] = float(val_n) if val_n.replace('.', '', 1).isdigit() else 0.0
-                    idx_dado += 1
-                if idx_dado < len(dados_tabela):
-                    val_f = dados_tabela[idx_dado]
-                    faltas[b] = float(val_f) if val_f.isdigit() else 0.0
-                    idx_dado += 1
+            # Mapeia até 4 notas bimestrais se existirem na linha
+            idx_nota = 0
+            for t in tokens_filtrados:
+                val_n = t.replace(',', '.')
+                if val_n.replace('.', '', 1).isdigit() and idx_nota < 4:
+                    notas[idx_nota] = float(val_n)
+                    idx_nota += 1
 
-            media_final = 0.0
-            if idx_dado < len(dados_tabela):
-                val_md = dados_tabela[idx_dado].replace(',', '.')
-                if val_md.replace('.', '', 1).isdigit():
-                    media_final = float(val_md)
-                else:
-                    notas_lancadas = [n for n in notas if n > 0]
-                    media_final = sum(notas_lancadas) / len(notas_lancadas) if notas_lancadas else 0.0
+            # Define a Média Final (último número da sequência de notas ou cálculo das notas existentes)
+            if idx_nota > 0:
+                media_final = notas[idx_nota - 1]  # Assume que a última nota extraída após os bimestres é a média
             else:
-                notas_lancadas = [n for n in notas if n > 0]
-                media_final = sum(notas_lancadas) / len(notas_lancadas) if notas_lancadas else 0.0
+                media_final = 0.0
 
             if len(nome_disciplina) > 3:
-                mapeamento_disciplinas[nome_disciplina] = {
-                    'notas': notas,
-                    'faltas': faltas,
-                    'media_final': media_final
-                }
+                is_tecnico = any(kw in nome_disciplina.upper() for kw in tecnicas)
+                nucleo = "Técnico" if is_tecnico else "Comum"
 
-        for nome_disp, blocos in mapeamento_disciplinas.items():
-            is_tecnico = any(kw in nome_disp.upper() for kw in tecnicas)
-            if is_tecnico:
-                nucleo = "Técnico"
-            else:
-                nucleo = "Comum"
-            
-            total_faltas = sum(blocos['faltas'])
-            freq_final_calc = max(0.0, (100.0 - total_faltas) / 100.0)
-
-            dados_finais.append({
-                'Nº Chamada': int(numero_chamada),
-                'Aluno': nome_aluno,
-                'Matrícula': matricula_aluno,
-                'Série': serie_aluno,
-                'Disciplina': nome_disp,
-                '1º BI': blocos['notas'][0],
-                '2º BI': blocos['notas'][1],
-                '3º BI': blocos['notas'][2],
-                '4º BI': blocos['notas'][3],
-                'Média Final': blocos['media_final'],
-                'Freq. Final': freq_final_calc,
-                'Núcleo': nucleo,
-                'Freq. 1º BI': max(0.0, 100.0 - blocos['faltas'][0]),
-                'Freq. 2º BI': max(0.0, 100.0 - blocos['faltas'][1]),
-                'Freq. 3º BI': max(0.0, 100.0 - blocos['faltas'][2]),
-                'Freq. 4º BI': max(0.0, 100.0 - blocos['faltas'][3]),
-                'Observações': ''
-            })
-            
+                dados_finais.append({
+                    'Nº Chamada': int(numero_chamada),
+                    'Aluno': nome_aluno,
+                    'Matrícula': matricula_aluno,
+                    'Série': serie_aluno,
+                    'Disciplina': nome_disciplina,
+                    '1º BI': notas[0],
+                    '2º BI': notas[1],
+                    '3º BI': notas[2],
+                    '4º BI': notas[3],
+                    'Média Final': media_final,
+                    'Freq. Final': freq_final_calc,  # Salvando a porcentagem real aqui (Ex: 100.0 ou 95.5)
+                    'Núcleo': nucleo,
+                    'Freq. 1º BI': freq_final_calc,  # Mantido apenas para evitar quebra de colunas na tabela antiga
+                    'Freq. 2º BI': freq_final_calc,
+                    'Freq. 3º BI': freq_final_calc,
+                    'Freq. 4º BI': freq_final_calc,
+                    'Observações': ''
+                })
+                
     return pd.DataFrame(dados_finais)
 
 
