@@ -113,7 +113,7 @@ def extrair_dados_pdf(arquivos_pdf):
         matricula_aluno = "Não Identificada"
         serie_aluno = "Não Identificada"
         
-        for linha in linhas:
+        for linha in lines:
             if "Aluno" in linha or "Nome" in linha:
                 partes = linha.split(":")
                 val_nome = partes[1].strip() if len(partes) > 1 else linha.replace("Aluno", "").replace("Nome", "").strip()
@@ -135,7 +135,7 @@ def extrair_dados_pdf(arquivos_pdf):
         if foto_bytes:
             st.session_state.fotos_alunos[nome_aluno] = foto_bytes
 
-        for linha in linhas:
+        for linha in lines:
             if any(p in linha for p in ["Notas das etapas", "Faltas nas etapas", "Diário", "Disciplina", "Total", "Este documento"]):
                 continue
             
@@ -160,21 +160,21 @@ def extrair_dados_pdf(arquivos_pdf):
             if not nome_disciplina or len(partes_dados) < 5:
                 continue
 
-            # --- CORREÇÃO DA FREQUÊNCIA: CAPTURA O PERCENTUAL DIRETO DO PDF ---
-            freq_final_calc = 100.0  # Valor fallback seguro
+            # --- CORREÇÃO DO PARSER: CAPTURA DO PERCENTUAL DIRETO ---
+            freq_final_calc = 1.0  # Padrão: 100% de presença em formato decimal para o Excel
             for token in tokens:
                 if "%" in token:
                     try:
-                        # Extrai o valor tirando o símbolo '%' e ajusta decimais
-                        freq_final_calc = float(token.replace("%", "").replace(",", "."))
-                        # Garante consistência na escala (Ex: se vier como 0.98 vira 98.0)
-                        if freq_final_calc <= 1.0:
-                            freq_final_calc = freq_final_calc * 100.0
+                        raw_val = float(token.replace("%", "").replace(",", "."))
+                        # Se o PDF trouxer algo como 98.5 ou 100, transformamos em decimal (0.985 ou 1.0)
+                        if raw_val > 1.0:
+                            freq_final_calc = raw_val / 100.0
+                        else:
+                            freq_final_calc = raw_val
                     except ValueError:
                         pass
                     break
 
-            # Filtra strings de status para isolar as notas numéricas
             tokens_filtrados = [t for t in partes_dados if "%" not in t and t not in ["Cursando", "Aprovado", "Retido", "-", "(Aguarda", "Carga", "Horária)", "Horária"]]
             
             notas = [0.0, 0.0, 0.0, 0.0]
@@ -185,7 +185,6 @@ def extrair_dados_pdf(arquivos_pdf):
                     notas[idx_nota] = float(val_n)
                     idx_nota += 1
 
-            # Média Final baseada no último valor disponível ou na média das lançadas
             if idx_nota > 0:
                 media_final = notas[idx_nota - 1]
             else:
@@ -195,7 +194,6 @@ def extrair_dados_pdf(arquivos_pdf):
                 is_tecnico = any(kw in nome_disciplina.upper() for kw in tecnicas)
                 nucleo = "Técnico" if is_tecnico else "Comum"
 
-                # IMPORTANTE: Estrutura agora gera uma única coluna de Presença ('Freq. Final')
                 dados_finais.append({
                     'Nº Chamada': int(numero_chamada),
                     'Aluno': nome_aluno,
@@ -207,7 +205,7 @@ def extrair_dados_pdf(arquivos_pdf):
                     '3º BI': notas[2],
                     '4º BI': notas[3],
                     'Média Final': media_final,
-                    'Freq. Final': freq_final_calc,
+                    'Freq. Final': freq_final_calc,  # Salva como decimal puro (Ex: 1.0 ou 0.95)
                     'Núcleo': nucleo,
                     'Observações': ''
                 })
@@ -260,11 +258,10 @@ else:
     df = conn.read(spreadsheet=link_da_sala_ativa, ttl="0")
     df.columns = df.columns.str.strip()
 
-    # Colunas numéricas simplificadas (Sem referências às frequências bimestrais deletadas)
     colunas_numericas = ['1º BI', '2º BI', '3º BI', '4º BI', 'Média Final', 'Freq. Final']
     for col in colunas_numericas:
         if col in df.columns:
-            df[col] = pd.to_numeric(df[col].astype(str).str.replace(',', '.'), errors='coerce').fillna(0.0)
+            df[col] = pd.to_numeric(df[col].astype(str).str.replace(',', '.'), errors='coerce').fillna(1.0 if col == 'Freq. Final' else 0.0)
 
     if 'Observações' in df.columns:
         df['Observações'] = df['Observações'].astype(str).replace('nan', '')
@@ -333,7 +330,11 @@ else:
         df_mat = df_aluno[df_aluno['Disciplina'] == st.session_state.disciplina_ativa].iloc[0]
 
         with m2:
-            porcentagem_presenca = float(df_mat['Freq. Final'])
+            # --- CORREÇÃO DO CÁLCULO GRÁFICO (DONUT) ---
+            val_f_final = float(df_mat['Freq. Final'])
+            
+            # Ajusta para que o Plotly monte fatias perfeitas em proporção de 0 a 100
+            porcentagem_presenca = val_f_final if val_f_final > 1.0 else val_f_final * 100.0
             porcentagem_faltas = max(0.0, 100.0 - porcentagem_presenca)
             
             st.write(f"**Visão Anual de Frequência: {st.session_state.disciplina_ativa}**")
