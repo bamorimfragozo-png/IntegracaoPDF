@@ -228,7 +228,6 @@ def extrair_dados_pdf(arquivos_pdf):
             else:
                 nucleo = "Comum"
             
-            tables generator
             freq_final_calc = 100.0
             for token in tokens:
                 if "%" in token:
