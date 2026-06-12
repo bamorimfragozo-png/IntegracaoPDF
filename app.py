@@ -280,6 +280,7 @@ if (not st.session_state.dadosCarregados):
                 #codigo adicionado para teste
                 df_atual = conn.read(spreadsheet=linkSalaAtiva)
                 df_final = pd.concat([df_atual, BDNovo],ignore_index=True)
+                BDFinal = BDFinal.drop_duplicates(subset=["Aluno", "Disciplina"],keep="last")
                 #conn.update(spreadsheet=linkSalaAtiva, data=df_final )
 
                 if (not BDNovo.empty):
