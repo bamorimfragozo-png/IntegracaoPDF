@@ -276,13 +276,20 @@ if (not st.session_state.dadosCarregados):
             with st.spinner("Processando arquivos e atualizando planilhas de notas..."):
                 BDNovo=extrairDados(arquivosEnviados)
 
+linkSalaAtiva = DICIONARIO_SALAS[salaSelecionada]
+
+
+
+
+
+                linkSalaAtiva=DICIONARIO_SALAS[salaSelecionada]
                 #codigo adicionado para teste
                 df_atual = conn.read(spreadsheet=linkSalaAtiva)
                 df_final = pd.concat([df_atual, BDNovo],ignore_index=True)
                 #conn.update(spreadsheet=linkSalaAtiva, data=df_final )
 
                 if (not BDNovo.empty):
-                    linkSalaAtiva=DICIONARIO_SALAS[salaSelecionada]
+                    #linkSalaAtiva=DICIONARIO_SALAS[salaSelecionada]
                     #conn.update(spreadsheet=linkSalaAtiva, data=BDNovo) 
                     conn.update(spreadsheet=linkSalaAtiva, data=df_final) #<----teste
                     st.session_state.salaAtiva=salaSelecionada
