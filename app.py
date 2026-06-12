@@ -323,7 +323,7 @@ else:
 
     ordemChamada=BD.sort_values(by='Nº Chamada', ascending=True)
     alunosLista=ordemChamada['Aluno'].unique().tolist()
-    #st.write(len(alunoLista))
+    
     st.sidebar.write(len(alunoLista))
     st.sidebar.write(alunoLista)
     
