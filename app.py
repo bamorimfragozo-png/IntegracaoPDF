@@ -206,7 +206,7 @@ def extrairDados(arquivosPdf):
             if (idDado<len(dadosTabela)):
                 valMedia=dadosTabela[idDado].replace(',', '.')
                 if (valMedia.replace('.', '', 1).isdigit()):
-                    mediaFinal=float(valMadia)
+                    mediaFinal=float(valMedia)
                 else:
                     notasLancadas=[]
                     for n in notas:
@@ -281,7 +281,7 @@ if (not st.session_state.dadosCarregados):
                     conn.update(spreadsheet=linkSalaAtiva, data=BDNovo)
 
                     st.session_state.salaAtiva=salaSelecionada
-                    st.session_state.dadosVCarregados=True
+                    st.session_state.dadosCarregados=True
                     st.session_state.materiaSelecionada=None
                     st.session_state.numAluno=0
                     st.rerun()
@@ -317,7 +317,7 @@ else:
     ordemChamada=BD.sort_values(by='Nº Chamada', ascending=True)
     alunosLista=ordemChamada['Aluno'].unique().tolist()
 
-    if (st.session_state.numAluno>=len(alunos_lista)):
+    if (st.session_state.numAluno>=len(alunosLista)):
         st.session_state.numAluno=0
 
     alunoNome=alunosLista[st.session_state.numAluno]
