@@ -221,10 +221,10 @@ def extrairDados(arquivosPdf):
                     for n in notas:
                       if (n>0):
                         notasLancadas.append(n)
-                    if (notasLancadas):
-                      mediaFinal=sum(notasLancadas)/len(notasLancadas)
-                    else:
-                      mediaFinal=0.0
+                      if (notasLancadas):
+                        mediaFinal=sum(notasLancadas)/len(notasLancadas)
+                      else:
+                        mediaFinal=0.0
 
             if (len(nomeDisciplina)>3):
                 mapeamentoDisciplinas[nomeDisciplina]={
