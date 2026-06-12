@@ -323,7 +323,7 @@ else:
 
     ordemChamada=BD.sort_values(by='Nº Chamada', ascending=True)
     alunosLista=ordemChamada['Aluno'].unique().tolist()
-    print(len(alunoLista))
+    st.write(len(alunoLista))
 
     
     if (st.session_state.numAluno>=len(alunosLista)):
