@@ -274,7 +274,7 @@ if (not st.session_state.dadosCarregados):
     if (st.button("PROCESSAR E ATUALIZAR DASHBOARD")):
         if (arquivosEnviados):
             with st.spinner("Processando arquivos e atualizando planilhas de notas..."):
-                BDNovo=extrairDados(arquivosEnviados)
+            BDNovo=extrairDados(arquivosEnviados)
 
                 if (not BDNovo.empty):
                     linkSalaAtiva=DICIONARIO_SALAS[salaSelecionada]
