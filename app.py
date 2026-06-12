@@ -276,12 +276,6 @@ if (not st.session_state.dadosCarregados):
             with st.spinner("Processando arquivos e atualizando planilhas de notas..."):
                 BDNovo=extrairDados(arquivosEnviados)
 
-linkSalaAtiva = DICIONARIO_SALAS[salaSelecionada]
-
-
-
-
-
                 linkSalaAtiva=DICIONARIO_SALAS[salaSelecionada]
                 #codigo adicionado para teste
                 df_atual = conn.read(spreadsheet=linkSalaAtiva)
