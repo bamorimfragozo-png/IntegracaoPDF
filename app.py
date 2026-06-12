@@ -125,7 +125,7 @@ def extrairDados(arquivosPdf):
                 if (len(partes)>1):
                     serieAluno=partes[1].strip()[:27]
 
-        if (nomeAluno=="Não Identificado" or not nome_aluno.strip()):
+        if (nomeAluno=="Não Identificado" or not nomeAluno.strip()):
             nomeAluno=arquivo.name.replace(".pdf", "").replace("Boletim", "").replace("_", " ").strip()
 
         if (fotos):
@@ -274,7 +274,7 @@ if (not st.session_state.dadosCarregados):
     if (st.button("PROCESSAR E ATUALIZAR DASHBOARD")):
         if (arquivosEnviados):
             with st.spinner("Processando arquivos e atualizando planilhas de notas..."):
-            BDNovo=extrairDados(arquivosEnviados)
+                BDNovo=extrairDados(arquivosEnviados)
 
                 if (not BDNovo.empty):
                     linkSalaAtiva=DICIONARIO_SALAS[salaSelecionada]
