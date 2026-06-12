@@ -216,14 +216,14 @@ def extrairDados(arquivosPdf):
                       mediaFinal=sum(notasLancadas)/len(notasLancadas)
                     else:
                       mediaFinal=0.0
-                else:
-                  notasLancadas=[]
-                    for n in notas:
-                      if (n>0):
+            else:
+                notasLancadas=[]
+                for n in notas:
+                    if (n>0):
                         notasLancadas.append(n)
-                      if (notasLancadas):
+                    if (notasLancadas):
                         mediaFinal=sum(notasLancadas)/len(notasLancadas)
-                      else:
+                    else:
                         mediaFinal=0.0
 
             if (len(nomeDisciplina)>3):
