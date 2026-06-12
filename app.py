@@ -116,7 +116,7 @@ def extrairDados(arquivosPdf):
             for termo in ["matrícula", "matricula", "prontuário", "prontuario"]:
               if (termo in linha.lower()):
                 buscaBT=re.search(r"cula:\s*(.{9})", linha, re.IGNORECASE)
-                  if (buscaBT):
+                if (buscaBT):
                     matriculaAluno=buscaBT.group(1).strip()
                     break
 
