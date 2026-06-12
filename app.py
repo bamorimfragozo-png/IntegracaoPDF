@@ -50,9 +50,9 @@ DICIONARIO_SALAS = {
     "Redes 1": st.secrets["connections"]["gsheets"]["Redes1"],
     "Redes 2": st.secrets["connections"]["gsheets"]["Redes2"],
     "Redes 3": st.secrets["connections"]["gsheets"]["Redes3"],
-    "Automação 1": st.secrets["connections"]["gsheets"]["Automação1"],
-    "Automação 2": st.secrets["connections"]["gsheets"]["Automação2"],
-    "Automação 3": st.secrets["connections"]["gsheets"]["Automação3"]
+    "Automação 1": st.secrets["connections"]["gsheets"]["Automacao1"],
+    "Automação 2": st.secrets["connections"]["gsheets"]["Automacao2"],
+    "Automação 3": st.secrets["connections"]["gsheets"]["Automacao3"]
 }
 
 #Estado de atualização do Dashboard
