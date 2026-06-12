@@ -143,7 +143,7 @@ def extrairDados(arquivosPdf):
               continue
 
             linhaLimpa=re.sub(r'^\d{5,6}\s+', '', linha.strip())
-            if (not re.search(r'[A-Z]{3,4}\.\d{4,5}|\([A-Z0-9]{5,}\)', linha_limpa)):
+            if (not re.search(r'[A-Z]{3,4}\.\d{4,5}|\([A-Z0-9]{5,}\)', linhaLimpa)):
                 continue
 
             tokens=linhaLimpa.split()
