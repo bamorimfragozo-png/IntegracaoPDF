@@ -305,7 +305,7 @@ if (not st.session_state.dadosCarregados):
 #EXIBIÇÃO VISUAL DO DASHBOARD ACADÊMICO
 else:
     if (st.sidebar.button("Ir para Tela de Upload")):
-        st.session_state.dadosCarregados=False
+        st.session_state.dadosCarregados=True
         st.session_state.numAluno=0
         st.session_state.materiaSelecionada=None
         st.rerun()
