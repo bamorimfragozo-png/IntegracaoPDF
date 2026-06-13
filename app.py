@@ -140,7 +140,6 @@ def extrairDados(arquivosPdf):
         superdotacao = "Não Informado"
 
        for linha in linhas:
-            # Normaliza os espaços para evitar erros de leitura do PDF
             linha_normalizada = " ".join(linha.split())
 
             if "Necessidades Especiais" in linha_normalizada:
