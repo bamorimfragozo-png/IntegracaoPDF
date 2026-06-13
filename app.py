@@ -112,62 +112,64 @@ def extrairDados(arquivosPdf):
                 break
 
         if eh_pdf_napne:
-            texto_unificado = " ".join(textoCompleto.split())
-            
-            # 1. Tenta pegar o nome por extenso no PDF
-            nomeAluno = "Não Identificado"
-            busca_nome = re.search(r"(?:Aluno|Nome)\s*:\s*([^:]+?)(?=(?:Matrícula|Série|Turma|$))", texto_unificado, re.IGNORECASE)
-            if busca_nome:
-                nomeAluno = busca_nome.group(1).strip()
-                nomeAluno = re.sub(r'\bMatrícula\b.*', '', nomeAluno, flags=re.IGNORECASE).strip()
-            
-            # 🚨 SEGURANÇA: Se o nome veio quebrado, curto demais (menor que 4 letras) ou inválido, usa o nome do arquivo
-            if nomeAluno == "Não Identificado" or len(nomeAluno) <= 4:
-                # Remove extensões e termos comuns do nome do arquivo para limpar
-                nomeAluno = arquivo.name.replace(".pdf", "").replace("NAPNE", "").replace("Boletim", "").replace("_", " ").strip()
+            # Primeiro, busca o nome do aluno na linha correspondente
+            for linha in linhas:
+                if "Aluno" in linha or "Nome" in linha:
+                    busca_nome = re.search(r"(?:Aluno|Nome)\s*:\s*(.*)", linha, re.IGNORECASE)
+                    if busca_nome:
+                        nomeAluno = busca_nome.group(1).strip()
+                        # Limpa qualquer resíduo de matrícula que venha na mesma linha
+                        nomeAluno = re.sub(r'\bMatrícula\b.*', '', nomeAluno, flags=re.IGNORECASE).strip()
 
-            # 2. Captura dos dados médicos
-            p_pne = "Sim" if "Portador(a) de Necessidades Especiais" in texto_unificado and "Sim" in texto_unificado.split("Portador(a) de Necessidades Especiais")[1][:15] else "Não"
-            p_trans = "Sim" if "Portador(a) de Transtorno" in texto_unificado and "Sim" in texto_unificado.split("Portador(a) de Transtorno")[1][:15] else "Não"
-            p_super = "Sim" if "Portador(a) de Superdotação" in texto_unificado and "Sim" in texto_unificado.split("Portador(a) de Superdotação")[1][:15] else "Não"
+            # Cria as variáveis com o valor padrão do sistema
+            p_pne, t_pne, p_trans, t_trans, p_super, t_super = "Não Informado", "Não Informado", "Não Informado", "Não Informado", "Não Informado", "Não Informado"
 
-            t_pne = "Não Informado"
-            b_tpne = re.search(r"Tipo de Necessidade Especial\s*:\s*(.+?)(?=(?:Portador|$))", texto_unificado, re.IGNORECASE)
-            if b_tpne: t_pne = b_tpne.group(1).strip()
+            # Varre o arquivo buscando os termos, igualzinho à busca de matrícula do seu código
+            for linha in linhas:
+                if "Possui Necessidades Especiais" in linha or "Portador(a) de Necessidades Especiais" in linha:
+                    busca = re.search(r"Especiais\s*:\s*(.*)", linha, re.IGNORECASE)
+                    if busca: p_pne = busca.group(1).strip()
 
-            t_trans = "Não Informado"
-            b_ttrans = re.search(r"Tipo de Transtorno\s*:\s*(.+?)(?=(?:Portador|$))", texto_unificado, re.IGNORECASE)
-            if b_ttrans: t_trans = b_ttrans.group(1).strip()
+                if "Tipo de Necessidade Especial" in linha:
+                    busca = re.search(r"Especial\s*:\s*(.*)", linha, re.IGNORECASE)
+                    if busca: t_pne = busca.group(1).strip()
 
-            t_super = "Não Informado"
-            b_tsuper = re.search(r"Superdota[çc]ã[oo]\s*:\s*(.+?)(?=$)", texto_unificado, re.IGNORECASE)
-            if b_tsuper: t_super = b_tsuper.group(1).strip()
+                if "Portador(a) de Transtorno" in linha:
+                    busca = re.search(r"Transtorno\s*:\s*(.*)", linha, re.IGNORECASE)
+                    if busca: p_trans = busca.group(1).strip()
 
-            if p_pne == "Não" and t_pne in ["Não", "Não Informado", "NÃO"]: t_pne = "Não Informado"
-            if p_trans == "Não" and t_trans in ["Não", "Não Informado", "NÃO"]: t_trans = "Não Informado"
-            if p_super == "Não" and t_super in ["Não", "Não Informado", "NÃO"]: t_super = "Não Informado"
+                if "Tipo de Transtorno" in linha:
+                    busca = re.search(r"Transtorno\s*:\s*(.*)", linha, re.IGNORECASE)
+                    if busca: t_trans = busca.group(1).strip()
 
-            # 3. MÁGICA DA MESCLAGEM: Verifica se o aluno já tem matérias na lista e atualiza elas diretamente!
-            aluno_encontrado = False
-            for dado in dadosFinais:
-                # Compara os primeiros 12 caracteres para tolerar pequenas variações de sobrenome
-                if dado['Aluno'].lower()[:12] == nomeAluno.lower()[:12]:
-                    dado['PNE'] = p_pne
-                    dado['Tipo NE'] = t_pne
-                    dado['Portador Transtorno'] = p_trans
-                    dado['Tipo Transtorno'] = t_trans
-                    dado['Portador Superdotação'] = p_super
-                    dado['Superdotação'] = t_super
-                    aluno_encontrado = True
+                if "Portador(a) de Superdotação" in linha:
+                    busca = re.search(r"Superdota[çc]ã[oo]\s*:\s*(.*)", linha, re.IGNORECASE)
+                    if busca: p_super = busca.group(1).strip()
 
-            # Se os boletins de nota ainda não foram lidos (o do NAPNE veio primeiro na lista), 
-            # aí sim criamos a linha de Acessibilidade para ser mesclada depois
-            if not aluno_encontrado:
-                dadosFinais.append({
-                    'Nº Chamada': int(numeroChamada), 'Aluno': nomeAluno, 'Matrícula': 'NAPNE', 'Série': 'NAPNE', 'Disciplina': 'Acessibilidade',
-                    '1º BI': 0.0, '2º BI': 0.0, '3º BI': 0.0, '4º BI': 0.0, 'Média Final': 0.0, 'Freq. Final': 100.0, 'Núcleo': 'Comum', 'Observações': '',
-                    'PNE': p_pne, 'Tipo NE': t_pne, 'Portador Transtorno': p_trans, 'Tipo Transtorno': t_trans, 'Portador Superdotação': p_super, 'Superdotação': t_super
-                })
+                if "Superdotação" in linha or "Superdotacao" in linha:
+                    if "Portador(a)" not in linha:
+                        busca = re.search(r"Superdota[çc]ã[oo]\s*:\s*(.*)", linha, re.IGNORECASE)
+                        if busca: t_super = busca.group(1).strip()
+
+            # Adiciona os dados na lista de forma idêntica à estrutura das disciplinas
+            dadosFinais.append({
+                'Nº Chamada': int(numeroChamada),
+                'Aluno': nomeAluno,
+                'Matrícula': 'NAPNE',
+                'Série': 'NAPNE',
+                'Disciplina': 'Acessibilidade',
+                '1º BI': 0.0, '2º BI': 0.0, '3º BI': 0.0, '4º BI': 0.0,
+                'Média Final': 0.0,
+                'Freq. Final': 100.0,
+                'Núcleo': 'Comum',
+                'Observações': '',
+                'PNE': p_pne,
+                'Tipo NE': t_pne,
+                'Portador Transtorno': p_trans,
+                'Tipo Transtorno': t_trans,
+                'Portador Superdotação': p_super,
+                'Superdotação': t_super
+            })
             continue
 
         #FIM LEITURA PDF NAPNE
