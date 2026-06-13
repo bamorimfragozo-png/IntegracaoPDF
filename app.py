@@ -115,9 +115,35 @@ def extrairDados(arquivosPdf):
             fotos=None
 
         linhas=textoCompleto.split('\n')
+        ##############################################
+        textoUnico=" ".join(linhas)
+
+        busca=re.search(r"Tipo de Transtorno\s*-\s*(.+?)(?:Portador\(a\)|Superdotação|$)", textoUnico, re.IGNORECASE)
+        if (busca):
+            tipoTranstorno=busca.group(1).replace("\n", " ").strip()
+
+        busca=re.search(r"Tipo de Necessidade Especial\s*-\s*(.+?)(?:Portador\(a\)|Tipo de Transtorno|$)", textoUnico, re.IGNORECASE)
+        if (busca):
+            tipoNecessidadeEspecial=busca.group(1).replace("\n", " ").strip()
+
+        busca=re.search(r"Superdotação\s*-\s*(.+?)(?:Portador\(a\)|$)", textoUnico, re.IGNORECASE)
+        if (busca):
+            superdotacao=busca.group(1).replace("\n", " ").strip()
+        ################################################
         nomeAluno="Não Identificado"
         matriculaAluno="Não Identificada"
         serieAluno="Não Identificada"
+
+        #############################################################
+        portadorNecessidadesEspeciais="Não"
+        tipoNecessidadeEspecial=""
+
+        portadorTranstorno="Não"
+        tipoTranstorno=""
+
+        portadorSuperdotacao="Não"
+        superdotacao=""
+        ############################################################
         
         for linha in linhas:
             if ("Aluno" in linha or "Nome" in linha):
@@ -139,6 +165,41 @@ def extrairDados(arquivosPdf):
                 partes=linha.split(":")
                 if (len(partes)>1):
                     serieAluno=partes[1].strip()[:27]
+
+            ##################################################
+            if ("Portador(a)" in linha and "Necessidades" in linha and "Especiais" in linha):
+                if ("Sim" in linha):
+                    portadorNecessidadesEspeciais="Sim"
+                elif ("Não" in linha or "Nao" in linha):
+                    portadorNecessidadesEspeciais="Não"
+
+            if ("Tipo de Necessidade Especial" in linha):
+                partes=linha.split("-")
+                if (len(partes)>1):
+                    tipoNecessidadeEspecial=partes[1].strip()
+
+            if ("Portador(a)" in linha and "Transtorno" in linha):
+                if ("Sim" in linha):
+                    portadorTranstorno="Sim"
+                elif ("Não" in linha or "Nao" in linha):
+                    portadorTranstorno="Não"
+
+            if ("Tipo de Transtorno" in linha):
+                partes=linha.split("-")
+                if (len(partes)>1):
+                    tipoTranstorno=partes[1].strip()
+
+            if ("Portador(a)" in linha and "Superdotação" in linha):
+                if ("Sim" in linha):
+                    portadorSuperdotacao="Sim"
+                elif ("Não" in linha or "Nao" in linha):
+                    portadorSuperdotacao="Não"
+
+            if ("Superdotação -" in linha):
+                partes=linha.split("-")
+                if (len(partes)>1):
+                    superdotacao=partes[1].strip()
+            ##################################################################
 
         if (nomeAluno=="Não Identificado" or not nomeAluno.strip()):
             nomeAluno=arquivo.name.replace(".pdf", "").replace("Boletim", "").replace("_", " ").strip()
@@ -273,7 +334,13 @@ def extrairDados(arquivosPdf):
                 'Média Final': blocos['mediaFinal'],
                 'Freq. Final': blocos['freqFinal'],
                 'Núcleo': nucleo,
-                'Observações': ''
+                'Observações': '',
+                'Portador Necessidades Especiais': portadorNecessidadesEspeciais,
+                'Tipo Necessidade Especial': tipoNecessidadeEspecial,
+                'Portador Transtorno': portadorTranstorno,
+                'Tipo Transtorno': tipoTranstorno,
+                'Portador Superdotação': portadorSuperdotacao,
+                'Superdotação': superdotacao
             })
     
     return pd.DataFrame(dadosFinais)
