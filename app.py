@@ -171,7 +171,7 @@ def extrairDados(arquivosPdf):
                     if busca: p_super = busca.group(1).strip()
 
                 if "Superdotação" in linha or "Superdotacao" in linha:
-                    if "Portador(a)" not in inline or "Portador(a)" not in linha:
+                    if "Portador(a)" not in linha or "Portador(a)" not in linha:
                         busca = re.search(r"Superdota[çc]ã[oo]\s*:\s*(.*)", linha, re.IGNORECASE)
                         if busca: t_super = busca.group(1).strip()
 
