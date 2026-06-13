@@ -126,7 +126,7 @@ def extrairDados(arquivosPdf):
         # 🟢 TRECHO 1 CORRIGIDO: ACUMULADOR DO NAPNE
         # =========================================================================
         eh_pdf_napne = False
-        for linha in lines or linhas: # Prevenção de digitação
+        for linha in linhas: # Prevenção de digitação
             if "Necessidades Especiais" in linha or "Transtorno" in linha or "Superdota" in linha:
                 eh_pdf_napne = True
                 break
