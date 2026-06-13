@@ -70,6 +70,19 @@ if ("fotoAluno" not in st.session_state):
     st.session_state.fotoAluno={}
 if ("ordenacao" not in st.session_state):
     st.session_state.ordenacao="Nota"
+st.sidebar.markdown("### Navegação")
+
+if (st.sidebar.button("Tela de Upload")):
+    st.session_state.dadosCarregados=False
+    st.session_state.materiaSelecionada=None
+    st.session_state.numAluno=0
+    st.rerun()
+
+if (st.sidebar.button("Dashboard")):
+    st.session_state.dadosCarregados=True
+    st.session_state.materiaSelecionada=None
+    st.session_state.numAluno=0
+    st.rerun()
 
 #Extração de dados
 def extrairDados(arquivosPdf):
@@ -299,17 +312,17 @@ if (not st.session_state.dadosCarregados):
 
 #EXIBIÇÃO VISUAL DO DASHBOARD ACADÊMICO
 else:
-    if (st.sidebar.button("Voltar para Tela de Upload")):
-        st.session_state.dadosCarregados=False
-        st.session_state.numAluno=0
-        st.session_state.materiaSelecionada=None
-        st.rerun()
+    #if (st.sidebar.button("Voltar para Tela de Upload")):
+     #   st.session_state.dadosCarregados=False
+       #  st.session_state.numAluno=0
+        #st.session_state.materiaSelecionada=None
+        #st.rerun()
         
-    if (st.sidebar.button("Voltar para Dashboard")):
-        st.session_state.dadosCarregados=True
-        st.session_state.materiaSelecionada=None
-        st.session_state.numAluno=0
-        st.rerun()
+    #if (st.sidebar.button("Voltar para Dashboard")):
+     #   st.session_state.dadosCarregados=True
+      #  st.session_state.materiaSelecionada=None
+       # st.session_state.numAluno=0
+        #st.rerun()
 
     st.sidebar.write(f"Visualizando: **{st.session_state.salaAtiva}**")
 
