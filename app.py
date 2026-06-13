@@ -400,6 +400,36 @@ else:
         c1.markdown(f"<div class='info-box'><b>Matrícula:</b> {matriculaVal}</div>", unsafe_allow_html=True)
         c2.markdown(f"<div class='info-box'><b>Série:</b> {serieVal}</div>", unsafe_allow_html=True)
 
+        # EXIBIÇÃO NAPNE
+        st.markdown("#### Informações de Acessibilidade / NAPNE")
+        pneStatus = BDAluno['PNE'].iloc[0] if 'PNE' in BDAluno.columns else "Não Informado"
+        pneTipo = BDAluno['Tipo NE'].iloc[0] if 'Tipo NE' in BDAluno.columns else "Não Informado"
+        transtornoStatus = BDAluno['Portador Transtorno'].iloc[0] if 'Portador Transtorno' in BDAluno.columns else "Não Informado"
+        transtornTipo = BDAluno['Tipo Transtorno'].iloc[0] if 'Tipo Transtorno' in BDAluno.columns else "Não Informado"
+        superStatus = BDAluno['Portador Superdotação'].iloc[0] if 'Portador Superdotação' in BDAluno.columns else "Não Informado"
+        superTipo = BDAluno['Superdotação'].iloc[0] if 'Superdotação' in BDAluno.columns else "Não Informado"
+
+        nc1, nc2, nc3 = st.columns(3)
+
+        with nc1:
+            if pneStatus not in ["Não Informado", "Não", "NÃO", "nao", "Não "]:
+                st.markdown(f"<div class='info-box' style='border-left: 5px solid #e74c3c;'><b>♿ PNE:</b> {pneTipo}</div>", unsafe_allow_html=True)
+            else:
+                st.markdown("<div class='info-box' style='color: #95a5a6;'><b>♿ PNE:</b> Não Informado</div>", unsafe_allow_html=True)
+
+        with nc2:
+            if transtornoStatus not in ["Não Informado", "Não", "NÃO", "nao", "Não "]:
+                st.markdown(f"<div class='info-box' style='border-left: 5px solid #f39c12;'><b>🧠 Transtorno:</b> {transtornoTipo}</div>", unsafe_allow_html=True)
+            else:
+                st.markdown("<div class='info-box' style='color: #95a5a6;'><b>🧠 Transtorno:</b> Não Informado</div>", unsafe_allow_html=True)
+
+        with nc3:
+            if superStatus not in ["Não Informado", "Não", "NÃO", "nao", "Não "]:
+                st.markdown(f"<div class='info-box' style='border-left: 5px solid #2ecc71;'><b>⭐ Superdotação:</b> {superTipo}</div>", unsafe_allow_html=True)
+            else:
+                st.markdown("<div class='info-box' style='color: #95a5a6;'><b>⭐ Superdotação:</b> Não Informado</div>", unsafe_allow_html=True)
+        # FIM DO BLOCO NAPNE
+
     st.divider()
 
     ordenarPor=st.radio("Ordenar disciplinas por:", ["Nota", "Frequência"], horizontal=True)
