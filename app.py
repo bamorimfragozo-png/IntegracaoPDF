@@ -265,13 +265,6 @@ def extrairDados(arquivosPdf):
 
 #UPLOAD DOS RELATÓRIOS EM PDF
 if (not st.session_state.dadosCarregados):
-    # ACRESCENTAR AQUI
-    if (st.sidebar.button("Ir para Dashboard")):
-        st.session_state.dadosCarregados=True
-        st.session_state.materiaSelecionada=None
-        st.session_state.numAluno=0
-        st.rerun()
-    # FIM DO QUE DEVE SER ACRESCENTADO
     st.title("Upload de PDFs")
     st.subheader("Selecione a sala correspondente e faça o upload dos relatórios em PDF.")
 
