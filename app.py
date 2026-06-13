@@ -304,6 +304,12 @@ else:
         st.session_state.numAluno=0
         st.session_state.materiaSelecionada=None
         st.rerun()
+        
+    if (st.sidebar.button("Voltar para Dashboard")):
+        st.session_state.dadosCarregados=True
+        st.session_state.materiaSelecionada=None
+        st.session_state.numAluno=0
+        st.rerun()
 
     st.sidebar.write(f"Visualizando: **{st.session_state.salaAtiva}**")
 
