@@ -139,32 +139,33 @@ def extrairDados(arquivosPdf):
         portSuperdotacao = "Não Informado"
         superdotacao = "Não Informado"
 
-       for linha in linhas:
-           linha_normalizada = " ".join(linha.split())
-           if "Necessidades Especiais" in linha_normalizada:
-               busca = re.search(r"Especiais\s*:\s*(.*)", linha_normalizada, re.IGNORECASE)
-               if busca: portNecesEspeciais = busca.group(1).strip()
+        for linha in linhas:
+            linha_normalizada = " ".join(linha.split())
 
-           if "Tipo de Necessidade Especial" in linha_normalizada:
-               busca = re.search(r"Especial\s*:\s*(.*)", linha_normalizada, re.IGNORECASE)
-               if busca: tipoNecesEspecial = busca.group(1).strip()
+            if "Necessidades Especiais" in linha_normalizada:
+                busca = re.search(r"Especiais\s*:\s*(.*)", linha_normalizada, re.IGNORECASE)
+                if busca: portNecesEspeciais = busca.group(1).strip()
 
-           if "Portador(a) de Transtorno" in linha_normalizada:
-               busca = re.search(r"Transtorno\s*:\s*(.*)", linha_normalizada, re.IGNORECASE)
-               if busca: portTranstorno = busca.group(1).strip()
+            if "Tipo de Necessidade Especial" in linha_normalizada:
+                busca = re.search(r"Especial\s*:\s*(.*)", linha_normalizada, re.IGNORECASE)
+                if busca: tipoNecesEspecial = busca.group(1).strip()
 
-           if "Tipo de Transtorno" in linha_normalizada:
-               busca = re.search(r"Transtorno\s*:\s*(.*)", linha_normalizada, re.IGNORECASE)
-               if busca: tipoTranstorno = busca.group(1).strip()
+            if "Portador(a) de Transtorno" in linha_normalizada:
+                busca = re.search(r"Transtorno\s*:\s*(.*)", linha_normalizada, re.IGNORECASE)
+                if busca: portTranstorno = busca.group(1).strip()
 
-           if "Portador(a) de Superdota" in linha_normalizada:
-               busca = re.search(r"Superdota[çc]ã[oo]\s*:\s*(.*)", linha_normalizada, re.IGNORECASE)
-               if busca: portSuperdotacao = busca.group(1).strip()
+            if "Tipo de Transtorno" in linha_normalizada:
+                busca = re.search(r"Transtorno\s*:\s*(.*)", linha_normalizada, re.IGNORECASE)
+                if busca: tipoTranstorno = busca.group(1).strip()
 
-           if "Superdotação" in linha_normalizada or "Superdotacao" in linha_normalizada:
-               if "Portador(a)" not in linha_normalizada:
-                   busca = re.search(r"Superdota[çc]ã[oo]\s*:\s*(.*)", linha_normalizada, re.IGNORECASE)
-                   if busca: superdotacao = busca.group(1).strip()
+            if "Portador(a) de Superdota" in linha_normalizada:
+                busca = re.search(r"Superdota[çc]ã[oo]\s*:\s*(.*)", linha_normalizada, re.IGNORECASE)
+                if busca: portSuperdotacao = busca.group(1).strip()
+
+            if "Superdotação" in linha_normalizada or "Superdotacao" in linha_normalizada:
+                if "Portador(a)" not in linha_normalizada:
+                    busca = re.search(r"Superdota[çc]ã[oo]\s*:\s*(.*)", linha_normalizada, re.IGNORECASE)
+                    if busca: superdotacao = busca.group(1).strip()
         #FIM NAPNE
         
         mapeamentoDisciplinas={}
