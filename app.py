@@ -118,70 +118,6 @@ def extrairDados(arquivosPdf):
         nomeAluno="Não Identificado"
         matriculaAluno="Não Identificada"
         serieAluno="Não Identificada"
-
-        # =========================================================================
-        # 🟢 TRECHO 1 CORRIGIDO: ACUMULADOR DO NAPNE
-        # =========================================================================
-        eh_pdf_napne = False
-        for linha in linhas: # Prevenção de digitação
-            if "Necessidades Especiais" in linha or "Transtorno" in linha or "Superdota" in linha:
-                eh_pdf_napne = True
-                break
-
-        if eh_pdf_napne:
-            matricula_alvo = "Não Identificada"
-            for linha in linhas:
-                for termo in ["matrícula", "matricula", "prontuário", "prontuario", "aluno", "nome"]:
-                    if termo in linha.lower() and ":" in linha:
-                        partes_m = linha.split(":")
-                        conteudo_linha = partes_m[1].strip() if len(partes_m) > 1 else ""
-                        
-                        # Captura qualquer padrão alfanumérico parecido com a matrícula (ex: BT3044548)
-                        busca_m = re.search(r'([A-Z0-9]{7,10})', conteudo_linha, re.IGNORECASE)
-                        if busca_m:
-                            matricula_alvo = busca_m.group(1).strip().upper()
-                            break
-                if matricula_alvo != "Não Identificada":
-                    break
-
-            p_pne, t_pne, p_trans, t_trans, p_super, t_super = "Não Informado", "Não Informado", "Não Informado", "Não Informado", "Não Informado", "Não Informado"
-
-            # 🔄 SUBSTITUA OS SEUS RE.SEARCH ANTIGOS POR ESTES:
-            for linha in linhas:
-                if "Necessidades Especiais" in linha:
-                    busca = re.search(r"Especiais\s*:\s*(.{1,100})", linha, re.IGNORECASE)
-                    if busca: p_pne = busca.group(1).strip()
-
-                if "Tipo de Necessidade Especial" in linha:
-                    busca = re.search(r"Especial\s*:\s*(.{1,100})", linha, re.IGNORECASE)
-                    if busca: t_pne = busca.group(1).strip()
-
-                if "Portador(a) de Transtorno" in linha:
-                    busca = re.search(r"Transtorno\s*:\s*(.{1,100})", linha, re.IGNORECASE)
-                    if busca: p_trans = busca.group(1).strip()
-
-                if "Tipo de Transtorno" in linha:
-                    busca = re.search(r"Transtorno\s*:\s*(.{1,100})", linha, re.IGNORECASE)
-                    if busca: t_trans = busca.group(1).strip()
-
-                if "Portador(a) de Superdotação" in linha:
-                    busca = re.search(r"Superdota[çc]ã[oo]\s*:\s*(.{1,100})", linha, re.IGNORECASE)
-                    if busca: p_super = busca.group(1).strip()
-
-                if "Superdotação" in linha or "Superdotacao" in linha:
-                    if "Portador(a)" not in linha:
-                        busca = re.search(r"Superdota[çc]ã[oo]\s*:\s*(.{1,100})", linha, re.IGNORECASE)
-                        if busca: t_super = busca.group(1).strip()
-
-            if matricula_alvo != "Não Identificada":
-                mapa_napne_temporario[matricula_alvo] = {
-                    'PNE': p_pne, 'Tipo NE': t_pne,
-                    'Portador Transtorno': p_trans, 'Tipo Transtorno': t_trans,
-                    'Portador Superdotação': p_super, 'Superdotação': t_super
-                }
-            continue 
-        # =========================================================================
-        # 🛑 FIM DO TRECHO 1 CORRIGIDO
         
         for linha in linhas:
             if ("Aluno" in linha or "Nome" in linha):
@@ -339,25 +275,6 @@ def extrairDados(arquivosPdf):
                 'Núcleo': nucleo,
                 'Observações': ''
             })
-
-   # 🔄 SUBSTITUA TODO AQUELE BLOCO "IF LOCALS()" POR ESTE AQUI:
-    for dado in dadosFinais:
-        mat_aluno = dado['Matrícula'].strip().upper()
-        if mat_aluno in mapa_napne_temporario:
-            info = mapa_napne_temporario[mat_aluno]
-            dado['PNE'] = info['PNE']
-            dado['Tipo NE'] = info['Tipo NE']
-            dado['Portador Transtorno'] = info['Portador Transtorno']
-            dado['Tipo Transtorno'] = info['Tipo Transtorno']
-            dado['Portador Superdotação'] = info['Portador Superdotação']
-            dado['Superdotação'] = info['Superdotação']
-        else:
-            dado['PNE'] = "Não Informado"
-            dado['Tipo NE'] = "Não Informado"
-            dado['Portador Transtorno'] = "Não Informado"
-            dado['Tipo Transtorno'] = "Não Informado"
-            dado['Portador Superdotação'] = "Não Informado"
-            dado['Superdotação'] = "Não Informado"
     
     return pd.DataFrame(dadosFinais)
 
@@ -455,38 +372,6 @@ else:
 
         c1.markdown(f"<div class='info-box'><b>Matrícula:</b> {matriculaVal}</div>", unsafe_allow_html=True)
         c2.markdown(f"<div class='info-box'><b>Série:</b> {serieVal}</div>", unsafe_allow_html=True)
-
-    # =========================================================================
-        # 🟢 TRECHO 3: CAMPOS VISUAIS DO NAPNE NO DASHBOARD
-        # =========================================================================
-        st.markdown("#### Informações de Acessibilidade (NAPNE)")
-        n_col1, n_col2, n_col3 = st.columns(3)
-        
-        val_pne = BDAluno['PNE'].iloc[0] if 'PNE' in BDAluno.columns else "Não Informado"
-        val_t_pne = BDAluno['Tipo NE'].iloc[0] if 'Tipo NE' in BDAluno.columns else "Não Informado"
-        val_trans = BDAluno['Portador Transtorno'].iloc[0] if 'Portador Transtorno' in BDAluno.columns else "Não Informado"
-        val_t_trans = BDAluno['Tipo Transtorno'].iloc[0] if 'Tipo Transtorno' in BDAluno.columns else "Não Informado"
-        val_super = BDAluno['Portador Superdotação'].iloc[0] if 'Portador Superdotação' in BDAluno.columns else "Não Informado"
-        val_t_super = BDAluno['Superdotação'].iloc[0] if 'Superdotação' in BDAluno.columns else "Não Informado"
-
-        with n_col1:
-            st.markdown(f"<div class='info-box'><b>PNE:</b> {val_pne}</div>", unsafe_allow_html=True)
-            # 🔄 MUDE ESTA LINHA:
-            if str(val_pne).strip().lower() in ["sim", "s"]:
-                st.markdown(f"<div class='info-box' style='color: #e67e22;'><b>Tipo NE:</b> {val_t_pne}</div>", unsafe_allow_html=True)
-                
-        with n_col2:
-            st.markdown(f"<div class='info-box'><b>Transtorno:</b> {val_trans}</div>", unsafe_allow_html=True)
-            # 🔄 MUDE ESTA LINHA:
-            if str(val_trans).strip().lower() in ["sim", "s"]:
-                st.markdown(f"<div class='info-box' style='color: #e67e22;'><b>Tipo Transtorno:</b> {val_t_trans}</div>", unsafe_allow_html=True)
-                
-        with n_col3:
-            st.markdown(f"<div class='info-box'><b>Superdotação:</b> {val_super}</div>", unsafe_allow_html=True)
-            # 🔄 MUDE ESTA LINHA:
-            if str(val_super).strip().lower() in ["sim", "s"]:
-                st.markdown(f"<div class='info-box' style='color: #e67e22;'><b>Laudo:</b> {val_t_super}</div>", unsafe_allow_html=True)
-    ##############################
 
     st.divider()
 
