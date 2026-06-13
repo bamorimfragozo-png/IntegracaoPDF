@@ -139,30 +139,33 @@ def extrairDados(arquivosPdf):
         portSuperdotacao = "Não Informado"
         superdotacao = "Não Informado"
 
-        for linha in linhas:
-            if "Portador(a) de Necessidades Especiais" in linha:
-                busca = re.search(r"Portador\(a\) de Necessidades Especiais:\s*(.*)", linha, re.IGNORECASE)
+       for linha in linhas:
+            # Normaliza os espaços para evitar erros de leitura do PDF
+            linha_normalizada = " ".join(linha.split())
+
+            if "Necessidades Especiais" in linha_normalizada:
+                busca = re.search(r"Especiais\s*:\s*(.*)", linha_normalizada, re.IGNORECASE)
                 if busca: portNecesEspeciais = busca.group(1).strip()
 
-            if "Tipo de Necessidade Especial" in linha:
-                busca = re.search(r"Tipo de Necessidade Especial:\s*(.*)", linha, re.IGNORECASE)
+            if "Tipo de Necessidade Especial" in linha_normalizada:
+                busca = re.search(r"Especial\s*:\s*(.*)", linha_normalizada, re.IGNORECASE)
                 if busca: tipoNecesEspecial = busca.group(1).strip()
 
-            if "Portador(a) de Transtorno" in linha:
-                busca = re.search(r"Portador\(a\) de Transtorno:\s*(.*)", linha, re.IGNORECASE)
+            if "Portador(a) de Transtorno" in linha_normalizada:
+                busca = re.search(r"Transtorno\s*:\s*(.*)", linha_normalizada, re.IGNORECASE)
                 if busca: portTranstorno = busca.group(1).strip()
 
-            if "Tipo de Transtorno" in linha:
-                busca = re.search(r"Tipo de Transtorno:\s*(.*)", linha, re.IGNORECASE)
+            if "Tipo de Transtorno" in linha_normalizada:
+                busca = re.search(r"Transtorno\s*:\s*(.*)", linha_normalizada, re.IGNORECASE)
                 if busca: tipoTranstorno = busca.group(1).strip()
 
-            if "Portador(a) de Superdotação" in linha or "Portador(a) de Superdotacao" in linha:
-                busca = re.search(r"Portador\(a\) de Superdota[çc]ã[oo]:\s*(.*)", linha, re.IGNORECASE)
+            if "Portador(a) de Superdota" in linha_normalizada:
+                busca = re.search(r"Superdota[çc]ã[oo]\s*:\s*(.*)", linha_normalizada, re.IGNORECASE)
                 if busca: portSuperdotacao = busca.group(1).strip()
 
-            if "Superdotação" in linha or "Superdotacao" in linha:
-                if "Portador(a)" not in linha:
-                    busca = re.search(r"Superdota[çc]ã[oo]:\s*(.*)", linha, re.IGNORECASE)
+            if "Superdotação" in linha_normalizada or "Superdotacao" in linha_normalizada:
+                if "Portador(a)" not in linha_normalizada:
+                    busca = re.search(r"Superdota[çc]ã[oo]\s*:\s*(.*)", linha_normalizada, re.IGNORECASE)
                     if busca: superdotacao = busca.group(1).strip()
         #FIM NAPNE
         
