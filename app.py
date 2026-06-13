@@ -369,6 +369,20 @@ def extrairDados(arquivosPdf):
                 'Superdotação': superdotacao
             })
 
+    # =========================================================================
+    if 'mapa_napne_temporario' in locals() and mapa_napne_temporario:
+        for dado in dadosFinais:
+            mat_aluno = dado['Matrícula'].strip()
+            if mat_aluno in mapa_napne_temporario:
+                info = mapa_napne_temporario[mat_aluno]
+                dado['PNE'] = info['PNE']
+                dado['Tipo NE'] = info['Tipo NE']
+                dado['Portador Transtorno'] = info['Portador Transtorno']
+                dado['Tipo Transtorno'] = info['Tipo Transtorno']
+                dado['Portador Superdotação'] = info['Portador Superdotação']
+                dado['Superdotação'] = info['Superdotação']
+    # =========================================================================
+    
     return pd.DataFrame(dadosFinais)
 
 #UPLOAD DOS RELATÓRIOS EM PDF
