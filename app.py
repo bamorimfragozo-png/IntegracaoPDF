@@ -104,6 +104,56 @@ def extrairDados(arquivosPdf):
         matriculaAluno="Não Identificada"
         serieAluno="Não Identificada"
 
+        eh_pdf_napne = False
+        for linha in linhas:
+            if "Necessidades Especiais" in linha or "Transtorno" in linha or "Superdota" in linha:
+                eh_pdf_napne = True
+                break
+
+        if eh_pdf_napne:
+            # 1. Primeiro descobrimos de quem é esse PDF do NAPNE
+            for linha in linhas:
+                if "Aluno" in linha or "Nome" in linha:
+                    partes = linha.split(":")
+                    valNome = partes[1].strip() if len(partes) > 1 else linha.replace("Aluno", "").replace("Nome", "").strip()
+                    nomeAluno = re.sub(r'\bMatrícula\b.*', '', valNome, flags=re.IGNORECASE).strip()
+            
+            # 2. Se não achou o nome pelo texto, pega o nome do arquivo
+            if nomeAluno == "Não Identificado" or not nomeAluno.strip():
+                nomeAluno = arquivo.name.replace(".pdf", "").replace("NAPNE", "").replace("_", " ").strip()
+
+            # 3. Extrai os dados do NAPNE deste arquivo
+            p_pne, t_pne, p_trans, t_trans, p_super, t_super = "Não Informado", "Não Informado", "Não Informado", "Não Informado", "Não Informado", "Não Informado"
+            for linha in linhas:
+                linha_norm = " ".join(linha.split())
+                if "Necessidades Especiais" in linha_norm:
+                    b = re.search(r"Especiais\s*:\s*(.*)", linha_norm, re.IGNORECASE)
+                    if b: p_pne = b.group(1).strip()
+                if "Tipo de Necessidade Especial" in linha_norm:
+                    b = re.search(r"Especial\s*:\s*(.*)", linha_norm, re.IGNORECASE)
+                    if b: t_pne = b.group(1).strip()
+                if "Portador(a) de Transtorno" in linha_norm:
+                    b = re.search(r"Transtorno\s*:\s*(.*)", linha_norm, re.IGNORECASE)
+                    if b: p_trans = b.group(1).strip()
+                if "Tipo de Transtorno" in linha_norm:
+                    b = re.search(r"Transtorno\s*:\s*(.*)", linha_norm, re.IGNORECASE)
+                    if b: t_trans = b.group(1).strip()
+                if "Portador(a) de Superdota" in linha_norm:
+                    b = re.search(r"Superdota[çc]ã[oo]\s*:\s*(.*)", linha_norm, re.IGNORECASE)
+                    if b: p_super = b.group(1).strip()
+                if "Superdotação" in linha_norm or "Superdotacao" in linha_norm:
+                    if "Portador(a)" not in linha_norm:
+                        b = re.search(r"Superdota[çc]ã[oo]\s*:\s*(.*)", linha_norm, re.IGNORECASE)
+                        if b: t_super = b.group(1).strip()
+
+            # 4. Cria uma linha temporária para injetar esses dados na planilha via Pandas
+            dadosFinais.append({
+                'Nº Chamada': int(numeroChamada), 'Aluno': nomeAluno, 'Matrícula': 'NAPNE', 'Série': 'NAPNE', 'Disciplina': 'Acessibilidade',
+                '1º BI': 0.0, '2º BI': 0.0, '3º BI': 0.0, '4º BI': 0.0, 'Média Final': 0.0, 'Freq. Final': 100.0, 'Núcleo': 'Comum', 'Observações': '',
+                'PNE': p_pne, 'Tipo NE': t_pne, 'Portador Transtorno': p_trans, 'Tipo Transtorno': t_trans, 'Portador Superdotação': p_super, 'Superdotação': t_super
+            })
+            continue # Pula o resto do código (evita procurar notas onde não tem)
+        
         for linha in linhas:
             if ("Aluno" in linha or "Nome" in linha):
                 partes=linha.split(":")
