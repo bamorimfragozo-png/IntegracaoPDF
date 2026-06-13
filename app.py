@@ -105,6 +105,9 @@ def extrairDados(arquivosPdf):
         serieAluno="Não Identificada"
 
         #PDF NAPNE LEITURA
+        if 'mapa_napne_temporario' not in locals():
+            mapa_napne_temporario = {}
+
         eh_pdf_napne = False
         for linha in linhas:
             if "Necessidades Especiais" in linha or "Transtorno" in linha or "Superdota" in linha:
@@ -114,11 +117,10 @@ def extrairDados(arquivosPdf):
         if eh_pdf_napne:
             matricula_alvo = "Não Identificada"
             
-            # 1. Busca a Matrícula dentro do PDF do NAPNE linha por linha (Inspirado no seu código)
+            # Busca a Matrícula linha por linha exatamente igual ao seu código original
             for linha in linhas:
                 for termo in ["matrícula", "matricula", "prontuário", "prontuario"]:
                     if termo in linha.lower():
-                        # Captura exatamente o padrão de matrícula de 9 dígitos do seu sistema
                         busca_m = re.search(r"(?:cula|ario)\s*:\s*(.{9})", linha, re.IGNORECASE)
                         if busca_m:
                             matricula_alvo = busca_m.group(1).strip()
@@ -126,10 +128,10 @@ def extrairDados(arquivosPdf):
                 if matricula_alvo != "Não Identificada":
                     break
 
-            # 2. Inicializa as variáveis de captura de acessibilidade
+            # Inicializa as variáveis de captura de acessibilidade
             p_pne, t_pne, p_trans, t_trans, p_super, t_super = "Não Informado", "Não Informado", "Não Informado", "Não Informado", "Não Informado", "Não Informado"
 
-            # 3. Varre linha por linha capturando as informações do NAPNE (Igual à Matrícula)
+            # Varre linha por linha capturando as informações do NAPNE (Igual à Matrícula)
             for linha in linhas:
                 if "Necessidades Especiais" in linha:
                     busca = re.search(r"Especiais\s*:\s*(.*)", linha, re.IGNORECASE)
@@ -156,16 +158,13 @@ def extrairDados(arquivosPdf):
                         busca = re.search(r"Superdota[çc]ã[oo]\s*:\s*(.*)", linha, re.IGNORECASE)
                         if busca: t_super = busca.group(1).strip()
 
-            # 4. LINKAGEM POR MATRÍCULA: Atualiza todas as linhas de matérias que têm essa matrícula
+            # Guarda os dados mapeados pela matrícula neste dicionário para usar no final
             if matricula_alvo != "Não Identificada":
-                for dado in dadosFinais:
-                    if dado['Matrícula'].strip() == matricula_alvo.strip():
-                        dado['PNE'] = p_pne
-                        dado['Tipo NE'] = t_pne
-                        dado['Portador Transtorno'] = p_trans
-                        dado['Tipo Transtorno'] = t_trans
-                        dado['Portador Superdotação'] = p_super
-                        dado['Superdotação'] = t_super
+                mapa_napne_temporario[matricula_alvo.strip()] = {
+                    'PNE': p_pne, 'Tipo NE': t_pne,
+                    'Portador Transtorno': p_trans, 'Tipo Transtorno': t_trans,
+                    'Portador Superdotação': p_super, 'Superdotação': t_super
+                }
 
             continue
 
