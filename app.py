@@ -65,7 +65,7 @@ if ("materiaSelecionada" not in st.session_state):
 if ("resetObs" not in st.session_state):
     st.session_state.resetObs=0
 if ("salaAtiva" not in st.session_state):
-    st.session_state.salaSelecionada="Redes 1"
+    st.session_state.salaAtiva="Redes 1"
 if ("fotoAluno" not in st.session_state):
     st.session_state.fotoAluno={}
 if ("ordenacao" not in st.session_state):
@@ -491,15 +491,14 @@ else:
         with m4:
             st.write("### Observações")
             chaveObs=f"{alunoNome}_{st.session_state.materiaSelecionada}_{st.session_state.resetObs}".replace(" ", "_")
-            obsSalva=str(BD['Observações']) 
+            obsSalva=""
             if ('Observações' in BDMateria.index and pd.notna(BDMateria['Observações'])):
-              obsSalva=str(BD['Observações'])
-            else:
-              obsSalva=""
-            historico=[] 
+                obsSalva=str(BDMateria['Observações'])
+            historico=[]
+
             for n in obsSalva.split(" | "):
-              if (n.strip() and n.lower()!="nan"):
-                historico.append(n.strip())
+                if (n.strip() and n.lower()!="nan"):
+                    historico.append(n.strip())
 
             with st.form(key=f"form_{chaveObs}"):
                 entradasAtuais=[]
