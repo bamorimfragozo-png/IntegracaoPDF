@@ -118,6 +118,68 @@ def extrairDados(arquivosPdf):
         nomeAluno="Não Identificado"
         matriculaAluno="Não Identificada"
         serieAluno="Não Identificada"
+
+        # =========================================================================
+        # 🟢 INÍCIO DO TRECHO DO NAPNE: VÍNCULO POR MATRÍCULA
+        # =========================================================================
+        if 'mapa_napne_temporario' not in locals():
+            mapa_napne_temporario = {}
+
+        eh_pdf_napne = False
+        for linha in linhas:
+            if "Necessidades Especiais" in linha or "Transtorno" in linha or "Superdota" in linha:
+                eh_pdf_napne = True
+                break
+
+        if eh_pdf_napne:
+            matricula_alvo = "Não Identificada"
+            for linha in linhas:
+                for termo in ["matrícula", "matricula", "prontuário", "prontuario"]:
+                    if termo in linha.lower():
+                        busca_m = re.search(r"cula:\s*(.{9})", linha, re.IGNORECASE)
+                        if busca_m:
+                            matricula_alvo = busca_m.group(1).strip()
+                            break
+                if matricula_alvo != "Não Identificada":
+                    break
+
+            p_pne, t_pne, p_trans, t_trans, p_super, t_super = "Não Informado", "Não Informado", "Não Informado", "Não Informado", "Não Informado", "Não Informado"
+
+            for linha in linhas:
+                if "Necessidades Especiais" in linha:
+                    busca = re.search(r"Especiais\s*:\s*(.*)", linha, re.IGNORECASE)
+                    if busca: p_pne = busca.group(1).strip()
+
+                if "Tipo de Necessidade Especial" in linha:
+                    busca = re.search(r"Especial\s*:\s*(.*)", linha, re.IGNORECASE)
+                    if busca: t_pne = busca.group(1).strip()
+
+                if "Portador(a) de Transtorno" in linha:
+                    busca = re.search(r"Transtorno\s*:\s*(.*)", linha, re.IGNORECASE)
+                    if busca: p_trans = busca.group(1).strip()
+
+                if "Tipo de Transtorno" in linha:
+                    busca = re.search(r"Transtorno\s*:\s*(.*)", linha, re.IGNORECASE)
+                    if busca: t_trans = busca.group(1).strip()
+
+                if "Portador(a) de Superdotação" in linha:
+                    busca = re.search(r"Superdota[çc]ã[oo]\s*:\s*(.*)", linha, re.IGNORECASE)
+                    if busca: p_super = busca.group(1).strip()
+
+                if "Superdotação" in linha or "Superdotacao" in linha:
+                    if "Portador(a)" not in linha:
+                        busca = re.search(r"Superdota[çc]ã[oo]\s*:\s*(.*)", linha, re.IGNORECASE)
+                        if busca: t_super = busca.group(1).strip()
+
+            if matricula_alvo != "Não Identificada":
+                mapa_napne_temporario[matricula_alvo] = {
+                    'PNE': p_pne, 'Tipo NE': t_pne,
+                    'Portador Transtorno': p_trans, 'Tipo Transtorno': t_trans,
+                    'Portador Superdotação': p_super, 'Superdotação': t_super
+                }
+            continue 
+        # =========================================================================
+        # 🛑 FIM DO TRECHO DO NAPNE
         
         for linha in linhas:
             if ("Aluno" in linha or "Nome" in linha):
@@ -275,6 +337,39 @@ def extrairDados(arquivosPdf):
                 'Núcleo': nucleo,
                 'Observações': ''
             })
+
+    # =========================================================================
+    # 🟢 INÍCIO DO TRECHO DE ASSOCIAÇÃO: INJETA O LAUDO EM CADA DISCIPLINA
+    # =========================================================================
+    if 'mapa_napne_temporario' in locals() and mapa_napne_temporario:
+        for dado in dadosFinais:
+            mat_aluno = dado['Matrícula'].strip()
+            if mat_aluno in mapa_napne_temporario:
+                info = mapa_napne_temporario[mat_aluno]
+                dado['PNE'] = info['PNE']
+                dado['Tipo NE'] = info['Tipo NE']
+                dado['Portador Transtorno'] = info['Portador Transtorno']
+                dado['Tipo Transtorno'] = info['Tipo Transtorno']
+                dado['Portador Superdotação'] = info['Portador Superdotação']
+                dado['Superdotação'] = info['Superdotação']
+            else:
+                dado['PNE'] = "Não Informado"
+                dado['Tipo NE'] = "Não Informado"
+                dado['Portador Transtorno'] = "Não Informado"
+                dado['Tipo Transtorno'] = "Não Informado"
+                dado['Portador Superdotação'] = "Não Informado"
+                dado['Superdotação'] = "Não Informado"
+    else:
+        for dado in dadosFinais:
+            dado['PNE'] = "Não Informado"
+            dado['Tipo NE'] = "Não Informado"
+            dado['Portador Transtorno'] = "Não Informado"
+            dado['Tipo Transtorno'] = "Não Informado"
+            dado['Portador Superdotação'] = "Não Informado"
+            dado['Superdotação'] = "Não Informado"
+    # =========================================================================
+    # 🛑 FIM DO TRECHO DE ASSOCIAÇÃO
+    
     
     return pd.DataFrame(dadosFinais)
 
