@@ -105,7 +105,7 @@ def extrairDados(arquivosPdf):
         serieAluno="Não Identificada"
 
         #PDF NAPNE LEITURA
-eh_pdf_napne = False
+        eh_pdf_napne = False
         for linha in linhas:
             if "Necessidades Especiais" in linha or "Transtorno" in linha or "Superdota" in linha:
                 eh_pdf_napne = True
