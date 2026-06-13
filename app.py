@@ -89,9 +89,6 @@ if (st.sidebar.button("Dashboard")):
 #Extração de dados
 def extrairDados(arquivosPdf):
     dadosFinais=[]
-    ############
-    mapa_napne_temporario = {}
-    ############
 
     for numeroChamada, arquivo in enumerate(arquivosPdf, start=1):
         memoriaPdf=io.BytesIO(arquivo.getvalue())
