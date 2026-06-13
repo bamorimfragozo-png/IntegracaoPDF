@@ -131,6 +131,41 @@ def extrairDados(arquivosPdf):
         if (fotos):
             st.session_state.fotoAluno[nomeAluno]=fotos
 
+        #EXTRAÇÃO DADOS NAPNE
+        portNecesEspeciais = "Não Informado"
+        tipoNecesEspecial = "Não Informado"
+        portTranstorno = "Não Informado"
+        tipoTranstorno = "Não Informado"
+        portSuperdotacao = "Não Informado"
+        superdotacao = "Não Informado"
+
+        for linha in linhas:
+            if "Portador(a) de Necessidades Especiais" in linha:
+                busca = re.search(r"Portador\(a\) de Necessidades Especiais:\s*(.*)", linha, re.IGNORECASE)
+                if busca: portNecesEspeciais = busca.group(1).strip()
+
+            if "Tipo de Necessidade Especial" in linha:
+                busca = re.search(r"Tipo de Necessidade Especial:\s*(.*)", linha, re.IGNORECASE)
+                if busca: tipoNecesEspecial = busca.group(1).strip()
+
+            if "Portador(a) de Transtorno" in linha:
+                busca = re.search(r"Portador\(a\) de Transtorno:\s*(.*)", linha, re.IGNORECASE)
+                if busca: portTranstorno = busca.group(1).strip()
+
+            if "Tipo de Transtorno" in linha:
+                busca = re.search(r"Tipo de Transtorno:\s*(.*)", linha, re.IGNORECASE)
+                if busca: tipoTranstorno = busca.group(1).strip()
+
+            if "Portador(a) de Superdotação" in linha or "Portador(a) de Superdotacao" in linha:
+                busca = re.search(r"Portador\(a\) de Superdota[çc]ã[oo]:\s*(.*)", linha, re.IGNORECASE)
+                if busca: portSuperdotacao = busca.group(1).strip()
+
+            if "Superdotação" in linha or "Superdotacao" in linha:
+                if "Portador(a)" not in linha:
+                    busca = re.search(r"Superdota[çc]ã[oo]:\s*(.*)", linha, re.IGNORECASE)
+                    if busca: superdotacao = busca.group(1).strip()
+        #FIM NAPNE
+        
         mapeamentoDisciplinas={}
 
         for linha in linhas:
@@ -258,7 +293,13 @@ def extrairDados(arquivosPdf):
                 'Média Final': blocos['mediaFinal'],
                 'Freq. Final': blocos['freqFinal'],
                 'Núcleo': nucleo,
-                'Observações': ''
+                'Observações': '',
+                'PNE': portNecesEspeciais,
+                'Tipo NE': tipoNecesEspecial,
+                'Portador Transtorno': portTranstorno,
+                'Tipo Transtorno': tipoTranstorno,
+                'Portador Superdotação': portSuperdotacao,
+                'Superdotação': superdotacao
             })
 
     return pd.DataFrame(dadosFinais)
