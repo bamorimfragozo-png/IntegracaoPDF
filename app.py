@@ -103,72 +103,7 @@ def extrairDados(arquivosPdf):
         nomeAluno="Não Identificado"
         matriculaAluno="Não Identificada"
         serieAluno="Não Identificada"
-
-        #PDF NAPNE LEITURA
-        if 'mapa_napne_temporario' not in locals():
-            mapa_napne_temporario = {}
-
-        eh_pdf_napne = False
-        for linha in linhas:
-            if "Necessidades Especiais" in linha or "Transtorno" in linha or "Superdota" in linha:
-                eh_pdf_napne = True
-                break
-
-        if eh_pdf_napne:
-            matricula_alvo = "Não Identificada"
-            
-            # Busca a Matrícula linha por linha exatamente igual ao seu código original
-            for linha in linhas:
-                for termo in ["matrícula", "matricula", "prontuário", "prontuario"]:
-                    if termo in linha.lower():
-                        busca_m = re.search(r"(?:cula|ario)\s*:\s*(.{9})", linha, re.IGNORECASE)
-                        if busca_m:
-                            matricula_alvo = busca_m.group(1).strip()
-                            break
-                if matricula_alvo != "Não Identificada":
-                    break
-
-            # Inicializa as variáveis de captura de acessibilidade
-            p_pne, t_pne, p_trans, t_trans, p_super, t_super = "Não Informado", "Não Informado", "Não Informado", "Não Informado", "Não Informado", "Não Informado"
-
-            # Varre linha por linha capturando as informações do NAPNE (Igual à Matrícula)
-            for linha in linhas:
-                if "Necessidades Especiais" in linha:
-                    busca = re.search(r"Especiais\s*:\s*(.*)", linha, re.IGNORECASE)
-                    if busca: p_pne = busca.group(1).strip()
-
-                if "Tipo de Necessidade Especial" in linha:
-                    busca = re.search(r"Especial\s*:\s*(.*)", linha, re.IGNORECASE)
-                    if busca: t_pne = busca.group(1).strip()
-
-                if "Portador(a) de Transtorno" in linha:
-                    busca = re.search(r"Transtorno\s*:\s*(.*)", linha, re.IGNORECASE)
-                    if busca: p_trans = busca.group(1).strip()
-
-                if "Tipo de Transtorno" in linha:
-                    busca = re.search(r"Transtorno\s*:\s*(.*)", linha, re.IGNORECASE)
-                    if busca: t_trans = busca.group(1).strip()
-
-                if "Portador(a) de Superdotação" in linha:
-                    busca = re.search(r"Superdota[çc]ã[oo]\s*:\s*(.*)", linha, re.IGNORECASE)
-                    if busca: p_super = busca.group(1).strip()
-
-                if "Superdotação" in linha or "Superdotacao" in linha:
-                    if "Portador(a)" not in linha:
-                        busca = re.search(r"Superdota[çc]ã[oo]\s*:\s*(.*)", linha, re.IGNORECASE)
-                        if busca: t_super = busca.group(1).strip()
-
-            # Guarda os dados mapeados pela matrícula neste dicionário para usar no final
-            if matricula_alvo != "Não Identificada":
-                mapa_napne_temporario[matricula_alvo.strip()] = {
-                    'PNE': p_pne, 'Tipo NE': t_pne,
-                    'Portador Transtorno': p_trans, 'Tipo Transtorno': t_trans,
-                    'Portador Superdotação': p_super, 'Superdotação': t_super
-                }
-
-            continue
-
-        #FIM LEITURA PDF NAPNE
+        
         for linha in linhas:
             if ("Aluno" in linha or "Nome" in linha):
                 partes=linha.split(":")
@@ -195,43 +130,6 @@ def extrairDados(arquivosPdf):
 
         if (fotos):
             st.session_state.fotoAluno[nomeAluno]=fotos
-
-        #EXTRAÇÃO DADOS NAPNE
-        portNecesEspeciais = "Não Informado"
-        tipoNecesEspecial = "Não Informado"
-        portTranstorno = "Não Informado"
-        tipoTranstorno = "Não Informado"
-        portSuperdotacao = "Não Informado"
-        superdotacao = "Não Informado"
-
-        for linha in linhas:
-            linha_normalizada = " ".join(linha.split())
-
-            if "Necessidades Especiais" in linha_normalizada:
-                busca = re.search(r"Especiais\s*:\s*(.*)", linha_normalizada, re.IGNORECASE)
-                if busca: portNecesEspeciais = busca.group(1).strip()
-
-            if "Tipo de Necessidade Especial" in linha_normalizada:
-                busca = re.search(r"Especial\s*:\s*(.*)", linha_normalizada, re.IGNORECASE)
-                if busca: tipoNecesEspecial = busca.group(1).strip()
-
-            if "Portador(a) de Transtorno" in linha_normalizada:
-                busca = re.search(r"Transtorno\s*:\s*(.*)", linha_normalizada, re.IGNORECASE)
-                if busca: portTranstorno = busca.group(1).strip()
-
-            if "Tipo de Transtorno" in linha_normalizada:
-                busca = re.search(r"Transtorno\s*:\s*(.*)", linha_normalizada, re.IGNORECASE)
-                if busca: tipoTranstorno = busca.group(1).strip()
-
-            if "Portador(a) de Superdota" in linha_normalizada:
-                busca = re.search(r"Superdota[çc]ã[oo]\s*:\s*(.*)", linha_normalizada, re.IGNORECASE)
-                if busca: portSuperdotacao = busca.group(1).strip()
-
-            if "Superdotação" in linha_normalizada or "Superdotacao" in linha_normalizada:
-                if "Portador(a)" not in linha_normalizada:
-                    busca = re.search(r"Superdota[çc]ã[oo]\s*:\s*(.*)", linha_normalizada, re.IGNORECASE)
-                    if busca: superdotacao = busca.group(1).strip()
-        #FIM NAPNE
         
         mapeamentoDisciplinas={}
 
@@ -360,28 +258,8 @@ def extrairDados(arquivosPdf):
                 'Média Final': blocos['mediaFinal'],
                 'Freq. Final': blocos['freqFinal'],
                 'Núcleo': nucleo,
-                'Observações': '',
-                'PNE': portNecesEspeciais,
-                'Tipo NE': tipoNecesEspecial,
-                'Portador Transtorno': portTranstorno,
-                'Tipo Transtorno': tipoTranstorno,
-                'Portador Superdotação': portSuperdotacao,
-                'Superdotação': superdotacao
+                'Observações': ''
             })
-
-    # =========================================================================
-    if 'mapa_napne_temporario' in locals() and mapa_napne_temporario:
-        for dado in dadosFinais:
-            mat_aluno = dado['Matrícula'].strip()
-            if mat_aluno in mapa_napne_temporario:
-                info = mapa_napne_temporario[mat_aluno]
-                dado['PNE'] = info['PNE']
-                dado['Tipo NE'] = info['Tipo NE']
-                dado['Portador Transtorno'] = info['Portador Transtorno']
-                dado['Tipo Transtorno'] = info['Tipo Transtorno']
-                dado['Portador Superdotação'] = info['Portador Superdotação']
-                dado['Superdotação'] = info['Superdotação']
-    # =========================================================================
     
     return pd.DataFrame(dadosFinais)
 
@@ -481,36 +359,6 @@ else:
         c1.markdown(f"<div class='info-box'><b>Matrícula:</b> {matriculaVal}</div>", unsafe_allow_html=True)
         c2.markdown(f"<div class='info-box'><b>Série:</b> {serieVal}</div>", unsafe_allow_html=True)
 
-        # EXIBIÇÃO NAPNE
-        st.markdown("#### Informações de Acessibilidade / NAPNE")
-        pneStatus = BDAluno['PNE'].iloc[0] if 'PNE' in BDAluno.columns else "Não Informado"
-        pneTipo = BDAluno['Tipo NE'].iloc[0] if 'Tipo NE' in BDAluno.columns else "Não Informado"
-        transtornoStatus = BDAluno['Portador Transtorno'].iloc[0] if 'Portador Transtorno' in BDAluno.columns else "Não Informado"
-        transtornTipo = BDAluno['Tipo Transtorno'].iloc[0] if 'Tipo Transtorno' in BDAluno.columns else "Não Informado"
-        superStatus = BDAluno['Portador Superdotação'].iloc[0] if 'Portador Superdotação' in BDAluno.columns else "Não Informado"
-        superTipo = BDAluno['Superdotação'].iloc[0] if 'Superdotação' in BDAluno.columns else "Não Informado"
-
-        nc1, nc2, nc3 = st.columns(3)
-
-        with nc1:
-            if pneStatus not in ["Não Informado", "Não", "NÃO", "nao", "Não "]:
-                st.markdown(f"<div class='info-box' style='border-left: 5px solid #e74c3c;'><b> PNE:</b> {pneTipo}</div>", unsafe_allow_html=True)
-            else:
-                st.markdown("<div class='info-box' style='color: #95a5a6;'><b> PNE:</b> Não Informado</div>", unsafe_allow_html=True)
-
-        with nc2:
-            if transtornoStatus not in ["Não Informado", "Não", "NÃO", "nao", "Não "]:
-                st.markdown(f"<div class='info-box' style='border-left: 5px solid #f39c12;'><b> Transtorno:</b> {transtornoTipo}</div>", unsafe_allow_html=True)
-            else:
-                st.markdown("<div class='info-box' style='color: #95a5a6;'><b> Transtorno:</b> Não Informado</div>", unsafe_allow_html=True)
-
-        with nc3:
-            if superStatus not in ["Não Informado", "Não", "NÃO", "nao", "Não "]:
-                st.markdown(f"<div class='info-box' style='border-left: 5px solid #2ecc71;'><b> Superdotação:</b> {superTipo}</div>", unsafe_allow_html=True)
-            else:
-                st.markdown("<div class='info-box' style='color: #95a5a6;'><b> Superdotação:</b> Não Informado</div>", unsafe_allow_html=True)
-        # FIM DO BLOCO NAPNE
-
     st.divider()
 
     ordenarPor=st.radio("Ordenar disciplinas por:", ["Nota", "Frequência"], horizontal=True)
@@ -519,7 +367,7 @@ else:
         st.session_state.materiaSelecionada=None
         st.session_state.ordenacao=ordenarPor
 
-    # --- GRID CENTRAL DO DASHBOARD ---
+    # Parte Central Dash
     m1, m2, m3, m4=st.columns([2, 3, 2, 2])
 
     with m1:
