@@ -112,21 +112,26 @@ def extrairDados(arquivosPdf):
                 break
 
         if eh_pdf_napne:
-            # Primeiro, busca o nome do aluno na linha correspondente
+            nome_alvo = "Não Identificado"
+            # 1. Busca o nome do aluno exatamente linha por linha
             for linha in linhas:
                 if "Aluno" in linha or "Nome" in linha:
-                    busca_nome = re.search(r"(?:Aluno|Nome)\s*:\s*(.*)", linha, re.IGNORECASE)
-                    if busca_nome:
-                        nomeAluno = busca_nome.group(1).strip()
-                        # Limpa qualquer resíduo de matrícula que venha na mesma linha
-                        nomeAluno = re.sub(r'\bMatrícula\b.*', '', nomeAluno, flags=re.IGNORECASE).strip()
+                    busca_n = re.search(r"(?:Aluno|Nome)\s*:\s*(.*)", linha, re.IGNORECASE)
+                    if busca_n:
+                        nome_alvo = busca_n.group(1).strip()
+                        nome_alvo = re.sub(r'\bMatrícula\b.*', '', nome_alvo, flags=re.IGNORECASE).strip()
+                        break
 
-            # Cria as variáveis com o valor padrão do sistema
+            # Se o nome falhou ou pegou um pedaço como "do", usamos o nome limpo do arquivo para garantir o vínculo
+            if nome_alvo == "Não Identificado" or len(nome_alvo) <= 3:
+                nome_alvo = arquivo.name.replace(".pdf", "").replace("NAPNE", "").replace("Boletim", "").replace("_", " ").strip()
+
+            # 2. Inicializa as variáveis de captura
             p_pne, t_pne, p_trans, t_trans, p_super, t_super = "Não Informado", "Não Informado", "Não Informado", "Não Informado", "Não Informado", "Não Informado"
 
-            # Varre o arquivo buscando os termos, igualzinho à busca de matrícula do seu código
+            # 3. Varre linha por linha capturando os dados após os dois pontos (Igual à Matrícula)
             for linha in linhas:
-                if "Possui Necessidades Especiais" in linha or "Portador(a) de Necessidades Especiais" in linha:
+                if "Necessidades Especiais" in linha:
                     busca = re.search(r"Especiais\s*:\s*(.*)", linha, re.IGNORECASE)
                     if busca: p_pne = busca.group(1).strip()
 
@@ -151,25 +156,27 @@ def extrairDados(arquivosPdf):
                         busca = re.search(r"Superdota[çc]ã[oo]\s*:\s*(.*)", linha, re.IGNORECASE)
                         if busca: t_super = busca.group(1).strip()
 
-            # Adiciona os dados na lista de forma idêntica à estrutura das disciplinas
-            dadosFinais.append({
-                'Nº Chamada': int(numeroChamada),
-                'Aluno': nomeAluno,
-                'Matrícula': 'NAPNE',
-                'Série': 'NAPNE',
-                'Disciplina': 'Acessibilidade',
-                '1º BI': 0.0, '2º BI': 0.0, '3º BI': 0.0, '4º BI': 0.0,
-                'Média Final': 0.0,
-                'Freq. Final': 100.0,
-                'Núcleo': 'Comum',
-                'Observações': '',
-                'PNE': p_pne,
-                'Tipo NE': t_pne,
-                'Portador Transtorno': p_trans,
-                'Tipo Transtorno': t_trans,
-                'Portador Superdotação': p_super,
-                'Superdotação': t_super
-            })
+            # 4. INJEÇÃO DIRETA: Procura as linhas de matérias desse aluno que já estão salvas e coloca os dados nelas
+            aluno_atualizado = False
+            for dado in dadosFinais:
+                # Se as primeiras letras do nome baterem, atualiza diretamente a linha da matéria existente
+                if dado['Aluno'].lower()[:10] == nome_alvo.lower()[:10]:
+                    dado['PNE'] = p_pne
+                    dado['Tipo NE'] = t_pne
+                    dado['Portador Transtorno'] = p_trans
+                    dado['Tipo Transtorno'] = t_trans
+                    dado['Portador Superdotação'] = p_super
+                    dado['Superdotação'] = t_super
+                    aluno_atualizado = True
+
+            # Se o PDF do NAPNE por acaso for processado antes do Boletim, criamos uma linha temporária de Acessibilidade
+            if not aluno_atualizado:
+                dadosFinais.append({
+                    'Nº Chamada': int(numeroChamada), 'Aluno': nome_alvo, 'Matrícula': 'NAPNE', 'Série': 'NAPNE', 'Disciplina': 'Acessibilidade',
+                    '1º BI': 0.0, '2º BI': 0.0, '3º BI': 0.0, '4º BI': 0.0, 'Média Final': 0.0, 'Freq. Final': 100.0, 'Núcleo': 'Comum', 'Observações': '',
+                    'PNE': p_pne, 'Tipo NE': t_pne, 'Portador Transtorno': p_trans, 'Tipo Transtorno': t_trans, 'Portador Superdotação': p_super, 'Superdotação': t_super
+                })
+                
             continue
 
         #FIM LEITURA PDF NAPNE
