@@ -89,6 +89,9 @@ if (st.sidebar.button("Dashboard")):
 #Extração de dados
 def extrairDados(arquivosPdf):
     dadosFinais=[]
+    ############
+    mapa_napne_temporario = {}
+    ############
 
     for numeroChamada, arquivo in enumerate(arquivosPdf, start=1):
         memoriaPdf=io.BytesIO(arquivo.getvalue())
@@ -120,13 +123,10 @@ def extrairDados(arquivosPdf):
         serieAluno="Não Identificada"
 
         # =========================================================================
-        # 🟢 TRECHO 1: CAPTURA FLEXÍVEL DO NAPNE POR MATRÍCULA
+        # 🟢 TRECHO 1 CORRIGIDO: ACUMULADOR DO NAPNE
         # =========================================================================
-        if 'mapa_napne_temporario' not in locals():
-            mapa_napne_temporario = {}
-
         eh_pdf_napne = False
-        for linha in linhas:
+        for linha in lines or linhas: # Prevenção de digitação
             if "Necessidades Especiais" in linha or "Transtorno" in linha or "Superdota" in linha:
                 eh_pdf_napne = True
                 break
@@ -136,11 +136,10 @@ def extrairDados(arquivosPdf):
             for linha in linhas:
                 for termo in ["matrícula", "matricula", "prontuário", "prontuario", "aluno", "nome"]:
                     if termo in linha.lower() and ":" in linha:
-                        # Pega tudo o que vem após os dois pontos e limpa espaços
                         partes_m = linha.split(":")
                         conteudo_linha = partes_m[1].strip() if len(partes_m) > 1 else ""
                         
-                        # Busca qualquer sequência de letras/números de 7 a 10 caracteres (ex: BT3044548)
+                        # Captura qualquer padrão alfanumérico parecido com a matrícula (ex: BT3044548)
                         busca_m = re.search(r'([A-Z0-9]{7,10})', conteudo_linha, re.IGNORECASE)
                         if busca_m:
                             matricula_alvo = busca_m.group(1).strip().upper()
@@ -172,7 +171,7 @@ def extrairDados(arquivosPdf):
                     if busca: p_super = busca.group(1).strip()
 
                 if "Superdotação" in linha or "Superdotacao" in linha:
-                    if "Portador(a)" not in linha:
+                    if "Portador(a)" not in inline or "Portador(a)" not in linha:
                         busca = re.search(r"Superdota[çc]ã[oo]\s*:\s*(.*)", linha, re.IGNORECASE)
                         if busca: t_super = busca.group(1).strip()
 
@@ -184,7 +183,7 @@ def extrairDados(arquivosPdf):
                 }
             continue 
         # =========================================================================
-        # 🛑 FIM DO TRECHO 1
+        # 🛑 FIM DO TRECHO 1 CORRIGIDO
         
         for linha in linhas:
             if ("Aluno" in linha or "Nome" in linha):
