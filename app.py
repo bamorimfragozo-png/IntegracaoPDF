@@ -70,6 +70,8 @@ if ("fotoAluno" not in st.session_state):
     st.session_state.fotoAluno={}
 if ("ordenacao" not in st.session_state):
     st.session_state.ordenacao="Nota"
+
+#MENU DE NAVEGAÇÃO
 st.sidebar.markdown("### Navegação")
 
 if (st.sidebar.button("Tela de Upload")):
@@ -312,18 +314,11 @@ if (not st.session_state.dadosCarregados):
 
 #EXIBIÇÃO VISUAL DO DASHBOARD ACADÊMICO
 else:
-    #if (st.sidebar.button("Voltar para Tela de Upload")):
-     #   st.session_state.dadosCarregados=False
-       #  st.session_state.numAluno=0
-        #st.session_state.materiaSelecionada=None
-        #st.rerun()
+    if ("salaAtiva" not in st.session_state or not st.session_state.salaAtiva):
+        st.info("Nenhum relatório foi carregado ainda.")
+        st.write("Faça o upload dos PDFs na tela de Upload para visualizar o Dashboard.")
+        st.stop()
         
-    #if (st.sidebar.button("Voltar para Dashboard")):
-     #   st.session_state.dadosCarregados=True
-      #  st.session_state.materiaSelecionada=None
-       # st.session_state.numAluno=0
-        #st.rerun()
-
     st.sidebar.write(f"Visualizando: **{st.session_state.salaAtiva}**")
 
     linkSalaAtiva=DICIONARIO_SALAS[st.session_state.salaAtiva]
