@@ -173,7 +173,7 @@ def extrairDados(arquivosPdf):
 
                 if "Superdotação" in linha or "Superdotacao" in linha:
                     if "Portador(a)" not in linha:
-                        busca = re.search(r"Superdota[çc]ã[oo]\s*:\s*(.{1,100})", inline or linha, re.IGNORECASE)
+                        busca = re.search(r"Superdota[çc]ã[oo]\s*:\s*(.{1,100})", linha, re.IGNORECASE)
                         if busca: t_super = busca.group(1).strip()
 
             if matricula_alvo != "Não Identificada":
