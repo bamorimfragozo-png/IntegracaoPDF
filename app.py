@@ -120,7 +120,7 @@ def extrairDados(arquivosPdf):
         serieAluno="Não Identificada"
 
         # =========================================================================
-        # 🟢 INÍCIO DO TRECHO DO NAPNE: VÍNCULO POR MATRÍCULA
+        # 🟢 TRECHO 1: CAPTURA FLEXÍVEL DO NAPNE POR MATRÍCULA
         # =========================================================================
         if 'mapa_napne_temporario' not in locals():
             mapa_napne_temporario = {}
@@ -134,11 +134,16 @@ def extrairDados(arquivosPdf):
         if eh_pdf_napne:
             matricula_alvo = "Não Identificada"
             for linha in linhas:
-                for termo in ["matrícula", "matricula", "prontuário", "prontuario"]:
-                    if termo in linha.lower():
-                        busca_m = re.search(r"cula:\s*(.{9})", linha, re.IGNORECASE)
+                for termo in ["matrícula", "matricula", "prontuário", "prontuario", "aluno", "nome"]:
+                    if termo in linha.lower() and ":" in linha:
+                        # Pega tudo o que vem após os dois pontos e limpa espaços
+                        partes_m = linha.split(":")
+                        conteudo_linha = partes_m[1].strip() if len(partes_m) > 1 else ""
+                        
+                        # Busca qualquer sequência de letras/números de 7 a 10 caracteres (ex: BT3044548)
+                        busca_m = re.search(r'([A-Z0-9]{7,10})', conteudo_linha, re.IGNORECASE)
                         if busca_m:
-                            matricula_alvo = busca_m.group(1).strip()
+                            matricula_alvo = busca_m.group(1).strip().upper()
                             break
                 if matricula_alvo != "Não Identificada":
                     break
@@ -179,7 +184,7 @@ def extrairDados(arquivosPdf):
                 }
             continue 
         # =========================================================================
-        # 🛑 FIM DO TRECHO DO NAPNE
+        # 🛑 FIM DO TRECHO 1
         
         for linha in linhas:
             if ("Aluno" in linha or "Nome" in linha):
@@ -467,6 +472,35 @@ else:
 
         c1.markdown(f"<div class='info-box'><b>Matrícula:</b> {matriculaVal}</div>", unsafe_allow_html=True)
         c2.markdown(f"<div class='info-box'><b>Série:</b> {serieVal}</div>", unsafe_allow_html=True)
+
+    # =========================================================================
+        # 🟢 TRECHO 3: CAMPOS VISUAIS DO NAPNE NO DASHBOARD
+        # =========================================================================
+        st.markdown("#### Informações de Acessibilidade (NAPNE)")
+        n_col1, n_col2, n_col3 = st.columns(3)
+        
+        val_pne = BDAluno['PNE'].iloc[0] if 'PNE' in BDAluno.columns else "Não Informado"
+        val_t_pne = BDAluno['Tipo NE'].iloc[0] if 'Tipo NE' in BDAluno.columns else "Não Informado"
+        val_trans = BDAluno['Portador Transtorno'].iloc[0] if 'Portador Transtorno' in BDAluno.columns else "Não Informado"
+        val_t_trans = BDAluno['Tipo Transtorno'].iloc[0] if 'Tipo Transtorno' in BDAluno.columns else "Não Informado"
+        val_super = BDAluno['Portador Superdotação'].iloc[0] if 'Portador Superdotação' in BDAluno.columns else "Não Informado"
+        val_t_super = BDAluno['Superdotação'].iloc[0] if 'Superdotação' in BDAluno.columns else "Não Informado"
+
+        with n_col1:
+            st.markdown(f"<div class='info-box'><b>PNE:</b> {val_pne}</div>", unsafe_allow_html=True)
+            if val_pne == "Sim":
+                st.markdown(f"<div class='info-box' style='color: #e67e22;'><b>Tipo NE:</b> {val_t_pne}</div>", unsafe_allow_html=True)
+                
+        with n_col2:
+            st.markdown(f"<div class='info-box'><b>Transtorno:</b> {val_trans}</div>", unsafe_allow_html=True)
+            if val_trans == "Sim":
+                st.markdown(f"<div class='info-box' style='color: #e67e22;'><b>Tipo Transtorno:</b> {val_t_trans}</div>", unsafe_allow_html=True)
+                
+        with n_col3:
+            st.markdown(f"<div class='info-box'><b>Superdotação:</b> {val_super}</div>", unsafe_allow_html=True)
+            if val_super == "Sim":
+                st.markdown(f"<div class='info-box' style='color: #e67e22;'><b>Laudo:</b> {val_t_super}</div>", unsafe_allow_html=True)
+        # =========================================================================
 
     st.divider()
 
