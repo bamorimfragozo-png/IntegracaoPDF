@@ -65,7 +65,7 @@ if ("materiaSelecionada" not in st.session_state):
 if ("resetObs" not in st.session_state):
     st.session_state.resetObs=0
 if ("salaAtiva" not in st.session_state):
-    st.session_state.salaAtiva="Redes 1"
+    st.session_state.salaSelecionada="Redes 1"
 if ("fotoAluno" not in st.session_state):
     st.session_state.fotoAluno={}
 if ("ordenacao" not in st.session_state):
@@ -265,11 +265,6 @@ def extrairDados(arquivosPdf):
 
 #UPLOAD DOS RELATÓRIOS EM PDF
 if (not st.session_state.dadosCarregados):
-    if (st.sidebar.button("Ir para Dashboard")):
-        st.session_state.dadosCarregados=True
-        st.session_state.materiaSelecionada=None
-        st.session_state.numAluno=0
-        st.rerun()
     st.title("Upload de PDFs")
     st.subheader("Selecione a sala correspondente e faça o upload dos relatórios em PDF.")
 
@@ -304,8 +299,8 @@ if (not st.session_state.dadosCarregados):
 
 #EXIBIÇÃO VISUAL DO DASHBOARD ACADÊMICO
 else:
-    if (st.sidebar.button("Ir para Tela de Upload")):
-        st.session_state.dadosCarregados=True
+    if (st.sidebar.button("Voltar para Tela de Upload")):
+        st.session_state.dadosCarregados=False
         st.session_state.numAluno=0
         st.session_state.materiaSelecionada=None
         st.rerun()
