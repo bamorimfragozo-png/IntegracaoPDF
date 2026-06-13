@@ -413,21 +413,21 @@ else:
 
         with nc1:
             if pneStatus not in ["Não Informado", "Não", "NÃO", "nao", "Não "]:
-                st.markdown(f"<div class='info-box' style='border-left: 5px solid #e74c3c;'><b>♿ PNE:</b> {pneTipo}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='info-box' style='border-left: 5px solid #e74c3c;'><b> PNE:</b> {pneTipo}</div>", unsafe_allow_html=True)
             else:
-                st.markdown("<div class='info-box' style='color: #95a5a6;'><b>♿ PNE:</b> Não Informado</div>", unsafe_allow_html=True)
+                st.markdown("<div class='info-box' style='color: #95a5a6;'><b> PNE:</b> Não Informado</div>", unsafe_allow_html=True)
 
         with nc2:
             if transtornoStatus not in ["Não Informado", "Não", "NÃO", "nao", "Não "]:
-                st.markdown(f"<div class='info-box' style='border-left: 5px solid #f39c12;'><b>🧠 Transtorno:</b> {transtornoTipo}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='info-box' style='border-left: 5px solid #f39c12;'><b> Transtorno:</b> {transtornoTipo}</div>", unsafe_allow_html=True)
             else:
-                st.markdown("<div class='info-box' style='color: #95a5a6;'><b>🧠 Transtorno:</b> Não Informado</div>", unsafe_allow_html=True)
+                st.markdown("<div class='info-box' style='color: #95a5a6;'><b> Transtorno:</b> Não Informado</div>", unsafe_allow_html=True)
 
         with nc3:
             if superStatus not in ["Não Informado", "Não", "NÃO", "nao", "Não "]:
-                st.markdown(f"<div class='info-box' style='border-left: 5px solid #2ecc71;'><b>⭐ Superdotação:</b> {superTipo}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='info-box' style='border-left: 5px solid #2ecc71;'><b> Superdotação:</b> {superTipo}</div>", unsafe_allow_html=True)
             else:
-                st.markdown("<div class='info-box' style='color: #95a5a6;'><b>⭐ Superdotação:</b> Não Informado</div>", unsafe_allow_html=True)
+                st.markdown("<div class='info-box' style='color: #95a5a6;'><b> Superdotação:</b> Não Informado</div>", unsafe_allow_html=True)
         # FIM DO BLOCO NAPNE
 
     st.divider()
