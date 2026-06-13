@@ -104,6 +104,7 @@ def extrairDados(arquivosPdf):
         matriculaAluno="Não Identificada"
         serieAluno="Não Identificada"
 
+        #PDF NAPNE LEITURA
         eh_pdf_napne = False
         for linha in linhas:
             if "Necessidades Especiais" in linha or "Transtorno" in linha or "Superdota" in linha:
@@ -111,49 +112,51 @@ def extrairDados(arquivosPdf):
                 break
 
         if eh_pdf_napne:
-            # 1. Primeiro descobrimos de quem é esse PDF do NAPNE
-            for linha in linhas:
-                if "Aluno" in linha or "Nome" in linha:
-                    partes = linha.split(":")
-                    valNome = partes[1].strip() if len(partes) > 1 else linha.replace("Aluno", "").replace("Nome", "").strip()
-                    nomeAluno = re.sub(r'\bMatrícula\b.*', '', valNome, flags=re.IGNORECASE).strip()
+            # Junta todo o texto do arquivo em uma única string limpa e sem quebras de linha bagunçadas
+            texto_unificado = " ".join(textoCompleto.split())
             
-            # 2. Se não achou o nome pelo texto, pega o nome do arquivo
+            # 1. Extração do Nome do Aluno no texto unificado
+            nomeAluno = "Não Identificado"
+            busca_nome = re.search(r"(?:Aluno|Nome)\s*:\s*([^:]+?)(?=(?:Matrícula|Série|Turma|$))", texto_unificado, re.IGNORECASE)
+            if busca_nome:
+                nomeAluno = busca_nome.group(1).strip()
+                nomeAluno = re.sub(r'\bMatrícula\b.*', '', nomeAluno, flags=re.IGNORECASE).strip()
+            
             if nomeAluno == "Não Identificado" or not nomeAluno.strip():
                 nomeAluno = arquivo.name.replace(".pdf", "").replace("NAPNE", "").replace("_", " ").strip()
 
-            # 3. Extrai os dados do NAPNE deste arquivo
-            p_pne, t_pne, p_trans, t_trans, p_super, t_super = "Não Informado", "Não Informado", "Não Informado", "Não Informado", "Não Informado", "Não Informado"
-            for linha in linhas:
-                linha_norm = " ".join(linha.split())
-                if "Necessidades Especiais" in linha_norm:
-                    b = re.search(r"Especiais\s*:\s*(.*)", linha_norm, re.IGNORECASE)
-                    if b: p_pne = b.group(1).strip()
-                if "Tipo de Necessidade Especial" in linha_norm:
-                    b = re.search(r"Especial\s*:\s*(.*)", linha_norm, re.IGNORECASE)
-                    if b: t_pne = b.group(1).strip()
-                if "Portador(a) de Transtorno" in linha_norm:
-                    b = re.search(r"Transtorno\s*:\s*(.*)", linha_norm, re.IGNORECASE)
-                    if b: p_trans = b.group(1).strip()
-                if "Tipo de Transtorno" in linha_norm:
-                    b = re.search(r"Transtorno\s*:\s*(.*)", linha_norm, re.IGNORECASE)
-                    if b: t_trans = b.group(1).strip()
-                if "Portador(a) de Superdota" in linha_norm:
-                    b = re.search(r"Superdota[çc]ã[oo]\s*:\s*(.*)", linha_norm, re.IGNORECASE)
-                    if b: p_super = b.group(1).strip()
-                if "Superdotação" in linha_norm or "Superdotacao" in linha_norm:
-                    if "Portador(a)" not in linha_norm:
-                        b = re.search(r"Superdota[çc]ã[oo]\s*:\s*(.*)", linha_norm, re.IGNORECASE)
-                        if b: t_super = b.group(1).strip()
+            # 2. Captura inteligente ignorando os dois pontos (busca por proximidade de palavras)
+            p_pne = "Sim" if "Portador(a) de Necessidades Especiais" in texto_unificado and "Sim" in texto_unificado.split("Portador(a) de Necessidades Especiais")[1][:15] else "Não"
+            p_trans = "Sim" if "Portador(a) de Transtorno" in texto_unificado and "Sim" in texto_unificado.split("Portador(a) de Transtorno")[1][:15] else "Não"
+            p_super = "Sim" if "Portador(a) de Superdotação" in texto_unificado and "Sim" in texto_unificado.split("Portador(a) de Superdotação")[1][:15] else "Não"
 
-            # 4. Cria uma linha temporária para injetar esses dados na planilha via Pandas
+            # 3. Captura dos Tipos/Laudos específicos usando Regex flexível
+            t_pne = "Não Informado"
+            b_tpne = re.search(r"Tipo de Necessidade Especial\s*:\s*(.+?)(?=(?:Portador|$))", texto_unificado, re.IGNORECASE)
+            if b_tpne: t_pne = b_tpne.group(1).strip()
+
+            t_trans = "Não Informado"
+            b_ttrans = re.search(r"Tipo de Transtorno\s*:\s*(.+?)(?=(?:Portador|$))", texto_unificado, re.IGNORECASE)
+            if b_ttrans: t_trans = b_ttrans.group(1).strip()
+
+            t_super = "Não Informado"
+            b_tsuper = re.search(r"Superdota[çc]ã[oo]\s*:\s*(.+?)(?=$)", texto_unificado, re.IGNORECASE)
+            if b_tsuper: t_super = b_tsuper.group(1).strip()
+
+            # 4. Ajuste fino caso o laudo tenha vindo como "Não" ou vazio
+            if p_pne == "Não" and t_pne in ["Não", "Não Informado", "NÃO"]: t_pne = "Não Informado"
+            if p_trans == "Não" and t_trans in ["Não", "Não Informado", "NÃO"]: t_trans = "Não Informado"
+            if p_super == "Não" and t_super in ["Não", "Não Informado", "NÃO"]: t_super = "Não Informado"
+
+            # Injeta os dados limpos e mastigados na planilha
             dadosFinais.append({
                 'Nº Chamada': int(numeroChamada), 'Aluno': nomeAluno, 'Matrícula': 'NAPNE', 'Série': 'NAPNE', 'Disciplina': 'Acessibilidade',
                 '1º BI': 0.0, '2º BI': 0.0, '3º BI': 0.0, '4º BI': 0.0, 'Média Final': 0.0, 'Freq. Final': 100.0, 'Núcleo': 'Comum', 'Observações': '',
                 'PNE': p_pne, 'Tipo NE': t_pne, 'Portador Transtorno': p_trans, 'Tipo Transtorno': t_trans, 'Portador Superdotação': p_super, 'Superdotação': t_super
             })
-            continue # Pula o resto do código (evita procurar notas onde não tem)
-        
+            continue
+
+        #FIM LEITURA PDF NAPNE
         for linha in linhas:
             if ("Aluno" in linha or "Nome" in linha):
                 partes=linha.split(":")
