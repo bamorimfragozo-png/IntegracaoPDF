@@ -491,6 +491,7 @@ else:
         with m4:
             st.write("### Observações")
             chaveObs=f"{alunoNome}_{st.session_state.materiaSelecionada}_{st.session_state.resetObs}".replace(" ", "_")
+            st.write("DEBUG:", BDMateria['Observações'])
             obsSalva=str(BD['Observações']) 
             if ('Observações' in BDMateria.index and pd.notna(BDMateria['Observações'])):
               obsSalva=str(BD['Observações'])
