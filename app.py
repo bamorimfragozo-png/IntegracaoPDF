@@ -324,8 +324,6 @@ else:
     linkSalaAtiva=DICIONARIO_SALAS[st.session_state.salaAtiva]
     BD=conn.read(spreadsheet=linkSalaAtiva, ttl="0")
     BD.columns=BD.columns.str.strip()
-
-    st.write(BD.columns.tolist())
     
     colunasNumericas=['1º BI', '2º BI', '3º BI', '4º BI', 'Média Final', 'Freq. Final']
     for col in colunasNumericas:
