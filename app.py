@@ -113,6 +113,10 @@ def extrairDados(arquivosPdf):
                         break
         except Exception:
             fotos=None
+        ####################################
+        st.subheader(f"DEBUG - {arquivo.name}")
+        st.text(textoCompleto)
+        ####################################
 
         linhas=textoCompleto.split('\n')
         ##############################################
