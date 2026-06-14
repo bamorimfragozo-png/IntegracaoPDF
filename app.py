@@ -95,7 +95,6 @@ def extrairDados(arquivosPdf):
     #for numeroChamada, arquivo in enumerate(arquivosPdf, start=1):
     ##################################
     numeroChamada = 1
-    ultimoAlunoLido = ""
     for arquivo in arquivosPdf:
     ##################################
         memoriaPdf=io.BytesIO(arquivo.getvalue())
@@ -108,9 +107,9 @@ def extrairDados(arquivosPdf):
             st.error(f"Erro ao ler o arquivo {arquivo.name}: {e}")
             continue
         #############################
-        textoPagina=""
+        textoCompleto = ""
         for pagina_index, pagina in enumerate(leitorPdf.pages):
-            textoPagina += pagina.extract_text() + "\n"
+            textoCompleto += pagina.extract_text() + "\n"
             
             # Descobre temporariamente o nome que está NESTA página específica
             nomeNestaPagina = "Não Identificado"
