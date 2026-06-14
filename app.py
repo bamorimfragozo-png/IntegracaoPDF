@@ -89,6 +89,7 @@ if (st.sidebar.button("Dashboard")):
 #EXTRAÇÃO DE DADOS
 def extrairDados(arquivosPdf):
     dadosFinais=[]
+    matriculas_processadas = set()  # <--- TESTE
 
     for numeroChamada, arquivo in enumerate(arquivosPdf, start=1):
         memoriaPdf=io.BytesIO(arquivo.getvalue())
@@ -145,6 +146,12 @@ def extrairDados(arquivosPdf):
 
         if (fotos):
             st.session_state.fotoAluno[nomeAluno]=fotos
+        # --- CORREÇÃO: VERIFICAÇÃO DE MATRÍCULA DUPLICADA ---
+            if matriculaAluno != "Não Identificada":
+                if matriculaAluno in matriculas_processadas:
+                    continue  # Pula esta página se a matrícula já foi lida antes
+                matriculas_processadas.add(matriculaAluno)
+        # ----------------------------------------------------
         
         mapeamentoDisciplinas={}
 
