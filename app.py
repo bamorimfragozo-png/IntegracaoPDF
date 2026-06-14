@@ -318,7 +318,9 @@ else:
         st.info("Nenhum relatório foi carregado ainda.")
         st.write("Faça o upload dos PDFs na tela de Upload para visualizar o Dashboard.")
         st.stop()
-        
+
+    alunoNome = alunosLista[st.session_state.numAluno]
+    
     st.sidebar.write(f"Visualizando: **{st.session_state.salaAtiva}**")
 
     linkSalaAtiva=DICIONARIO_SALAS[st.session_state.salaAtiva]
