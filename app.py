@@ -73,6 +73,8 @@ if ("ordenacao" not in st.session_state):
 
 #MENU DE NAVEGAÇÃO
 st.sidebar.markdown("### Navegação")
+if ('salaSelecionada' in locals()): 
+    st.session_state.salaAtiva = salaSelecionada
 
 if (st.sidebar.button("Tela de Upload")):
     st.session_state.dadosCarregados=False
