@@ -113,7 +113,6 @@ def extrairDados(arquivosPdf):
             
             # Descobre temporariamente o nome que está NESTA página específica
             nomeNestaPagina = "Não Identificado"
-        textoPagina = textoCompleto
             for linha in textoPagina.split('\n'):
                 if ("Aluno" in linha or "Nome" in linha):
                     partes = linha.split(":")
@@ -128,6 +127,7 @@ def extrairDados(arquivosPdf):
                 numeroChamada += 1
             
             ultimoAlunoLido = nomeNestaPagina
+            textoPagina=textoCompleto
             textoCompleto = textoPagina # Alimenta o resto do seu código com a página atual
         ##############################
 
