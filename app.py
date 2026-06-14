@@ -108,6 +108,7 @@ def extrairDados(arquivosPdf):
             st.error(f"Erro ao ler o arquivo {arquivo.name}: {e}")
             continue
         #############################
+        textoPagina=""
         for pagina_index, pagina in enumerate(leitorPdf.pages):
             textoPagina += pagina.extract_text() + "\n"
             
