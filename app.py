@@ -108,6 +108,7 @@ def extrairDados(arquivosPdf):
             continue
         #############################
         textoCompleto = ""
+        textoPagina=textoCompleto
         for pagina_index, pagina in enumerate(leitorPdf.pages):
             textoCompleto += pagina.extract_text() + "\n"
             
@@ -127,7 +128,6 @@ def extrairDados(arquivosPdf):
                 numeroChamada += 1
             
             ultimoAlunoLido = nomeNestaPagina
-            textoPagina=textoCompleto
             textoCompleto = textoPagina # Alimenta o resto do seu código com a página atual
         ##############################
 
