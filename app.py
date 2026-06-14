@@ -114,22 +114,19 @@ def extrairDados(arquivosPdf):
                         break
         except Exception:
             fotos=None
-        # --- ADICIONE ESTE BLOCO ABAIXO DO "fotos=None" ---
-        linhas_temp = textoCompleto.split('\n')
+        # --- BLOCO DE VALIDAÇÃO CORRIGIDO (COLE AQUI) ---
         matricula_temp = "Não Identificada"
-        for l_temp in linhas_temp:
-            for termo in ["matrícula", "matricula", "prontuário", "prontuario"]:
-                if (termo in l_temp.lower()):
-                    busca_temp = re.search(r"cula:\s*(.{9})", l_temp, re.IGNORECASE)
-                    if (busca_temp):
-                        matricula_temp = busca_temp.group(1).strip()
-                        break
+        for termo in ["matrícula", "matricula", "prontuário", "prontuario"]:
+            busca_temp = re.search(termo + r":\s*(.{9})", textoCompleto, re.IGNORECASE)
+            if (busca_temp):
+                matricula_temp = busca_temp.group(1).strip()
+                break
         
         if matricula_temp != "Não Identificada":
             if matricula_temp in matriculas_processadas:
-                continue  # Se a matrícula já foi processada, pula este arquivo/página
+                continue  # Pula o arquivo se essa matrícula já foi processada
             matriculas_processadas.add(matricula_temp)
-        # --------------------------------------------------
+        # ------------------------------------------------
 
         linhas=textoCompleto.split('\n')
         nomeAluno="Não Identificado"
