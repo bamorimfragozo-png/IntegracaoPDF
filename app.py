@@ -92,16 +92,24 @@ if (st.sidebar.button("Dashboard")):
 def extrairDados(arquivosPdf):
     dadosFinais=[]
     
-    for numeroChamada, arquivo in enumerate(arquivosPdf, start=1):
+    #for numeroChamada, arquivo in enumerate(arquivosPdf, start=1):
+    ##################################
+    numeroChamada = 1
+    for arquivo in arquivosPdf:
+    ##################################
         memoriaPdf=io.BytesIO(arquivo.getvalue())
         try:
             leitorPdf=PdfReader(memoriaPdf)
-            textoCompleto=""
-            for pagina in leitorPdf.pages:
-                textoCompleto+=pagina.extract_text()+"\n"
+            #textoCompleto=""
+            #for pagina in leitorPdf.pages:
+                #textoCompleto+=pagina.extract_text()+"\n"
         except Exception as e:
             st.error(f"Erro ao ler o arquivo {arquivo.name}: {e}")
             continue
+        #############################
+        for pagina_index, pagina in enumerate(leitorPdf.pages):
+            textoCompleto = pagina.extract_text() + "\n"
+        ##############################
 
         #EXTRAÇÃO DA FOTO DO PDF
         fotos=None
@@ -277,6 +285,9 @@ def extrairDados(arquivosPdf):
                 'Núcleo': nucleo,
                 'Observações': ''
             })
+            ##################
+            numeroChamada += 1
+            ######################
 
     return pd.DataFrame(dadosFinais)
 
