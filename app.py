@@ -338,8 +338,8 @@ else:
     ordemChamada=BD.sort_values(by='Nº Chamada', ascending=True)
     alunosLista=ordemChamada['Aluno'].unique().tolist()
     
-    st.sidebar.write(f"numeroAlunos:{len(alunosLista)}")
-    #st.sidebar.write(alunosLista)
+    #st.sidebar.write(f"numeroAlunos:{len(alunosLista)}")
+    st.sidebar.write(alunosLista)
     
     if (st.session_state.numAluno>=len(alunosLista)):
         st.session_state.numAluno=0
