@@ -95,6 +95,7 @@ def extrairDados(arquivosPdf):
     #for numeroChamada, arquivo in enumerate(arquivosPdf, start=1):
     ##################################
     numeroChamada = 1
+    ultimoAlunoLido = ""
     for arquivo in arquivosPdf:
     ##################################
         memoriaPdf=io.BytesIO(arquivo.getvalue())
@@ -108,7 +109,25 @@ def extrairDados(arquivosPdf):
             continue
         #############################
         for pagina_index, pagina in enumerate(leitorPdf.pages):
-            textoCompleto = pagina.extract_text() + "\n"
+            textoPagina = pagina.extract_text() + "\n"
+            
+            # Descobre temporariamente o nome que está NESTA página específica
+            nomeNestaPagina = "Não Identificado"
+            for linha in textoPagina.split('\n'):
+                if ("Aluno" in linha or "Nome" in linha):
+                    partes = linha.split(":")
+                    valNome = partes[1].strip() if len(partes) > 1 else linha.replace("Aluno", "").replace("Nome", "").strip()
+                    nomeNestaPagina = re.sub(r'\bMatrícula\b.*', '', valNome, flags=re.IGNORECASE).strip()
+            
+            if nomeNestaPagina == "Não Identificado" or not nomeNestaPagina.strip():
+                nomeNestaPagina = arquivo.name.replace(".pdf", "").strip()
+
+            # SE MUDOU O NOME DO ALUNO: atualiza o número da chamada (exceto no primeiríssimo aluno)
+            if ultimoAlunoLido != "" and nomeNestaPagina != ultimoAlunoLido:
+                numeroChamada += 1
+            
+            ultimoAlunoLido = nomeNestaPagina
+            textoCompleto = textoPagina # Alimenta o resto do seu código com a página atual
         ##############################
 
         #EXTRAÇÃO DA FOTO DO PDF
@@ -285,9 +304,6 @@ def extrairDados(arquivosPdf):
                 'Núcleo': nucleo,
                 'Observações': ''
             })
-            ##################
-            numeroChamada += 1
-            ######################
 
     return pd.DataFrame(dadosFinais)
 
