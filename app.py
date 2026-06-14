@@ -340,6 +340,11 @@ else:
     
     #st.sidebar.write(f"numeroAlunos:{len(alunosLista)}")
     #st.sidebar.write(alunosLista)
+
+    if not alunosLista:
+        st.info("Nenhum relatório foi carregado ainda.")
+        st.write("Faça o upload dos PDFs na tela de Upload para visualizar o Dashboard.")
+        st.stop()
     
     if (st.session_state.numAluno>=len(alunosLista)):
         st.session_state.numAluno=0
