@@ -293,15 +293,15 @@ if (not st.session_state.dadosCarregados):
 
                 linkSalaAtiva=DICIONARIO_SALAS[salaSelecionada]
                 #codigo adicionado para teste
-                df_atual = conn.read(spreadsheet=linkSalaAtiva)
-                df_final = pd.concat([df_atual, BDNovo],ignore_index=True)
-                df_final = df_final.drop_duplicates(subset=["Aluno", "Disciplina"],keep="last")
+                #df_atual = conn.read(spreadsheet=linkSalaAtiva)
+                #df_final = pd.concat([df_atual, BDNovo],ignore_index=True)
+                #df_final = df_final.drop_duplicates(subset=["Aluno", "Disciplina"],keep="last")
                 #conn.update(spreadsheet=linkSalaAtiva, data=df_final )
 
                 if (not BDNovo.empty):
                     #linkSalaAtiva=DICIONARIO_SALAS[salaSelecionada]
-                    #conn.update(spreadsheet=linkSalaAtiva, data=BDNovo) 
-                    conn.update(spreadsheet=linkSalaAtiva, data=df_final) #<----teste
+                    conn.update(spreadsheet=linkSalaAtiva, data=BDNovo) 
+                    #conn.update(spreadsheet=linkSalaAtiva, data=df_final) #<----teste
                     st.session_state.salaAtiva=salaSelecionada
                     st.session_state.dadosCarregados=True
                     st.session_state.materiaSelecionada=None
