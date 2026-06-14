@@ -109,7 +109,7 @@ def extrairDados(arquivosPdf):
             continue
         #############################
         for pagina_index, pagina in enumerate(leitorPdf.pages):
-            textoPagina = pagina.extract_text() + "\n"
+            textoPagina += pagina.extract_text() + "\n"
             
             # Descobre temporariamente o nome que está NESTA página específica
             nomeNestaPagina = "Não Identificado"
@@ -304,7 +304,14 @@ def extrairDados(arquivosPdf):
                 'Núcleo': nucleo,
                 'Observações': ''
             })
-
+        ##################################
+        if 'ultimo_nome_visto' not in locals():
+            ultimo_nome_visto = nomeAluno
+        
+        if nomeAluno != ultimo_nome_visto:
+            numeroChamada += 1
+            ultimo_nome_visto = nomeAluno
+        #####################################
     return pd.DataFrame(dadosFinais)
 
 #UPLOAD DOS RELATÓRIOS EM PDF
