@@ -43,7 +43,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-#Conexão com planilhas
+#CONEXÃO COM PLANILHAS
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 DICIONARIO_SALAS = {
@@ -55,7 +55,7 @@ DICIONARIO_SALAS = {
     "Automação 3": st.secrets["connections"]["gsheets"]["Automacao3"]
 }
 
-#Estado de atualização do Dashboard
+#ESTADO DE ATUALIZAÇÃO DO DASHBOARD
 if ("dadosCarregados" not in st.session_state):
     st.session_state.dadosCarregados=False
 if ("numAluno" not in st.session_state):
@@ -86,7 +86,7 @@ if (st.sidebar.button("Dashboard")):
     st.session_state.numAluno=0
     st.rerun()
 
-#Extração de dados
+#EXTRAÇÃO DE DADOS
 def extrairDados(arquivosPdf):
     dadosFinais=[]
 
@@ -113,42 +113,12 @@ def extrairDados(arquivosPdf):
                         break
         except Exception:
             fotos=None
-        ####################################
-        st.subheader(f"DEBUG - {arquivo.name}")
-        st.text(textoCompleto)
-        ####################################
 
         linhas=textoCompleto.split('\n')
-        ##############################################
-        textoUnico=" ".join(linhas)
-
-        busca=re.search(r"Tipo de Transtorno\s*-\s*(.+?)(?:Portador\(a\)|Superdotação|$)", textoUnico, re.IGNORECASE)
-        if (busca):
-            tipoTranstorno=busca.group(1).replace("\n", " ").strip()
-
-        busca=re.search(r"Tipo de Necessidade Especial\s*-\s*(.+?)(?:Portador\(a\)|Tipo de Transtorno|$)", textoUnico, re.IGNORECASE)
-        if (busca):
-            tipoNecessidadeEspecial=busca.group(1).replace("\n", " ").strip()
-
-        busca=re.search(r"Superdotação\s*-\s*(.+?)(?:Portador\(a\)|$)", textoUnico, re.IGNORECASE)
-        if (busca):
-            superdotacao=busca.group(1).replace("\n", " ").strip()
-        ################################################
         nomeAluno="Não Identificado"
         matriculaAluno="Não Identificada"
         serieAluno="Não Identificada"
 
-        #############################################################
-        portadorNecessidadesEspeciais="Não"
-        tipoNecessidadeEspecial=""
-
-        portadorTranstorno="Não"
-        tipoTranstorno=""
-
-        portadorSuperdotacao="Não"
-        superdotacao=""
-        ############################################################
-        
         for linha in linhas:
             if ("Aluno" in linha or "Nome" in linha):
                 partes=linha.split(":")
@@ -169,41 +139,6 @@ def extrairDados(arquivosPdf):
                 partes=linha.split(":")
                 if (len(partes)>1):
                     serieAluno=partes[1].strip()[:27]
-
-            ##################################################
-            if ("Portador(a)" in linha and "Necessidades" in linha and "Especiais" in linha):
-                if ("Sim" in linha):
-                    portadorNecessidadesEspeciais="Sim"
-                elif ("Não" in linha or "Nao" in linha):
-                    portadorNecessidadesEspeciais="Não"
-
-            if ("Tipo de Necessidade Especial" in linha):
-                partes=linha.split("-")
-                if (len(partes)>1):
-                    tipoNecessidadeEspecial=partes[1].strip()
-
-            if ("Portador(a)" in linha and "Transtorno" in linha):
-                if ("Sim" in linha):
-                    portadorTranstorno="Sim"
-                elif ("Não" in linha or "Nao" in linha):
-                    portadorTranstorno="Não"
-
-            if ("Tipo de Transtorno" in linha):
-                partes=linha.split("-")
-                if (len(partes)>1):
-                    tipoTranstorno=partes[1].strip()
-
-            if ("Portador(a)" in linha and "Superdotação" in linha):
-                if ("Sim" in linha):
-                    portadorSuperdotacao="Sim"
-                elif ("Não" in linha or "Nao" in linha):
-                    portadorSuperdotacao="Não"
-
-            if ("Superdotação -" in linha):
-                partes=linha.split("-")
-                if (len(partes)>1):
-                    superdotacao=partes[1].strip()
-            ##################################################################
 
         if (nomeAluno=="Não Identificado" or not nomeAluno.strip()):
             nomeAluno=arquivo.name.replace(".pdf", "").replace("Boletim", "").replace("_", " ").strip()
@@ -338,13 +273,7 @@ def extrairDados(arquivosPdf):
                 'Média Final': blocos['mediaFinal'],
                 'Freq. Final': blocos['freqFinal'],
                 'Núcleo': nucleo,
-                'Observações': '',
-                'Portador Necessidades Especiais': portadorNecessidadesEspeciais,
-                'Tipo Necessidade Especial': tipoNecessidadeEspecial,
-                'Portador Transtorno': portadorTranstorno,
-                'Tipo Transtorno': tipoTranstorno,
-                'Portador Superdotação': portadorSuperdotacao,
-                'Superdotação': superdotacao
+                'Observações': ''
             })
     
     return pd.DataFrame(dadosFinais)
@@ -452,7 +381,7 @@ else:
         st.session_state.materiaSelecionada=None
         st.session_state.ordenacao=ordenarPor
 
-    # Parte Central Dash
+    # PARTE CENTRAL DASH
     m1, m2, m3, m4=st.columns([2, 3, 2, 2])
 
     with m1:
