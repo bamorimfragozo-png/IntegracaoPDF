@@ -6,7 +6,7 @@ from pypdf import PdfReader
 import io
 import re
 
-#Configurar página/CSS
+#CONFIGURAR PÁGINA/CSS
 st.set_page_config(page_title="Dashboard Acadêmico", layout="wide")
 tecnicas=[
     "ILPR", "MAIN", "ININ", "LDPR", "RDCO", "LPWE", "SOPE",
@@ -44,9 +44,9 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 #CONEXÃO COM PLANILHAS
-conn = st.connection("gsheets", type=GSheetsConnection)
+conn=st.connection("gsheets", type=GSheetsConnection)
 
-DICIONARIO_SALAS = {
+DICIONARIO_SALAS={
     "Redes 1": st.secrets["connections"]["gsheets"]["Redes1"],
     "Redes 2": st.secrets["connections"]["gsheets"]["Redes2"],
     "Redes 3": st.secrets["connections"]["gsheets"]["Redes3"],
@@ -74,7 +74,7 @@ if ("ordenacao" not in st.session_state):
 #MENU DE NAVEGAÇÃO
 st.sidebar.markdown("### Navegação")
 if ('salaSelecionada' in locals()): 
-    st.session_state.salaAtiva = salaSelecionada
+    st.session_state.salaAtiva=salaSelecionada
 
 if (st.sidebar.button("Tela de Upload")):
     st.session_state.dadosCarregados=False
@@ -93,11 +93,11 @@ def extrairDados(arquivosPdf):
     dadosFinais=[]
     
     #for numeroChamada, arquivo in enumerate(arquivosPdf, start=1):
-    ##################################
-    numeroChamada = 1
+    ##############################################################################
+    numeroChamada=1
     ultimoAlunoLido=""
     for arquivo in arquivosPdf:
-    ##################################
+    ##############################################################################
         memoriaPdf=io.BytesIO(arquivo.getvalue())
         try:
             leitorPdf=PdfReader(memoriaPdf)
@@ -107,29 +107,30 @@ def extrairDados(arquivosPdf):
         except Exception as e:
             st.error(f"Erro ao ler o arquivo {arquivo.name}: {e}")
             continue
-        #############################
-        textoCompleto = ""
-        for pagina_index, pagina in enumerate(leitorPdf.pages):
-            textoCompleto += pagina.extract_text() + "\n"
+        #####################################################################################################
+        textoCompleto=""
+        for paginaIndex, pagina in enumerate(leitorPdf.pages):
+            textoCompleto+=pagina.extract_text() + "\n"
             textoPagina=textoCompleto
-            # Descobre temporariamente o nome que está NESTA página específica
-            nomeNestaPagina = "Não Identificado"
+            nomeNestaPagina="Não Identificado"
             for linha in textoPagina.split('\n'):
                 if ("Aluno" in linha or "Nome" in linha):
-                    partes = linha.split(":")
-                    valNome = partes[1].strip() if len(partes) > 1 else linha.replace("Aluno", "").replace("Nome", "").strip()
-                    nomeNestaPagina = re.sub(r'\bMatrícula\b.*', '', valNome, flags=re.IGNORECASE).strip()
+                    partes=linha.split(":")
+                    if (len(partes)>1):
+                        valNome=partes[1].strip()  
+                    else:
+                        valNome=linha.replace("Aluno", "").replace("Nome", "").strip()
+                    nomeNestaPagina=re.sub(r'\bMatrícula\b.*', '', valNome, flags=re.IGNORECASE).strip()
             
-            if nomeNestaPagina == "Não Identificado" or not nomeNestaPagina.strip():
-                nomeNestaPagina = arquivo.name.replace(".pdf", "").strip()
-
-            # SE MUDOU O NOME DO ALUNO: atualiza o número da chamada (exceto no primeiríssimo aluno)
-            if ultimoAlunoLido != "" and nomeNestaPagina != ultimoAlunoLido:
-                numeroChamada += 1
+            if (nomeNestaPagina=="Não Identificado" or not nomeNestaPagina.strip()):
+                nomeNestaPagina=arquivo.name.replace(".pdf", "").strip()
+                
+            if (ultimoAlunoLido!="" and nomeNestaPagina!=ultimoAlunoLido):
+                numeroChamada+=1
             
-            ultimoAlunoLido = nomeNestaPagina
-            textoCompleto = textoPagina # Alimenta o resto do seu código com a página atual
-        ##############################
+            ultimoAlunoLido=nomeNestaPagina
+            textoCompleto=textoPagina 
+        ######################################################################################################
 
         #EXTRAÇÃO DA FOTO DO PDF
         fotos=None
@@ -305,14 +306,14 @@ def extrairDados(arquivosPdf):
                 'Núcleo': nucleo,
                 'Observações': ''
             })
-        ##################################
-        if 'ultimo_nome_visto' not in locals():
-            ultimo_nome_visto = nomeAluno
+        ##############################################################################################
+        if ('ultimoNomeVisto' not in locals()):
+            ultimoNomeVisto=nomeAluno
         
-        if nomeAluno != ultimo_nome_visto:
-            numeroChamada += 1
-            ultimo_nome_visto = nomeAluno
-        #####################################
+        if (nomeAluno!=ultimoNomeVisto):
+            numeroChamada+=1
+            ultimoNomeVisto=nomeAluno
+        ##############################################################################################
     return pd.DataFrame(dadosFinais)
 
 #UPLOAD DOS RELATÓRIOS EM PDF
@@ -339,7 +340,7 @@ if (not st.session_state.dadosCarregados):
                 if (not BDNovo.empty):
                     #linkSalaAtiva=DICIONARIO_SALAS[salaSelecionada]
                     #conn.update(spreadsheet=linkSalaAtiva, data=BDNovo) 
-                    conn.update(spreadsheet=linkSalaAtiva, data=df_final) #<----teste
+                    conn.update(spreadsheet=linkSalaAtiva, data=df_final) #<-----------------teste
                     st.session_state.salaAtiva=salaSelecionada
                     st.session_state.dadosCarregados=True
                     st.session_state.materiaSelecionada=None
@@ -378,12 +379,11 @@ else:
     
     #st.sidebar.write(f"numeroAlunos:{len(alunosLista)}")
     #st.sidebar.write(alunosLista)
-    ####################################
-    if not alunosLista:
+    
+    if (not alunosLista):   #<-----------------teste
         st.info("Nenhum relatório foi carregado ainda.")
         st.write("Faça o upload dos PDFs na tela de Upload para visualizar o Dashboard.")
         st.stop()
-    #####################################
     
     if (st.session_state.numAluno>=len(alunosLista)):
         st.session_state.numAluno=0
@@ -395,7 +395,7 @@ else:
     t1, t2=st.columns([1, 4])
     with t1:
         st.markdown("### Foto")
-        if alunoNome in st.session_state.fotoAluno:
+        if (alunoNome in st.session_state.fotoAluno):
             st.image(st.session_state.fotoAluno[alunoNome], use_container_width=True)
         else:
             st.image("https://via.placeholder.com/150", use_container_width=True)
@@ -445,7 +445,7 @@ else:
                 st.session_state.materiaSelecionada=disciplinasOrdenadas[0]
 
         for disci in disciplinasOrdenadas:
-            if st.button(disci, key=f"btn_{disci}"):
+            if (st.button(disci, key=f"btn_{disci}")):
                 st.session_state.materiaSelecionada=disci
                 st.session_state.resetObs+=1
                 st.rerun()
@@ -463,13 +463,13 @@ else:
 
             st.write(f"**Visão Anual de Frequência: {st.session_state.materiaSelecionada}**")
 
-            BDRosca=pd.DataFrame({
+            BDFreqRosca=pd.DataFrame({
                 "Status":["Presença", "Faltas"],
                 "Percentual":[porcentagemPresenca, porcentagemFaltas]
             })
 
             graficoFreq=px.pie(
-                BDRosca,
+                BDFreqRosca,
                 names="Status",
                 values="Percentual",
                 hole=0.6,
@@ -569,7 +569,7 @@ else:
     st.divider()
     b1, b2, b3=st.columns([1, 1, 1])
     with b1:
-        if st.button("⬅️ Anterior"):
+        if (st.button("⬅️ Anterior")):
             st.session_state.numAluno=(st.session_state.numAluno-1)%len(alunosLista)
             st.session_state.materiaSelecionada=None
             st.session_state.resetObs+=1
@@ -596,13 +596,13 @@ else:
             index=indiceSelecao
         )
 
-        if dicionarioChamada[escolhaNum]!=st.session_state.numAluno:
+        if (dicionarioChamada[escolhaNum]!=st.session_state.numAluno):
             st.session_state.numAluno=dicionarioChamada[escolhaNum]
             st.session_state.materiaSelecionada=None
             st.session_state.resetObs+=1
             st.rerun()
     with b3:
-        if st.button("Próximo ➡️"):
+        if (st.button("Próximo ➡️")):
             st.session_state.numAluno=(st.session_state.numAluno+1)%len(alunosLista)
             st.session_state.materiaSelecionada=None
             st.session_state.resetObs+=1
