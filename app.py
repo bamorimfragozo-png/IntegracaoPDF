@@ -90,9 +90,35 @@ if (st.sidebar.button("Dashboard")):
 def extrairDados(arquivosPdf):
     dadosFinais=[]
     matriculas_processadas = set()  # <--- TESTE
+    arquivos_divididos = []  # <--- ADICIONE ESTA LINHA
 
     for numeroChamada, arquivo in enumerate(arquivosPdf, start=1):
         memoriaPdf=io.BytesIO(arquivo.getvalue())
+        # --- ADICIONE ESTE BLOCO AQUI ---
+        try:
+            leitor_temp = PdfReader(memoriaPdf)
+            if len(leitor_temp.pages) > 1 and not hasattr(arquivo, '_ja_dividido'):
+                from pypdf import PdfWriter
+                for i, pagina in enumerate(leitor_temp.pages):
+                    escritor = PdfWriter()
+                    escritor.add_page(pagina)
+                    sub_memoria = io.BytesIO()
+                    escritor.write(sub_memoria)
+                    sub_memoria.seek(0)
+                    
+                    class SubArquivo:
+                        def __init__(self, name, bytes_io):
+                            self.name = f"{name}_p{i+1}.pdf"
+                            self._bytes_io = bytes_io
+                            self._ja_dividido = True
+                        def getvalue(self):
+                            return self._bytes_io.getvalue()
+                    
+                    arquivos_divididos.append(SubArquivo(arquivo.name, sub_memoria))
+                continue
+        except Exception:
+            pass
+        # --------------------------------
         try:
             leitorPdf=PdfReader(memoriaPdf)
             textoCompleto=""
@@ -114,19 +140,19 @@ def extrairDados(arquivosPdf):
                         break
         except Exception:
             fotos=None
-        # --- BLOCO DE VALIDAÇÃO CORRIGIDO (COLE AQUI) ---
-        matricula_temp = "Não Identificada"
+        # --- ADICIONE ISSO LOGO ANTES DE NOMEALUNO = "NÃO IDENTIFICADO" ---
+        matriculaAluno = "Não Identificada"
         for termo in ["matrícula", "matricula", "prontuário", "prontuario"]:
-            busca_temp = re.search(termo + r":\s*(.{9})", textoCompleto, re.IGNORECASE)
-            if (busca_temp):
-                matricula_temp = busca_temp.group(1).strip()
+            buscaBT = re.search(termo + r":\s*(.{9})", textoCompleto, re.IGNORECASE)
+            if (buscaBT):
+                matriculaAluno = buscaBT.group(1).strip()
                 break
-        
-        if matricula_temp != "Não Identificada":
-            if matricula_temp in matriculas_processadas:
-                continue  # Pula o arquivo se essa matrícula já foi processada
-            matriculas_processadas.add(matricula_temp)
-        # ------------------------------------------------
+
+        if matriculaAluno != "Não Identificada":
+            if matriculaAluno in matriculas_processadas:
+                continue
+            matriculas_processadas.add(matriculaAluno)
+        # ------------------------------------------------------------------
 
         linhas=textoCompleto.split('\n')
         nomeAluno="Não Identificado"
@@ -295,7 +321,12 @@ def extrairDados(arquivosPdf):
                 'Núcleo': nucleo,
                 'Observações': ''
             })
-    
+
+    # --- ADICIONE ESTE BLOCO ANTES DO RETURN ---
+    if arquivos_divididos:
+        df_divididos = extrairDados(arquivos_divididos)
+        dadosFinais.extend(df_divididos.to_dict(orient='records'))
+    # --------------------------------------------
     return pd.DataFrame(dadosFinais)
 
 #UPLOAD DOS RELATÓRIOS EM PDF
