@@ -95,6 +95,7 @@ def extrairDados(arquivosPdf):
     #for numeroChamada, arquivo in enumerate(arquivosPdf, start=1):
     ##################################
     numeroChamada = 1
+    ultimoAlunoLido=""
     for arquivo in arquivosPdf:
     ##################################
         memoriaPdf=io.BytesIO(arquivo.getvalue())
