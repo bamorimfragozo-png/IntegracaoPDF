@@ -286,6 +286,7 @@ if (not st.session_state.dadosCarregados):
     st.subheader("Selecione a sala correspondente e faça o upload dos relatórios em PDF.")
 
     salaSelecionada=st.selectbox("Selecione a Sala:", list(DICIONARIO_SALAS.keys()))
+    st.session_state.salaAtiva=salaSelecionada #<-----------------teste
     arquivosEnviados=st.file_uploader("Faça o upload de quantos PDFs desejar aqui:", type=["pdf"], accept_multiple_files=True, key=f"uploader_{salaSelecionada}")
 
     if (st.button("PROCESSAR E ATUALIZAR DASHBOARD")):
@@ -342,11 +343,12 @@ else:
     
     #st.sidebar.write(f"numeroAlunos:{len(alunosLista)}")
     #st.sidebar.write(alunosLista)
-
+    ####################################
     if not alunosLista:
         st.info("Nenhum relatório foi carregado ainda.")
         st.write("Faça o upload dos PDFs na tela de Upload para visualizar o Dashboard.")
         st.stop()
+    #####################################
     
     if (st.session_state.numAluno>=len(alunosLista)):
         st.session_state.numAluno=0
