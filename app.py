@@ -109,10 +109,9 @@ def extrairDados(arquivosPdf):
             continue
         #############################
         textoCompleto = ""
-        textoPagina=textoCompleto
         for pagina_index, pagina in enumerate(leitorPdf.pages):
             textoCompleto += pagina.extract_text() + "\n"
-            
+            textoPagina=textoCompleto
             # Descobre temporariamente o nome que está NESTA página específica
             nomeNestaPagina = "Não Identificado"
             for linha in textoPagina.split('\n'):
