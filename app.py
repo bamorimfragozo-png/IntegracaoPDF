@@ -187,7 +187,7 @@ def extrairDados(arquivosPdf):
         if match:
             necEspeciais = match.group(1)
 
-        match = re.search(r"Tipo\s+de\s+Necessidade\s+Especial\s+-?\s*(.+?)\s*(?=Portador\(a\)|$)")", texto_napne, re.IGNORECASE)
+        match = re.search(r"Tipo\s+de\s+Necessidade\s+Especial\s+-?\s*(.+?)\s*(?=Portador\(a\)|$)"), texto_napne, re.IGNORECASE)
         if match:
             tipoNecEspecial = match.group(1)
 
@@ -195,7 +195,7 @@ def extrairDados(arquivosPdf):
         if match:
             transtorno = match.group(1)
 
-        match = re.search(r"Tipo\s+de\s+Transtorno\s+-?\s*(.+?)\s*(?=Portador\(a\)|$)")", texto_napne, re.IGNORECASE)
+        match = re.search(r"Tipo\s+de\s+Transtorno\s+-?\s*(.+?)\s*(?=Portador\(a\)|$)"), texto_napne, re.IGNORECASE)
         if match:
             tipoTranstorno = match.group(1)
 
