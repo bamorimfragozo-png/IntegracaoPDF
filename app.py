@@ -58,8 +58,8 @@ DICIONARIO_SALAS={
 #ESTADO DE ATUALIZAÇÃO DO DASHBOARD
 if ("dadosCarregados" not in st.session_state):
     st.session_state.dadosCarregados=False
-if ("numAluno" not in st.session_state):
-    st.session_state.numAluno=0
+if ("pagAluno" not in st.session_state):
+    st.session_state.pagAluno=0
 if ("materiaSelecionada" not in st.session_state):
     st.session_state.materiaSelecionada=None
 if ("resetObs" not in st.session_state):
@@ -79,13 +79,13 @@ if ('salaSelecionada' in locals()):
 if (st.sidebar.button("Tela de Upload")):
     st.session_state.dadosCarregados=False
     st.session_state.materiaSelecionada=None
-    st.session_state.numAluno=0
+    st.session_state.pagAluno=0
     st.rerun()
 
 if (st.sidebar.button("Dashboard")):
     st.session_state.dadosCarregados=True
     st.session_state.materiaSelecionada=None
-    st.session_state.numAluno=0
+    st.session_state.pagAluno=0
     st.rerun()
 
 #EXTRAÇÃO DE DADOS
@@ -231,26 +231,26 @@ def extrairDados(arquivosPdf):
             notas=[0.0, 0.0, 0.0, 0.0]
             faltas=[0.0, 0.0, 0.0, 0.0]
 
-            idDado=0
+            pagDado=0
             for etapa in range(4):
-                if (idDado<len(dadosTabela)):
-                    valNota=dadosTabela[idDado].replace(',', '.')
+                if (pagDado<len(dadosTabela)):
+                    valNota=dadosTabela[pagDado].replace(',', '.')
                     if (valNota.replace('.','',1).isdigit()):
                       notas[etapa]=float(valNota)
                     else:
                       notas[etapa]=0.0
-                    idDado+=1
-                if (idDado<len(dadosTabela)):
-                    valFalta=dadosTabela[idDado]
+                    pagDado+=1
+                if (pagDado<len(dadosTabela)):
+                    valFalta=dadosTabela[pagDado]
                     if (valFalta.isdigit()):
                       faltas[etapa]=float(valFalta)
                     else:
                       faltas[etapa]=0.0
-                    idDado+=1
+                    pagDado+=1
 
             mediaFinal=0.0
-            if (idDado<len(dadosTabela)):
-                valMedia=dadosTabela[idDado].replace(',', '.')
+            if (pagDado<len(dadosTabela)):
+                valMedia=dadosTabela[pagDado].replace(',', '.')
                 if (valMedia.replace('.', '', 1).isdigit()):
                     mediaFinal=float(valMedia)
                 else:
@@ -322,7 +322,7 @@ if (not st.session_state.dadosCarregados):
     st.subheader("Selecione a sala correspondente e faça o upload dos relatórios em PDF.")
 
     salaSelecionada=st.selectbox("Selecione a Sala:", list(DICIONARIO_SALAS.keys()))
-    st.session_state.salaAtiva=salaSelecionada #<-----------------teste
+    st.session_state.salaAtiva=salaSelecionada #<-----------------------------------------------------------------------------------------------------------------------teste
     arquivosEnviados=st.file_uploader("Faça o upload de quantos PDFs desejar aqui:", type=["pdf"], accept_multiple_files=True, key=f"uploader_{salaSelecionada}")
 
     if (st.button("PROCESSAR E ATUALIZAR DASHBOARD")):
@@ -340,11 +340,11 @@ if (not st.session_state.dadosCarregados):
                 if (not BDNovo.empty):
                     #linkSalaAtiva=DICIONARIO_SALAS[salaSelecionada]
                     #conn.update(spreadsheet=linkSalaAtiva, data=BDNovo) 
-                    conn.update(spreadsheet=linkSalaAtiva, data=df_final) #<-----------------teste
+                    conn.update(spreadsheet=linkSalaAtiva, data=df_final) #<----------------------------------------------------------------------------------------------------------teste
                     st.session_state.salaAtiva=salaSelecionada
                     st.session_state.dadosCarregados=True
                     st.session_state.materiaSelecionada=None
-                    st.session_state.numAluno=0
+                    st.session_state.pagAluno=0
                     st.rerun()
                 else:
                     st.error("Não foi possível extrair dados estruturados válidos.")
@@ -380,15 +380,15 @@ else:
     #st.sidebar.write(f"numeroAlunos:{len(alunosLista)}")
     #st.sidebar.write(alunosLista)
     
-    if (not alunosLista):   #<-----------------teste
+    if (not alunosLista):   #<-------------------------------------------------------------------------------------------------------------------------------------------------teste
         st.info("Nenhum relatório foi carregado ainda.")
         st.write("Faça o upload dos PDFs na tela de Upload para visualizar o Dashboard.")
         st.stop()
     
-    if (st.session_state.numAluno>=len(alunosLista)):
-        st.session_state.numAluno=0
+    if (st.session_state.pagAluno>=len(alunosLista)):
+        st.session_state.pagAluno=0
 
-    alunoNome=alunosLista[st.session_state.numAluno]
+    alunoNome=alunosLista[st.session_state.pagAluno]
     BDAluno=BD[BD['Aluno']==alunoNome].copy()
 
     #FOTO E IDENTIFICAÇÃO DO ESTUDANTE
@@ -556,9 +556,9 @@ else:
                     if (novaNota.strip()):
                         entradasAtuais.append(novaNota.strip())
                         textoFinal=" | ".join(entradasAtuais)
-                        indice=BD[(BD['Aluno']==alunoNome) & (BD['Disciplina']==st.session_state.materiaSelecionada)].index
-                        if (not indice.empty):
-                            BD.at[indice[0], 'Observações']=str(textoFinal)
+                        pagina=BD[(BD['Aluno']==alunoNome) & (BD['Disciplina']==st.session_state.materiaSelecionada)].index
+                        if (not pagina.empty):
+                            BD.at[pagina[0], 'Observações']=str(textoFinal)
 
                             conn.update(spreadsheet=linkSalaAtiva, data=BD)
                             st.session_state.resetObs+=1
@@ -570,7 +570,7 @@ else:
     b1, b2, b3=st.columns([1, 1, 1])
     with b1:
         if (st.button("⬅️ Anterior")):
-            st.session_state.numAluno=(st.session_state.numAluno-1)%len(alunosLista)
+            st.session_state.pagAluno=(st.session_state.pagAluno-1)%len(alunosLista)
             st.session_state.materiaSelecionada=None
             st.session_state.resetObs+=1
             st.rerun()
@@ -586,24 +586,24 @@ else:
         opcoesOrdenadas=sorted(list(dicionarioChamada.keys()))
 
         if (numAtual in opcoesOrdenadas):
-          indiceSelecao=opcoesOrdenadas.index(numAtual)
+          paginaSelecao=opcoesOrdenadas.index(numAtual)
         else:
-          indiceSelecao=0
+          paginaSelecao=0
 
         escolhaNum=st.selectbox(
             "Aluno Nº:",
             options=opcoesOrdenadas,
-            index=indiceSelecao
+            index=paginaSelecao
         )
 
-        if (dicionarioChamada[escolhaNum]!=st.session_state.numAluno):
-            st.session_state.numAluno=dicionarioChamada[escolhaNum]
+        if (dicionarioChamada[escolhaNum]!=st.session_state.pagAluno):
+            st.session_state.pagAluno=dicionarioChamada[escolhaNum]
             st.session_state.materiaSelecionada=None
             st.session_state.resetObs+=1
             st.rerun()
     with b3:
         if (st.button("Próximo ➡️")):
-            st.session_state.numAluno=(st.session_state.numAluno+1)%len(alunosLista)
+            st.session_state.pagAluno=(st.session_state.pagAluno+1)%len(alunosLista)
             st.session_state.materiaSelecionada=None
             st.session_state.resetObs+=1
             st.rerun()
