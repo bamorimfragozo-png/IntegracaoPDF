@@ -91,13 +91,15 @@ if (st.sidebar.button("Dashboard")):
 #EXTRAÇÃO DE DADOS
 def extrairDados(arquivosPdf):
     dadosFinais=[]
-    
+    ###########################--NAPNE--####################################################
+    mapa_napne_temporario = {}
+    ############################--NAPNE--##################################################
     #for numeroChamada, arquivo in enumerate(arquivosPdf, start=1):
-    ##############################################################################
+    ########################--VÁRIOS ALUNOS--###################################################
     numeroChamada=1
     ultimoAlunoLido=""
     for arquivo in arquivosPdf:
-    ##############################################################################
+    ##################################--VÁRIOS ALUNOS--#####################################
         memoriaPdf=io.BytesIO(arquivo.getvalue())
         try:
             leitorPdf=PdfReader(memoriaPdf)
@@ -107,7 +109,7 @@ def extrairDados(arquivosPdf):
         except Exception as e:
             st.error(f"Erro ao ler o arquivo {arquivo.name}: {e}")
             continue
-        #####################################################################################################
+        ###################################--VÁRIOS ALUNOS--########################################################
         textoCompleto=""
         for paginaIndex, pagina in enumerate(leitorPdf.pages):
             textoCompleto+=pagina.extract_text() + "\n"
@@ -130,7 +132,7 @@ def extrairDados(arquivosPdf):
             
             ultimoAlunoLido=nomeNestaPagina
             textoCompleto=textoPagina 
-        ######################################################################################################
+        ##################################--VÁRIOS ALUNOS--##################################################
 
         #EXTRAÇÃO DA FOTO DO PDF
         fotos=None
@@ -149,14 +151,14 @@ def extrairDados(arquivosPdf):
         nomeAluno="Não Identificado"
         matriculaAluno="Não Identificada"
         serieAluno="Não Identificada"
-        ###############################################################################################
-        necEspeciais = "Não"
-        tipoNecEspecial = "-"
-        transtorno = "Não"
-        tipoTranstorno = "-"
-        superdotacao = "Não"
-        tipoSuperdotacao = "-"
-        ###############################################################################################
+        ######################################--NAPNE--#################################################
+        necEspeciais="Não"
+        tipoNecEspecial="-"
+        transtorno="Não"
+        tipoTranstorno="-"
+        superdotacao="Não"
+        tipoSuperdotacao="-"
+        ########################################--NAPNE--#################################################
 
         for linha in linhas:
             if ("Aluno" in linha or "Nome" in linha):
@@ -178,8 +180,7 @@ def extrairDados(arquivosPdf):
                 partes=linha.split(":")
                 if (len(partes)>1):
                     serieAluno=partes[1].strip()[:27]
-            ##################################################################################################################
-            # Captura de Necessidades Especiais
+            ###########################################--NAPNE--#########################################################
             if ("Necessidades Especiais" in linha):
                 # Se houver "Não" ou "Sim" logo após o termo
                 busca_nec = re.search(r"Necessidades\s+Especiais\s+(Sim|Não)", linha, re.IGNORECASE)
@@ -212,7 +213,7 @@ def extrairDados(arquivosPdf):
                 if len(partes_super) > 1:
                     tipoSuperdotacao = partes_super[1].replace("-", "").strip()
                     if not tipoSuperdotacao: tipoSuperdotacao = "-"
-            ##################################################################################################################################
+            ################################################--NAPNE--######################################################################
 
         if (nomeAluno=="Não Identificado" or not nomeAluno.strip()):
             nomeAluno=arquivo.name.replace(".pdf", "").replace("Boletim", "").replace("_", " ").strip()
@@ -348,23 +349,41 @@ def extrairDados(arquivosPdf):
                 'Freq. Final': blocos['freqFinal'],
                 'Núcleo': nucleo,
                 'Observações': '',
-                #############################################################################################################
+                ###################################################--NAPNE--######################################################
                 'Necessidades Especiais': necEspeciais,
                 'Tipo de Necessidade Especial': tipoNecEspecial,
                 'Transtorno': transtorno,
                 'Tipo de Transtorno': tipoTranstorno,
                 'Superdotação': superdotacao,
                 'Tipo de Superdotação': tipoSuperdotacao
-                ##############################################################################################################
+                #####################################################--NAPNE--#####################################################
             })
-        ##############################################################################################
+        #######################################################--VÁRIOS ALUNOS--#################################
         if ('ultimoNomeVisto' not in locals()):
             ultimoNomeVisto=nomeAluno
         
         if (nomeAluno!=ultimoNomeVisto):
             numeroChamada+=1
             ultimoNomeVisto=nomeAluno
-        ##############################################################################################
+        ##############################################--VÁRIOS ALUNOS--#######################################
+        ####################################--NAPNE--##########################################################
+        if nomeAluno and nomeAluno != "Não Identificado":
+            mapa_napne_temporario[nomeAluno.strip().upper()] = {
+                'nec': necEspeciais, 't_nec': tipoNecEspecial,
+                'trans': transtorno, 't_trans': tipoTranstorno,
+                'super': superdotacao, 't_super': tipoSuperdotacao
+            }
+    for dado in dadosFinais:
+        aluno_alvo = dado['Aluno'].strip().upper()
+        if aluno_alvo in mapa_napne_temporario:
+            info = mapa_napne_temporario[aluno_alvo]
+            dado['Necessidades Especiais'] = info['nec']
+            dado['Tipo de Necessidade Especial'] = info['t_nec']
+            dado['Transtorno'] = info['trans']
+            dado['Tipo de Transtorno'] = info['t_trans']
+            dado['Superdotação'] = info['super']
+            dado['Tipo de Superdotação'] = info['t_super']
+    ############################################--NAPNE--#################################################################
     return pd.DataFrame(dadosFinais)
 
 #UPLOAD DOS RELATÓRIOS EM PDF
@@ -382,7 +401,7 @@ if (not st.session_state.dadosCarregados):
                 BDNovo=extrairDados(arquivosEnviados)
 
                 linkSalaAtiva=DICIONARIO_SALAS[salaSelecionada]
-                #codigo adicionado para teste
+                #-------------------------------codigo adicionado para teste----------------------------------------------------------
                 df_atual = conn.read(spreadsheet=linkSalaAtiva)
                 df_final = pd.concat([df_atual, BDNovo],ignore_index=True)
                 df_final = df_final.drop_duplicates(subset=["Aluno", "Disciplina"],keep="last")
@@ -467,6 +486,32 @@ else:
 
         c1.markdown(f"<div class='info-box'><b>Matrícula:</b> {matriculaVal}</div>", unsafe_allow_html=True)
         c2.markdown(f"<div class='info-box'><b>Série:</b> {serieVal}</div>", unsafe_allow_html=True)
+        ##########################################--NAPNE--########################################################
+        st.markdown("#### Informações de Inclusão (NAPNE)")
+        n_col1, n_col2, n_col3 = st.columns(3)
+        
+        val_pne = BDAluno['Necessidades Especiais'].iloc[0] if 'Necessidades Especiais' in BDAluno.columns else "Não Informado"
+        val_t_pne = BDAluno['Tipo de Necessidade Especial'].iloc[0] if 'Tipo de Necessidade Especial' in BDAluno.columns else "-"
+        val_trans = BDAluno['Transtorno'].iloc[0] if 'Transtorno' in BDAluno.columns else "Não Informado"
+        val_t_trans = BDAluno['Tipo de Transtorno'].iloc[0] if 'Tipo de Transtorno' in BDAluno.columns else "-"
+        val_super = BDAluno['Superdotação'].iloc[0] if 'Superdotação' in BDAluno.columns else "Não Informado"
+        val_t_super = BDAluno['Tipo de Superdotação'].iloc[0] if 'Tipo de Superdotação' in BDAluno.columns else "-"
+
+        with n_col1:
+            st.markdown(f"<div class='info-box'><b>Possui PNE:</b> {val_pne}</div>", unsafe_allow_html=True)
+            if str(val_pne).strip().lower() in ["sim", "s"]:
+                st.markdown(f"<div class='info-box' style='color: #e67e22;'><b>Tipo de PNE:</b> {val_t_pne}</div>", unsafe_allow_html=True)
+                
+        with n_col2:
+            st.markdown(f"<div class='info-box'><b>Possui Transtorno:</b> {val_trans}</div>", unsafe_allow_html=True)
+            if str(val_trans).strip().lower() in ["sim", "s"]:
+                st.markdown(f"<div class='info-box' style='color: #e67e22;'><b>Tipo Transtorno:</b> {val_t_trans}</div>", unsafe_allow_html=True)
+                
+        with n_col3:
+            st.markdown(f"<div class='info-box'><b>Superdotação:</b> {val_super}</div>", unsafe_allow_html=True)
+            if str(val_super).strip().lower() in ["sim", "s"]:
+                st.markdown(f"<div class='info-box' style='color: #e67e22;'><b>Tipo Superdotação:</b> {val_t_super}</div>", unsafe_allow_html=True)
+        #########################################--NAPNE--################################################################
 
     st.divider()
 
