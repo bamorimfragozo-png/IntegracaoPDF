@@ -149,6 +149,14 @@ def extrairDados(arquivosPdf):
         nomeAluno="Não Identificado"
         matriculaAluno="Não Identificada"
         serieAluno="Não Identificada"
+        ###############################################################################################
+        necEspeciais = "Não"
+        tipoNecEspecial = "-"
+        transtorno = "Não"
+        tipoTranstorno = "-"
+        superdotacao = "Não"
+        tipoSuperdotacao = "-"
+        ###############################################################################################
 
         for linha in linhas:
             if ("Aluno" in linha or "Nome" in linha):
@@ -170,6 +178,41 @@ def extrairDados(arquivosPdf):
                 partes=linha.split(":")
                 if (len(partes)>1):
                     serieAluno=partes[1].strip()[:27]
+            ##################################################################################################################
+            # Captura de Necessidades Especiais
+            if ("Necessidades Especiais" in linha):
+                # Se houver "Não" ou "Sim" logo após o termo
+                busca_nec = re.search(r"Necessidades\s+Especiais\s+(Sim|Não)", linha, re.IGNORECASE)
+                if busca_nec:
+                    necEspeciais = busca_nec.group(1).strip()
+            if ("Tipo de Necessidade Especial" in linha):
+                partes_nec = linha.split("Tipo de Necessidade Especial")
+                if len(partes_nec) > 1:
+                    tipoNecEspecial = partes_nec[1].replace("-", "").strip()
+                    if not tipoNecEspecial: tipoNecEspecial = "-"
+
+            # Captura de Transtornos
+            if ("Transtorno" in linha and "Tipo" not in linha):
+                busca_trans = re.search(r"Transtorno\s+(Sim|Não)", linha, re.IGNORECASE)
+                if busca_trans:
+                    transtorno = busca_trans.group(1).strip()
+            if ("Tipo de Transtorno" in linha):
+                partes_trans = linha.split("Tipo de Transtorno")
+                if len(partes_trans) > 1:
+                    tipoTranstorno = partes_trans[1].replace("-", "").strip()
+                    if not tipoTranstorno: tipoTranstorno = "-"
+
+            # Captura de Superdotação
+            if ("Portador(a) de Superdotação" in linha):
+                busca_super = re.search(r"Superdotação\s+(Sim|Não)", linha, re.IGNORECASE)
+                if busca_super:
+                    superdotacao = busca_super.group(1).strip()
+            if ("Superdotação -" in linha or ("Superdotação" in linha and "Portador" not in linha)):
+                partes_super = linha.split("Superdotação")
+                if len(partes_super) > 1:
+                    tipoSuperdotacao = partes_super[1].replace("-", "").strip()
+                    if not tipoSuperdotacao: tipoSuperdotacao = "-"
+            ##################################################################################################################################
 
         if (nomeAluno=="Não Identificado" or not nomeAluno.strip()):
             nomeAluno=arquivo.name.replace(".pdf", "").replace("Boletim", "").replace("_", " ").strip()
@@ -304,7 +347,15 @@ def extrairDados(arquivosPdf):
                 'Média Final': blocos['mediaFinal'],
                 'Freq. Final': blocos['freqFinal'],
                 'Núcleo': nucleo,
-                'Observações': ''
+                'Observações': '',
+                #############################################################################################################
+                'Necessidades Especiais': necEspeciais,
+                'Tipo de Necessidade Especial': tipoNecEspecial,
+                'Transtorno': transtorno,
+                'Tipo de Transtorno': tipoTranstorno,
+                'Superdotação': superdotacao,
+                'Tipo de Superdotação': tipoSuperdotacao
+                ##############################################################################################################
             })
         ##############################################################################################
         if ('ultimoNomeVisto' not in locals()):
