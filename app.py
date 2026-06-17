@@ -203,7 +203,7 @@ def extrairDados(arquivosPdf):
         if match:
             superdotacao = match.group(1)
 
-        match = re.search(r"Superdotação\s+-?\s*(.+?)\s*$)", texto_napne, re.IGNORECASE)
+        match = re.search(r"Superdotação\s+-?\s*(.+?)\s*$", texto_napne, re.IGNORECASE)
         if match:
             tipoSuperdotacao = match.group(1)
         ############################--NAPNE--###########################
