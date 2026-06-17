@@ -148,7 +148,7 @@ def extrairDados(arquivosPdf):
             fotos=None
 
         linhas=textoCompleto.split('\n')
-        texto_napne = textoCompleto.replace("\n", " ") <------------------------------------------------------------------teste NAPNE
+        texto_napne = textoCompleto.replace("\n", " ") #<------------------------------------------------------------------teste NAPNE
         nomeAluno="Não Identificado"
         matriculaAluno="Não Identificada"
         serieAluno="Não Identificada"
