@@ -148,7 +148,6 @@ def extrairDados(arquivosPdf):
             fotos=None
 
         linhas=textoCompleto.split('\n')
-        st.write(f"--- TEXTO EXTRAÍDO DO ARQUIVO {arquivo.name} ---", linhas) <--------------------------------------------------------teste
         nomeAluno="Não Identificado"
         matriculaAluno="Não Identificada"
         serieAluno="Não Identificada"
