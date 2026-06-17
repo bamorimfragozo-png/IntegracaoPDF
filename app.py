@@ -169,6 +169,13 @@ def extrairDados(arquivosPdf):
                 else:
                   valNome=linha.replace("Aluno", "").replace("Nome", "").strip()
                 nomeAluno=re.sub(r'\bMatrícula\b.*', '', valNome, flags=re.IGNORECASE).strip()
+            ############################################-NAPNE--######################################################
+            if "NAPNE" in linha or "Acessibilidade" in linha:
+                necEspeciais = "Sim"
+                # Se a linha contiver a palavra Acessibilidade, tentamos usá-la como o tipo
+                if "Acessibilidade" in linha:
+                    tipoNecEspecial = "Acessibilidade"
+            #############################################--NAPNE--#####################################################
 
             for termo in ["matrícula", "matricula", "prontuário", "prontuario"]:
               if (termo in linha.lower()):
