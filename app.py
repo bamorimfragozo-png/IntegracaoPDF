@@ -92,7 +92,7 @@ if (st.sidebar.button("Dashboard")):
 def extrairDados(arquivosPdf):
     dadosFinais=[]
     ###########################--NAPNE--####################################################
-    mapa_napne_temporario = {}
+    mapaNapneTemporario={}
     ############################--NAPNE--##################################################
     #for numeroChamada, arquivo in enumerate(arquivosPdf, start=1):
     ########################--VÁRIOS ALUNOS--###################################################
@@ -148,7 +148,7 @@ def extrairDados(arquivosPdf):
             fotos=None
 
         linhas=textoCompleto.split('\n')
-        texto_napne = textoCompleto.replace("\n", " ") #<------------------------------------------------------------------teste NAPNE
+        textoNapne=textoCompleto.replace("\n", " ") #<------------------------------------------------------------------teste NAPNE
         nomeAluno="Não Identificado"
         matriculaAluno="Não Identificada"
         serieAluno="Não Identificada"
@@ -183,29 +183,29 @@ def extrairDados(arquivosPdf):
                     serieAluno=partes[1].strip()[:27]
 
         #######################--NAPNE--#############################################
-        match = re.search(r"Portador\(a\)\s+de\s+Necessidades\s+Especiais\s+(Sim|Não)", texto_napne, re.IGNORECASE)
-        if match:
-            necEspeciais = match.group(1)
+        match=re.search(r"Portador\(a\)\s+de\s+Necessidades\s+Especiais\s+(Sim|Não)", textoNapne, re.IGNORECASE)
+        if (match):
+            necEspeciais=match.group(1)
 
-        match = re.search(r"Tipo\s+de\s+Necessidade\s+Especial\s+-?\s*(.+?)\s*(?=Portador\(a\)|$)", texto_napne, re.IGNORECASE)
-        if match:
-            tipoNecEspecial = match.group(1)
+        match=re.search(r"Tipo\s+de\s+Necessidade\s+Especial\s+-?\s*(.+?)\s*(?=Portador\(a\)|$)", textoNapne, re.IGNORECASE)
+        if (match):
+            tipoNecEspecial=match.group(1)
 
-        match = re.search(r"Portador\(a\)\s+de\s+Transtorno\s+(Sim|Não)", texto_napne, re.IGNORECASE)
-        if match:
-            transtorno = match.group(1)
+        match=re.search(r"Portador\(a\)\s+de\s+Transtorno\s+(Sim|Não)", textoNapne, re.IGNORECASE)
+        if (match):
+            transtorno=match.group(1)
 
-        match = re.search(r"Tipo\s+de\s+Transtorno\s+-?\s*(.+?)\s*(?=Portador\(a\)|$)", texto_napne, re.IGNORECASE)
-        if match:
-            tipoTranstorno = match.group(1)
+        match=re.search(r"Tipo\s+de\s+Transtorno\s+-?\s*(.+?)\s*(?=Portador\(a\)|$)", textoNapne, re.IGNORECASE)
+        if (match):
+            tipoTranstorno=match.group(1)
 
-        match = re.search(r"Portador\(a\)\s+de\s+Superdotação\s+(Sim|Não)", texto_napne, re.IGNORECASE)
-        if match:
-            superdotacao = match.group(1)
+        match=re.search(r"Portador\(a\)\s+de\s+Superdotação\s+(Sim|Não)", textoNapne, re.IGNORECASE)
+        if (match):
+            superdotacao=match.group(1)
 
-        match = re.search(r"Superdotação\s+-?\s*(.+?)\s*$", texto_napne, re.IGNORECASE)
-        if match:
-            tipoSuperdotacao = match.group(1)
+        match=re.search(r"Superdotação\s+-?\s*(.+?)\s*$", textoNapne, re.IGNORECASE)
+        if (match):
+            tipoSuperdotacao=match.group(1)
         ############################--NAPNE--###########################
         if (nomeAluno=="Não Identificado" or not nomeAluno.strip()):
             nomeAluno=arquivo.name.replace(".pdf", "").replace("Boletim", "").replace("_", " ").strip()
@@ -359,22 +359,22 @@ def extrairDados(arquivosPdf):
             ultimoNomeVisto=nomeAluno
         ##############################################--VÁRIOS ALUNOS--#######################################
         ####################################--NAPNE--##########################################################
-        if nomeAluno and nomeAluno != "Não Identificado":
-            mapa_napne_temporario[nomeAluno.strip().upper()] = {
-                'nec': necEspeciais, 't_nec': tipoNecEspecial,
-                'trans': transtorno, 't_trans': tipoTranstorno,
-                'super': superdotacao, 't_super': tipoSuperdotacao
+        if (nomeAluno and nomeAluno!="Não Identificado"):
+            mapaNapneTemporario[nomeAluno.strip().upper()]={
+                'nec': necEspeciais, 'tipNec': tipoNecEspecial,
+                'trans': transtorno, 'tipTrans': tipoTranstorno,
+                'super': superdotacao, 'tipSuper': tipoSuperdotacao
             }
     for dado in dadosFinais:
-        aluno_alvo = dado['Aluno'].strip().upper()
-        if aluno_alvo in mapa_napne_temporario:
-            info = mapa_napne_temporario[aluno_alvo]
-            dado['Necessidades Especiais'] = info['nec']
-            dado['Tipo de Necessidade Especial'] = info['t_nec']
-            dado['Transtorno'] = info['trans']
-            dado['Tipo de Transtorno'] = info['t_trans']
-            dado['Superdotação'] = info['super']
-            dado['Tipo de Superdotação'] = info['t_super']
+        alunoAlvo=dado['Aluno'].strip().upper()
+        if (alunoAlvo in mapaNapneTemporario):
+            info=mapaNapneTemporario[alunoAlvo]
+            dado['Necessidades Especiais']=info['nec']
+            dado['Tipo de Necessidade Especial']=info['tipNec']
+            dado['Transtorno']=info['trans']
+            dado['Tipo de Transtorno']=info['tipTrans']
+            dado['Superdotação']=info['super']
+            dado['Tipo de Superdotação']=info['tipSuper']
     ############################################--NAPNE--#################################################################
     return pd.DataFrame(dadosFinais)
 
@@ -480,29 +480,52 @@ else:
         c2.markdown(f"<div class='info-box'><b>Série:</b> {serieVal}</div>", unsafe_allow_html=True)
         ##########################################--NAPNE--########################################################
         st.markdown("#### Informações de Inclusão (NAPNE)")
-        n_col1, n_col2, n_col3 = st.columns(3)
+        napCol1, napCol2, napCol3=st.columns(3)
         
-        val_pne = BDAluno['Necessidades Especiais'].iloc[0] if 'Necessidades Especiais' in BDAluno.columns else "Não Informado"
-        val_t_pne = BDAluno['Tipo de Necessidade Especial'].iloc[0] if 'Tipo de Necessidade Especial' in BDAluno.columns else "-"
-        val_trans = BDAluno['Transtorno'].iloc[0] if 'Transtorno' in BDAluno.columns else "Não Informado"
-        val_t_trans = BDAluno['Tipo de Transtorno'].iloc[0] if 'Tipo de Transtorno' in BDAluno.columns else "-"
-        val_super = BDAluno['Superdotação'].iloc[0] if 'Superdotação' in BDAluno.columns else "Não Informado"
-        val_t_super = BDAluno['Tipo de Superdotação'].iloc[0] if 'Tipo de Superdotação' in BDAluno.columns else "-"
+        if ('Necessidades Especiais' in BDAluno.columns):
+            valPne=BDAluno['Necessidades Especiais'].iloc[0]
+        else:
+            valPne="Não Informado"
+            
+        if ('Tipo de Necessidade Especial' in BDAluno.columns):
+            valTipPne=BDAluno['Tipo de Necessidade Especial'].iloc[0] 
+        else:
+            valTipPne="-"
 
-        with n_col1:
-            st.markdown(f"<div class='info-box'><b>Possui PNE:</b> {val_pne}</div>", unsafe_allow_html=True)
-            if str(val_pne).strip().lower() in ["sim", "s"]:
-                st.markdown(f"<div class='info-box' style='color: #e67e22;'><b>Tipo de PNE:</b> {val_t_pne}</div>", unsafe_allow_html=True)
+        if ('Transtorno' in BDAluno.columns):
+            valTrans=BDAluno['Transtorno'].iloc[0] 
+        else:
+            valTrans="Não Informado"
+            
+        if ('Tipo de Transtorno' in BDAluno.columns):
+            valTipTrans=BDAluno['Tipo de Transtorno'].iloc[0] 
+        else:
+            valTipTrans="-"
+            
+        if ('Superdotação' in BDAluno.columns):
+            valSuper=BDAluno['Superdotação'].iloc[0]
+        else:
+            valSuper="Não Informado"
+            
+        if ('Tipo de Superdotação' in BDAluno.columns):
+            valTipSuper=BDAluno['Tipo de Superdotação'].iloc[0]
+        else:
+            valTipSuper="-"
+
+        with napCol1:
+            st.markdown(f"<div class='info-box'><b>Possui PNE:</b> {valPne}</div>", unsafe_allow_html=True)
+            if (str(valPne).strip().lower() in ["sim", "s"]):
+                st.markdown(f"<div class='info-box' style='color: #e67e22;'><b>Tipo de PNE:</b> {valTipPne}</div>", unsafe_allow_html=True)
                 
-        with n_col2:
-            st.markdown(f"<div class='info-box'><b>Possui Transtorno:</b> {val_trans}</div>", unsafe_allow_html=True)
-            if str(val_trans).strip().lower() in ["sim", "s"]:
-                st.markdown(f"<div class='info-box' style='color: #e67e22;'><b>Tipo Transtorno:</b> {val_t_trans}</div>", unsafe_allow_html=True)
+        with napCol2:
+            st.markdown(f"<div class='info-box'><b>Possui Transtorno:</b> {valTrans}</div>", unsafe_allow_html=True)
+            if (str(valTrans).strip().lower() in ["sim", "s"]):
+                st.markdown(f"<div class='info-box' style='color: #e67e22;'><b>Tipo Transtorno:</b> {valTipTrans}</div>", unsafe_allow_html=True)
                 
-        with n_col3:
-            st.markdown(f"<div class='info-box'><b>Superdotação:</b> {val_super}</div>", unsafe_allow_html=True)
-            if str(val_super).strip().lower() in ["sim", "s"]:
-                st.markdown(f"<div class='info-box' style='color: #e67e22;'><b>Tipo Superdotação:</b> {val_t_super}</div>", unsafe_allow_html=True)
+        with napCol3:
+            st.markdown(f"<div class='info-box'><b>Superdotação:</b> {valSuper}</div>", unsafe_allow_html=True)
+            if (str(valSuper).strip().lower() in ["sim", "s"]):
+                st.markdown(f"<div class='info-box' style='color: #e67e22;'><b>Tipo Superdotação:</b> {valTipSuper}</div>", unsafe_allow_html=True)
         #########################################--NAPNE--################################################################
 
     st.divider()
