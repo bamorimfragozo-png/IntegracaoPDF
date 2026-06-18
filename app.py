@@ -105,7 +105,7 @@ def Extrair_Foto(leitorPdf, pagina):
         fotos=None
     return fotos
     
-def Extrair_Nome_Aluno(texto):
+def Extrair_Nome_Aluno(linha):
     if ("Aluno" in linha or "Nome" in linha):
         partes=linha.split(":")
     if (len(partes)>1):
