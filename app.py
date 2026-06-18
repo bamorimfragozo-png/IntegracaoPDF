@@ -173,9 +173,9 @@ def extrairDados(arquivosPdf):
                     nomeNestaPagina=re.sub(r'\bMatrícula\b.*', '', valNome, flags=re.IGNORECASE).strip()
                     
                     fotos=Extrair_Foto(leitorPdf,pagina)
-                    nomeAluno=Extrair_Nome_Aluno(textoCompleto)
-                    matriculaAluno=Extrair_Matricula_Aluno(textoCompleto)
-                    serieAluno=Extrair_Serie_Aluno(textoCompleto)
+                    nomeAluno=Extrair_Nome_Aluno(linha)
+                    matriculaAluno=Extrair_Matricula_Aluno(linha)
+                    serieAluno=Extrair_Serie_Aluno(linha)
             
             if (nomeNestaPagina=="Não Identificado" or not nomeNestaPagina.strip()):
                 nomeNestaPagina=arquivo.name.replace(".pdf", "").strip()
