@@ -130,7 +130,7 @@ def Extrair_Matricula_Aluno(texto):
 
 def Extrair_Serie_Aluno(texto):
     linha=texto
-    SerieAluno=""
+    serieAluno=""
     if ("Série" in linha or "Serie" in linha or "Ano" in linha or "Turma" in linha):
         partes=linha.split(":")
         if (len(partes)>1):
