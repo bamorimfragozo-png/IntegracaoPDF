@@ -137,6 +137,111 @@ def Extrair_Serie_Aluno(texto):
             serieAluno=partes[1].strip()[:27]
     return serieAluno
 
+def Extrair_Disciplinas_Aluno(linhasDisciplinas):
+        mapeamentoDisciplinas={}
+
+        for linha in linhas:
+          encontrou=False
+          for p in ["Notas das etapas", "Faltas nas etapas", "Diário", "Disciplina", "Total", "Este documento"]:
+            if (p in linha):
+              encontrou=True
+              break
+            if(encontrou):
+              continue
+
+            linhaLimpa=re.sub(r'^\d{5,6}\s+', '', linha.strip())
+            if (not re.search(r'[A-Z]{3,4}\.\d{4,5}|\([A-Z0-9]{5,}\)', linhaLimpa)):
+                continue
+
+            tokens=linhaLimpa.split()
+            partesTexto=[]
+            partesDados=[]
+            passouDaMateria=False
+
+            for token in tokens:
+                if ((',' in token and token.replace(',', '').isdigit()) and not passouDaMateria):
+                    passouDaMateria=True
+                if (not passouDaMateria):
+                    partesTexto.append(token)
+                else:
+                    partesDados.append(token)
+
+            nomeDisciplina=" ".join(partesTexto).strip()
+            if (not nomeDisciplina or len(partesDados)<5):
+                continue
+
+            #CAPTURA DA FREQUÊNCIA DENTRO DA LINHA ATUAL
+            calculoFreq=100.0
+            for token in tokens:
+                if ("%" in token):
+                    try:
+                        calculoFreq=float(token.replace("%", "").replace(",", "."))
+                    except ValueError:
+                        pass
+                    break
+
+            tokensFiltrados=[]
+            for tok in partesDados:
+                if (tok in ["Cursando", "(Aguarda", "Carga", "Horária)", "Horária", "Aprovado", "Retido"] or "%" in tok):
+                    continue
+                if (tok=="-" or tok.replace(',', '.').replace('.', '', 1).isdigit()):
+                    tokensFiltrados.append(tok)
+
+            dadosTabela=tokensFiltrados[4:]
+
+            notas=[0.0, 0.0, 0.0, 0.0]
+            faltas=[0.0, 0.0, 0.0, 0.0]
+
+            pagDado=0
+            for etapa in range(4):
+                if (pagDado<len(dadosTabela)):
+                    valNota=dadosTabela[pagDado].replace(',', '.')
+                    if (valNota.replace('.','',1).isdigit()):
+                      notas[etapa]=float(valNota)
+                    else:
+                      notas[etapa]=0.0
+                    pagDado+=1
+                if (pagDado<len(dadosTabela)):
+                    valFalta=dadosTabela[pagDado]
+                    if (valFalta.isdigit()):
+                      faltas[etapa]=float(valFalta)
+                    else:
+                      faltas[etapa]=0.0
+                    pagDado+=1
+
+            mediaFinal=0.0
+            if (pagDado<len(dadosTabela)):
+                valMedia=dadosTabela[pagDado].replace(',', '.')
+                if (valMedia.replace('.', '', 1).isdigit()):
+                    mediaFinal=float(valMedia)
+                else:
+                    notasLancadas=[]
+                    for n in notas:
+                      if (n>0):
+                        notasLancadas.append(n)
+                    if (notasLancadas):
+                      mediaFinal=sum(notasLancadas)/len(notasLancadas)
+                    else:
+                      mediaFinal=0.0
+            else:
+                notasLancadas=[]
+                for n in notas:
+                    if (n>0):
+                        notasLancadas.append(n)
+                    if (notasLancadas):
+                        mediaFinal=sum(notasLancadas)/len(notasLancadas)
+                    else:
+                        mediaFinal=0.0
+
+            if (len(nomeDisciplina)>3):
+                mapeamentoDisciplinas[nomeDisciplina]={
+                    'notas': notas,
+                    'faltas': faltas,
+                    'mediaFinal': mediaFinal,
+                    'freqFinal': calculoFreq
+                }
+        return mapeamentoDisciplinas
+
 #EXTRAÇÃO DE DADOS
 def extrairDados(arquivosPdf):
     dadosFinais=[]
@@ -167,7 +272,10 @@ def extrairDados(arquivosPdf):
             nomeNestaPagina="Não Identificado"
             linhas=textoPagina.split('\n')
             for linha in linhas:
-                if ("Aluno" in linha or "Nome" in linha):
+                if ("Aluno" in linha or "Nome" in linha): #identifica o aluno
+                    
+                    textoCompletoDoAluno=leitorPdf.pages[paginaIndex].extract_text() + "\n" +leitorPdf.pages[paginaIndex+1].extract_text() +"\n"
+                    
                     partes=linha.split(":")
                     if (len(partes)>1):
                         valNome=partes[1].strip()  
@@ -179,6 +287,7 @@ def extrairDados(arquivosPdf):
                     nomeAluno=Extrair_Nome_Aluno(linha)
                     matriculaAluno=Extrair_Matricula_Aluno(linha)
                     serieAluno=Extrair_Serie_Aluno(linha)
+                    mapeamentoDisciplinas=Extrair_Disciplinas_Aluno(textoCompletoDoAluno.split("\n"))
             
             if (nomeNestaPagina=="Não Identificado" or not nomeNestaPagina.strip()):
                 nomeNestaPagina=arquivo.name.replace(".pdf", "").strip()
