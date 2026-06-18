@@ -57,7 +57,7 @@ DICIONARIO_SALAS={
 
 #ESTADO DE ATUALIZAÇÃO DO DASHBOARD
 if ("dadosCarregados" not in st.session_state):
-    st.session_state.dadosCarregados=False
+    st.session_state.dadosCarregados=True
 if ("pagAluno" not in st.session_state):
     st.session_state.pagAluno=0
 if ("materiaSelecionada" not in st.session_state):
