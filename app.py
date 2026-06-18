@@ -88,6 +88,22 @@ if (st.sidebar.button("Dashboard")):
     st.session_state.pagAluno=0
     st.rerun()
 
+def Extrair_Foto(page):
+    #EXTRAÇÃO DA FOTO DO PDF
+    fotos=None
+    try:
+        primeiraPagina=leitorPdf.pages[0]
+        #if ("/XObject" in pagina["/Resources"]):
+        if ("/XObject" in pagina["/Resources"]):
+            xobject=pagina["/Resources"]["/XObject"].get_object()
+            for obj in xobject:
+                if (xobject[obj]["/Subtype"]=="/Image"):
+                    fotos=xobject[obj].get_data()
+                    break
+    except Exception:
+        fotos=None
+    return fotos
+
 #EXTRAÇÃO DE DADOS
 def extrairDados(arquivosPdf):
     dadosFinais=[]
@@ -133,20 +149,25 @@ def extrairDados(arquivosPdf):
             ultimoAlunoLido=nomeNestaPagina
             textoCompleto=textoPagina 
         ##################################--VÁRIOS ALUNOS--##################################################
-
-        #EXTRAÇÃO DA FOTO DO PDF
-        fotos=None
-        try:
-            primeiraPagina=leitorPdf.pages[0]
-            if ("/XObject" in primeiraPagina["/Resources"]):
-                xobject=primeiraPagina["/Resources"]["/XObject"].get_object()
-                for obj in xobject:
-                    if (xobject[obj]["/Subtype"]=="/Image"):
-                        fotos=xobject[obj].get_data()
-                        break
-        except Exception:
+        ##### ALTERACAO PAZINATTO-acrescentado paragrafo, colocando dentro do for de cima
+            #EXTRAÇÃO DA FOTO DO PDF
+        fotos=Extrair_Foto(pagina)
+            """
             fotos=None
-
+            try:
+                primeiraPagina=leitorPdf.pages[0]
+                #if ("/XObject" in pagina["/Resources"]):
+                if ("/XObject" in pagina["/Resources"]):
+                    xobject=pagina["/Resources"]["/XObject"].get_object()
+                    for obj in xobject:
+                        if (xobject[obj]["/Subtype"]=="/Image"):
+                            fotos=xobject[obj].get_data()
+                            break
+            except Exception:
+                fotos=None
+        """
+        #FIM ALTERACAO PAZINATTO
+        
         linhas=textoCompleto.split('\n')
         textoNapne=textoCompleto.replace("\n", " ") #<------------------------------------------------------------------teste NAPNE
         nomeAluno="Não Identificado"
