@@ -287,7 +287,7 @@ def extrairDados(arquivosPdf):
                     nomeAluno=Extrair_Nome_Aluno(linha)
                     matriculaAluno=Extrair_Matricula_Aluno(linha)
                     serieAluno=Extrair_Serie_Aluno(linha)
-                    mapeamentoDisciplinas=Extrair_Disciplinas_Aluno(textoCompletoDoAluno.split("\n"))
+                    mapeamentoDisciplinas=Extrair_Disciplinas_Aluno(textoCompletoDoAluno.split('\n'))
             
             if (nomeNestaPagina=="Não Identificado" or not nomeNestaPagina.strip()):
                 nomeNestaPagina=arquivo.name.replace(".pdf", "").strip()
