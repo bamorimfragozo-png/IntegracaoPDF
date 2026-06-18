@@ -152,20 +152,20 @@ def extrairDados(arquivosPdf):
         ##### ALTERACAO PAZINATTO-acrescentado paragrafo, colocando dentro do for de cima
             #EXTRAÇÃO DA FOTO DO PDF
         fotos=Extrair_Foto(pagina)
-            """
-            fotos=None
-            try:
-                primeiraPagina=leitorPdf.pages[0]
-                #if ("/XObject" in pagina["/Resources"]):
-                if ("/XObject" in pagina["/Resources"]):
-                    xobject=pagina["/Resources"]["/XObject"].get_object()
-                    for obj in xobject:
-                        if (xobject[obj]["/Subtype"]=="/Image"):
-                            fotos=xobject[obj].get_data()
-                            break
-            except Exception:
-                fotos=None
-        """
+            
+            #fotos=None
+            #try:
+            #    primeiraPagina=leitorPdf.pages[0]
+            #    #if ("/XObject" in pagina["/Resources"]):
+            #    if ("/XObject" in pagina["/Resources"]):
+            #        xobject=pagina["/Resources"]["/XObject"].get_object()
+            #        for obj in xobject:
+            #            if (xobject[obj]["/Subtype"]=="/Image"):
+            #                fotos=xobject[obj].get_data()
+            #                break
+            #except Exception:
+            #    fotos=None
+        
         #FIM ALTERACAO PAZINATTO
         
         linhas=textoCompleto.split('\n')
