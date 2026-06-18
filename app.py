@@ -88,7 +88,7 @@ if (st.sidebar.button("Dashboard")):
     st.session_state.pagAluno=0
     st.rerun()
 
-def Extrair_Foto(paginaIndex):
+def Extrair_Foto(leitorPdf, paginaIndex):
     #EXTRAÇÃO DA FOTO DO PDF
     fotos=None
     try:
@@ -114,6 +114,7 @@ def extrairDados(arquivosPdf):
     ########################--VÁRIOS ALUNOS--###################################################
     numeroChamada=1
     ultimoAlunoLido=""
+    leitorPdf=None
     for arquivo in arquivosPdf:
     ##################################--VÁRIOS ALUNOS--#####################################
         memoriaPdf=io.BytesIO(arquivo.getvalue())
@@ -151,7 +152,7 @@ def extrairDados(arquivosPdf):
         ##################################--VÁRIOS ALUNOS--##################################################
         ##### ALTERACAO PAZINATTO-acrescentado paragrafo, colocando dentro do for de cima
             #EXTRAÇÃO DA FOTO DO PDF
-            fotos=Extrair_Foto(paginaIndex)
+            fotos=Extrair_Foto(leitorPdf,paginaIndex)
             
             #fotos=None
             #try:
