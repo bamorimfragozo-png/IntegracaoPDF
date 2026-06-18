@@ -214,7 +214,7 @@ def extrairDados(arquivosPdf):
         tipoSuperdotacao="-"
         ########################################--NAPNE--#################################################
 
-        for linha in linhas:
+        #for linha in linhas:
             #if ("Aluno" in linha or "Nome" in linha):
             #    partes=linha.split(":")
             #    if (len(partes)>1):
