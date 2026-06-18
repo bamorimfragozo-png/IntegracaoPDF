@@ -151,7 +151,7 @@ def extrairDados(arquivosPdf):
         ##################################--VÁRIOS ALUNOS--##################################################
         ##### ALTERACAO PAZINATTO-acrescentado paragrafo, colocando dentro do for de cima
             #EXTRAÇÃO DA FOTO DO PDF
-        fotos=Extrair_Foto(pagina)
+            fotos=Extrair_Foto(pagina)
             
             #fotos=None
             #try:
