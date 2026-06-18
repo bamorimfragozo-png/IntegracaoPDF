@@ -88,7 +88,7 @@ if (st.sidebar.button("Dashboard")):
     st.session_state.pagAluno=0
     st.rerun()
 
-def Extrair_Foto(page):
+def Extrair_Foto(pagina):
     #EXTRAÇÃO DA FOTO DO PDF
     fotos=None
     try:
