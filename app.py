@@ -171,6 +171,11 @@ def extrairDados(arquivosPdf):
                     else:
                         valNome=linha.replace("Aluno", "").replace("Nome", "").strip()
                     nomeNestaPagina=re.sub(r'\bMatrícula\b.*', '', valNome, flags=re.IGNORECASE).strip()
+                    
+                fotos=Extrair_Foto(leitorPdf,pagina)
+                nomeAluno=Extrair_Nome_Aluno(linha)
+                matriculaAluno=Extrair_Matricula_Aluno(linha)
+                serieAluno=Extrair_Serie_Aluno(linha)
             
             if (nomeNestaPagina=="Não Identificado" or not nomeNestaPagina.strip()):
                 nomeNestaPagina=arquivo.name.replace(".pdf", "").strip()
@@ -183,10 +188,7 @@ def extrairDados(arquivosPdf):
         ##################################--VÁRIOS ALUNOS--##################################################
         ##### ALTERACAO PAZINATTO-acrescentado paragrafo, colocando dentro do for de cima
             #EXTRAÇÃO DA FOTO DO PDF
-            fotos=Extrair_Foto(leitorPdf,pagina)
-            nomeAluno=Extrair_Nome_Aluno(linha)
-            matriculaAluno=Extrair_Matricula_Aluno(linha)
-            serieAluno=Extrair_Serie_Aluno(linha)
+
             
             #fotos=None
             #try:
