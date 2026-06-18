@@ -124,7 +124,7 @@ def Extrair_Matricula_Aluno(linha):
                 break
     return matriculaAluno
 
-def Extrair_Serie_Aluno(linha){
+def Extrair_Serie_Aluno(linha):
     if ("Série" in linha or "Serie" in linha or "Ano" in linha or "Turma" in linha):
         partes=linha.split(":")
         if (len(partes)>1):
