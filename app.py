@@ -88,11 +88,12 @@ if (st.sidebar.button("Dashboard")):
     st.session_state.pagAluno=0
     st.rerun()
 
-def Extrair_Foto(leitorPdf, paginaIndex):
+def Extrair_Foto(leitorPdf, pagina):
     #EXTRAÇÃO DA FOTO DO PDF
     fotos=None
     try:
-        primeiraPagina=leitorPdf.pages[paginaIndex]
+        #primeiraPagina=leitorPdf.pages[paginaIndex]
+        primeiraPagina=pagina
         #if ("/XObject" in pagina["/Resources"]):
         if ("/XObject" in primeiraPagina["/Resources"]):
             xobject=primeiraPagina["/Resources"]["/XObject"].get_object()
@@ -152,7 +153,7 @@ def extrairDados(arquivosPdf):
         ##################################--VÁRIOS ALUNOS--##################################################
         ##### ALTERACAO PAZINATTO-acrescentado paragrafo, colocando dentro do for de cima
             #EXTRAÇÃO DA FOTO DO PDF
-            fotos=Extrair_Foto(leitorPdf,paginaIndex)
+            fotos=Extrair_Foto(leitorPdf,pagina)
             
             #fotos=None
             #try:
