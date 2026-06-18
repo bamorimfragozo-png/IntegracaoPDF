@@ -104,6 +104,32 @@ def Extrair_Foto(leitorPdf, pagina):
     except Exception:
         fotos=None
     return fotos
+    
+def Extrair_Nome_Aluno(texto):
+    if ("Aluno" in linha or "Nome" in linha):
+        partes=linha.split(":")
+    if (len(partes)>1):
+        valNome=partes[1].strip()
+    else:
+        valNome=linha.replace("Aluno", "").replace("Nome", "").strip()
+    nomeAluno=re.sub(r'\bMatrícula\b.*', '', valNome, flags=re.IGNORECASE).strip()
+    return nomeAluno
+
+def Extrair_Matricula_Aluno(linha):
+    for termo in ["matrícula", "matricula", "prontuário", "prontuario"]:
+        if (termo in linha.lower()):
+            buscaBT=re.search(r"cula:\s*(.{9})", linha, re.IGNORECASE)
+            if (buscaBT):
+                matriculaAluno=buscaBT.group(1).strip()
+                break
+    return matriculaAluno
+
+def Extrair_Serie_Aluno(linha){
+    if ("Série" in linha or "Serie" in linha or "Ano" in linha or "Turma" in linha):
+        partes=linha.split(":")
+        if (len(partes)>1):
+            serieAluno=partes[1].strip()[:27]
+    return serieAluno
 
 #EXTRAÇÃO DE DADOS
 def extrairDados(arquivosPdf):
@@ -133,7 +159,8 @@ def extrairDados(arquivosPdf):
             textoCompleto+=pagina.extract_text() + "\n"
             textoPagina=textoCompleto
             nomeNestaPagina="Não Identificado"
-            for linha in textoPagina.split('\n'):
+            linhas=textoPagina.split('\n')
+            for linha in linhas:
                 if ("Aluno" in linha or "Nome" in linha):
                     partes=linha.split(":")
                     if (len(partes)>1):
@@ -154,6 +181,9 @@ def extrairDados(arquivosPdf):
         ##### ALTERACAO PAZINATTO-acrescentado paragrafo, colocando dentro do for de cima
             #EXTRAÇÃO DA FOTO DO PDF
             fotos=Extrair_Foto(leitorPdf,pagina)
+            nomeAluno=Extrair_Nome_Aluno(linha)
+            matriculaAluno=Extrair_Matricula_Aluno(linha)
+            serieAluno=Extrair_Serie_Aluno(linha)
             
             #fotos=None
             #try:
@@ -185,26 +215,30 @@ def extrairDados(arquivosPdf):
         ########################################--NAPNE--#################################################
 
         for linha in linhas:
-            if ("Aluno" in linha or "Nome" in linha):
-                partes=linha.split(":")
-                if (len(partes)>1):
-                  valNome=partes[1].strip()
-                else:
-                  valNome=linha.replace("Aluno", "").replace("Nome", "").strip()
-                nomeAluno=re.sub(r'\bMatrícula\b.*', '', valNome, flags=re.IGNORECASE).strip()
+            #if ("Aluno" in linha or "Nome" in linha):
+            #    partes=linha.split(":")
+            #    if (len(partes)>1):
+            #      valNome=partes[1].strip()
+            #    else:
+            #      valNome=linha.replace("Aluno", "").replace("Nome", "").strip()
+            #    nomeAluno=re.sub(r'\bMatrícula\b.*', '', valNome, flags=re.IGNORECASE).strip()
+            
+            #for termo in ["matrícula", "matricula", "prontuário", "prontuario"]:
+            #  if (termo in linha.lower()):
+            #    buscaBT=re.search(r"cula:\s*(.{9})", linha, re.IGNORECASE)
+            #    if (buscaBT):
+            #        matriculaAluno=buscaBT.group(1).strip()
+            #        break
 
-            for termo in ["matrícula", "matricula", "prontuário", "prontuario"]:
-              if (termo in linha.lower()):
-                buscaBT=re.search(r"cula:\s*(.{9})", linha, re.IGNORECASE)
-                if (buscaBT):
-                    matriculaAluno=buscaBT.group(1).strip()
-                    break
+            #if ("Série" in linha or "Serie" in linha or "Ano" in linha or "Turma" in linha):
+            #    partes=linha.split(":")
+            #    if (len(partes)>1):
+            #        serieAluno=partes[1].strip()[:27]
 
-            if ("Série" in linha or "Serie" in linha or "Ano" in linha or "Turma" in linha):
-                partes=linha.split(":")
-                if (len(partes)>1):
-                    serieAluno=partes[1].strip()[:27]
-
+            #nomeAluno=Extrair_Nome_Aluno(linha)
+            #matriculaAluno=Extrair_Matricula_Aluno(linha)
+            #serieAluno=Extrair_Serie_Aluno(linha)
+        
         #######################--NAPNE--#############################################
         match=re.search(r"Portador\(a\)\s+de\s+Necessidades\s+Especiais\s+(Sim|Não)", textoNapne, re.IGNORECASE)
         if (match):
