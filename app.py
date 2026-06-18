@@ -105,7 +105,8 @@ def Extrair_Foto(leitorPdf, pagina):
         fotos=None
     return fotos
     
-def Extrair_Nome_Aluno(linha):
+def Extrair_Nome_Aluno(texto):
+    linha=texto
     if ("Aluno" in linha or "Nome" in linha):
         partes=linha.split(":")
     if (len(partes)>1):
@@ -115,7 +116,8 @@ def Extrair_Nome_Aluno(linha):
     nomeAluno=re.sub(r'\bMatrícula\b.*', '', valNome, flags=re.IGNORECASE).strip()
     return nomeAluno
 
-def Extrair_Matricula_Aluno(linha):
+def Extrair_Matricula_Aluno(texto):
+    linha=texto
     for termo in ["matrícula", "matricula", "prontuário", "prontuario"]:
         if (termo in linha.lower()):
             buscaBT=re.search(r"cula:\s*(.{9})", linha, re.IGNORECASE)
@@ -124,7 +126,8 @@ def Extrair_Matricula_Aluno(linha):
                 break
     return matriculaAluno
 
-def Extrair_Serie_Aluno(linha):
+def Extrair_Serie_Aluno(texto):
+    linha=texto
     if ("Série" in linha or "Serie" in linha or "Ano" in linha or "Turma" in linha):
         partes=linha.split(":")
         if (len(partes)>1):
