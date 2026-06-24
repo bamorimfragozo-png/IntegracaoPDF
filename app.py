@@ -72,7 +72,7 @@ if ("ordenacao" not in st.session_state):
     st.session_state.ordenacao = "Nota"
 
 # MENU DE NAVEGAÇÃO
-st.sidebar.markdown("### Navegação")
+st.sidebar.markdown("### Navigation")
 if ('salaSelecionada' in locals()): 
     st.session_state.salaAtiva = salaSelecionada
 
@@ -138,6 +138,7 @@ def Extrair_Serie_Aluno(texto):
 def Extrair_Disciplinas_Aluno(linhasDisciplinas):
     mapeamentoDisciplinas = {}
 
+    # CORREÇÃO CRUCIAL: Alterado de 'for linha in linhas:' para ler o parâmetro correto 'linhasDisciplinas'
     for linha in linhasDisciplinas:
         encontrou = False
         for p in ["Notas das etapas", "Faltas nas etapas", "Diário", "Disciplina", "Total", "Este documento"]:
@@ -239,13 +240,12 @@ def Extrair_Disciplinas_Aluno(linhasDisciplinas):
             }
     return mapeamentoDisciplinas
 
-# EXTRAÇÃO DE DADOS
+# EXTRAÇÃO DE DADOS OTIMIZADA E UNIFICADA
 def extrairDados(arquivosPdf):
     dadosFinais = []
     mapaNapneTemporario = {}
     numeroChamada = 1
     ultimoAlunoLido = ""
-    leitorPdf = None
     
     for arquivo in arquivosPdf:
         memoriaPdf = io.BytesIO(arquivo.getvalue())
@@ -255,134 +255,118 @@ def extrairDados(arquivosPdf):
             st.error(f"Erro ao ler o arquivo {arquivo.name}: {e}")
             continue
             
-        textoCompleto = ""
+        # Processamento isolado e linear por página
         for paginaIndex, pagina in enumerate(leitorPdf.pages):
-            textoCompleto += pagina.extract_text() + "\n"
-            textoPagina = textoCompleto
-            nomeNestaPagina = "Não Identificado"
+            textoPagina = pagina.extract_text() + "\n"
             linhas = textoPagina.split('\n')
             
-            # Inicialização segura para prevenir UnboundLocalError
-            textoCompletoDoAluno = textoCompleto
+            # Identifica se é uma página inicial de aluno
+            temAluno = any("Aluno" in linha or "Nome" in linha for linha in linhas)
+            if not temAluno:
+                continue  # Pula páginas acessórias ou vazias que bagunçam a leitura
+                
+            # Captura o contexto estendido de texto (página atual + próxima) para varrer as disciplinas sem quebras
+            try:
+                textoCompletoDoAluno = leitorPdf.pages[paginaIndex].extract_text() + "\n" + leitorPdf.pages[paginaIndex+1].extract_text() + "\n"
+            except Exception:
+                textoCompletoDoAluno = textoPagina
+                
+            textoNapne = textoCompletoDoAluno.replace("\n", " ")
+            
+            # Inicializa variáveis para esta página de Aluno específica
             nomeAluno = "Não Identificado"
             matriculaAluno = "Não Identificada"
             serieAluno = "Não Identificada"
-            fotos = None
-            mapeamentoDisciplinas = {}
+            fotos = Extrair_Foto(leitorPdf, pagina)
             
+            # Captura os metadados do Aluno
             for linha in linhas:
                 if ("Aluno" in linha or "Nome" in linha):
-                    try:
-                        textoCompletoDoAluno = leitorPdf.pages[paginaIndex].extract_text() + "\n" + leitorPdf.pages[paginaIndex+1].extract_text() + "\n"
-                    except Exception:
-                        textoCompletoDoAluno = leitorPdf.pages[paginaIndex].extract_text() + "\n"
-                    
-                    partes = linha.split(":")
-                    if (len(partes) > 1):
-                        valNome = partes[1].strip()  
-                    else:
-                        valNome = linha.replace("Aluno", "").replace("Nome", "").strip()
-                    nomeNestaPagina = re.sub(r'\bMatrícula\b.*', '', valNome, flags=re.IGNORECASE).strip()
-                    
-                    fotos = Extrair_Foto(leitorPdf, pagina)
                     nomeAluno = Extrair_Nome_Aluno(linha)
                     matriculaAluno = Extrair_Matricula_Aluno(linha)
                     serieAluno = Extrair_Serie_Aluno(linha)
-                    
-                    # Disciplinas mapeadas no momento certo
-                    mapeamentoDisciplinas = Extrair_Disciplinas_Aluno(textoCompletoDoAluno.split('\n'))
+                    break # Encontrou o cabeçalho principal, sai do loop de metadados
             
-            if (nomeNestaPagina == "Não Identificado" or not nomeNestaPagina.strip()):
-                nomeNestaPagina = arquivo.name.replace(".pdf", "").strip()
-                
-            if (ultimoAlunoLido != "" and nomeNestaPagina != ultimoAlunoLido):
+            # Se falhou ao identificar por texto, usa o nome do arquivo
+            if (nomeAluno == "Não Identificado" or not nomeAluno.strip()):
+                nomeAluno = arquivo.name.replace(".pdf", "").replace("Boletim", "").replace("_", " ").strip()
+
+            if (fotos):
+                st.session_state.fotoAluno[nomeAluno] = fotos
+
+            # EXTRAÇÃO DO NAPNE REALIZADA DIRETAMENTE NO CONTEXTO DO ALUNO ATUAL
+            necEspeciais = "Não"
+            tipoNecEspecial = "-"
+            transtorno = "Não"
+            tipoTranstorno = "-"
+            superdotacao = "Não"
+            tipoSuperdotacao = "-"
+
+            match = re.search(r"Portador\(a\)\s+de\s+Necessidades\s+Especiais\s+(Sim|Não)", textoNapne, re.IGNORECASE)
+            if (match): necEspeciais = match.group(1)
+
+            match = re.search(r"Tipo\s+de\s+Necessidade\s+Especial\s+-?\s*(.+?)\s*(?=Portador\(a\)|Transtorno|Superdotação|$)", textoNapne, re.IGNORECASE)
+            if (match): tipoNecEspecial = match.group(1).strip()
+
+            match = re.search(r"Portador\(a\)\s+de\s+Transtorno\s+(Sim|Não)", textoNapne, re.IGNORECASE)
+            if (match): transtorno = match.group(1)
+
+            match = re.search(r"Tipo\s+de\s+Transtorno\s+-?\s*(.+?)\s*(?=Portador\(a\)|Necessidade|Superdotação|$)", textoNapne, re.IGNORECASE)
+            if (match): tipoTranstorno = match.group(1).strip()
+
+            match = re.search(r"Portador\(a\)\s+de\s+Superdotação\s+(Sim|Não)", textoNapne, re.IGNORECASE)
+            if (match): superdotacao = match.group(1)
+
+            match = re.search(r"Superdotação\s+-?\s*(.+?)\s*$", textoNapne, re.IGNORECASE)
+            if (match): tipoSuperdotacao = match.group(1).strip()
+
+            # Mapeia as disciplinas usando o escopo correto de linhas
+            mapeamentoDisciplinas = Extrair_Disciplinas_Aluno(textoCompletoDoAluno.split('\n'))
+            
+            # Controle dinâmico do número de chamada por alteração de aluno legítimo
+            if (ultimoAlunoLido != "" and nomeAluno != ultimoAlunoLido):
                 numeroChamada += 1
-            
-            ultimoAlunoLido = nomeNestaPagina
-            textoCompleto = textoPagina 
-        
-        textoNapne = textoCompleto.replace("\n", " ")
-        necEspeciais = "Não"
-        tipoNecEspecial = "-"
-        transtorno = "Não"
-        tipoTranstorno = "-"
-        superdotacao = "Não"
-        tipoSuperdotacao = "-"
+            ultimoAlunoLido = nomeAluno
 
-        match = re.search(r"Portador\(a\)\s+de\s+Necessidades\s+Especiais\s+(Sim|Não)", textoNapne, re.IGNORECASE)
-        if (match):
-            necEspeciais = match.group(1)
+            # Monta os registros estruturados da página processada
+            for nomeDisp, blocos in mapeamentoDisciplinas.items():
+                tecnico = False
+                for kw in tecnicas:
+                    if (kw in nomeDisp.upper()):
+                        tecnico = True
+                        break
+                nucleo = "Técnico" if tecnico else "Comum"
 
-        match = re.search(r"Tipo\s+de\s+Necessidade\s+Especial\s+-?\s*(.+?)\s*(?=Portador\(a\)|$)", textoNapne, re.IGNORECASE)
-        if (match):
-            tipoNecEspecial = match.group(1)
-
-        match = re.search(r"Portador\(a\)\s+de\s+Transtorno\s+(Sim|Não)", textoNapne, re.IGNORECASE)
-        if (match):
-            transtorno = match.group(1)
-
-        match = re.search(r"Tipo\s+de\s+Transtorno\s+-?\s*(.+?)\s*(?=Portador\(a\)|$)", textoNapne, re.IGNORECASE)
-        if (match):
-            tipoTranstorno = match.group(1)
-
-        match = re.search(r"Portador\(a\)\s+de\s+Superdotação\s+(Sim|Não)", textoNapne, re.IGNORECASE)
-        if (match):
-            superdotacao = match.group(1)
-
-        match = re.search(r"Superdotação\s+-?\s*(.+?)\s*$", textoNapne, re.IGNORECASE)
-        if (match):
-            tipoSuperdotacao = match.group(1)
-            
-        if (nomeAluno == "Não Identificado" or not nomeAluno.strip()):
-            nomeAluno = arquivo.name.replace(".pdf", "").replace("Boletim", "").replace("_", " ").strip()
-
-        if (fotos):
-            st.session_state.fotoAluno[nomeAluno] = fotos
-
-        for nomeDisp, blocos in mapeamentoDisciplinas.items():
-            tecnico = False
-            for kw in tecnicas:
-                if (kw in nomeDisp.upper()):
-                    tecnico = True
-                    break
-            nucleo = "Técnico" if tecnico else "Comum"
-
-            dadosFinais.append({
-                'Nº Chamada': int(numeroChamada),
-                'Aluno': nomeAluno,
-                'Matrícula': matriculaAluno,
-                'Série': serieAluno,
-                'Disciplina': nomeDisp,
-                '1º BI': blocos['notas'][0],
-                '2º BI': blocos['notas'][1],
-                '3º BI': blocos['notas'][2],
-                '4º BI': blocos['notas'][3],
-                'Média Final': blocos['mediaFinal'],
-                'Freq. Final': blocos['freqFinal'],
-                'Núcleo': nucleo,
-                'Observações': '',
-                'Necessidades Especiais': necEspeciais,
-                'Tipo de Necessidade Especial': tipoNecEspecial,
-                'Transtorno': transtorno,
-                'Tipo de Transtorno': tipoTranstorno,
-                'Superdotação': superdotacao,
-                'Tipo de Superdotação': tipoSuperdotacao
-            })
-            
-        if ('ultimoNomeVisto' not in locals()):
-            ultimoNomeVisto = nomeAluno
-        
-        if (nomeAluno != ultimoNomeVisto):
-            numeroChamada += 1
-            ultimoNomeVisto = nomeAluno
-            
-        if (nomeAluno and nomeAluno != "Não Identificado"):
-            mapaNapneTemporario[nomeAluno.strip().upper()] = {
-                'nec': necEspeciais, 'tipNec': tipoNecEspecial,
-                'trans': transtorno, 'tipTrans': tipoTranstorno,
-                'super': superdotacao, 'tipSuper': tipoSuperdotacao
-            }
-            
+                dadosFinais.append({
+                    'Nº Chamada': int(numeroChamada),
+                    'Aluno': nomeAluno,
+                    'Matrícula': matriculaAluno,
+                    'Série': serieAluno,
+                    'Disciplina': nomeDisp,
+                    '1º BI': blocos['notas'][0],
+                    '2º BI': blocos['notas'][1],
+                    '3º BI': blocos['notas'][2],
+                    '4º BI': blocos['notas'][3],
+                    'Média Final': blocos['mediaFinal'],
+                    'Freq. Final': blocos['freqFinal'],
+                    'Núcleo': nucleo,
+                    'Observações': '',
+                    'Necessidades Especiais': necEspeciais,
+                    'Tipo de Necessidade Especial': tipoNecEspecial,
+                    'Transtorno': transtorno,
+                    'Tipo de Transtorno': tipoTranstorno,
+                    'Superdotação': superdotacao,
+                    'Tipo de Superdotação': tipoSuperdotacao
+                })
+                
+            if (nomeAluno and nomeAluno != "Não Identificado"):
+                mapaNapneTemporario[nomeAluno.strip().upper()] = {
+                    'nec': necEspeciais, 'tipNec': tipoNecEspecial,
+                    'trans': transtorno, 'tipTrans': tipoTranstorno,
+                    'super': superdotacao, 'tipSuper': tipoSuperdotacao
+                }
+                
+    # Varredura final de contingência para garantir que nenhum campo NAPNE fique em branco entre linhas repetidas do mesmo aluno
     for dado in dadosFinais:
         alunoAlvo = dado['Aluno'].strip().upper()
         if (alunoAlvo in mapaNapneTemporario):
@@ -407,7 +391,7 @@ if (not st.session_state.dadosCarregados):
 
     if (st.button("PROCESSAR E ATUALIZAR DASHBOARD")):
         if (arquivosEnviados):
-            with st.spinner("Processando arquivos e updating planilhas de notas..."):
+            with st.spinner("Processando arquivos e atualizando planilhas de notas..."):
                 BDNovo = extrairDados(arquivosEnviados)
 
                 linkSalaAtiva = DICIONARIO_SALAS[salaSelecionada]
