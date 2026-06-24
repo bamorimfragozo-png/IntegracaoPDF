@@ -132,6 +132,7 @@ def Extrair_Serie_Aluno(texto):
             serieAluno = partes[1].strip()[:27]
     return serieAluno
 
+# CORREÇÃO CRÍTICA: LENDO O PARÂMETRO CORRETO DA FUNÇÃO
 def Extrair_Disciplinas_Aluno(linhasDisciplinas):
     mapeamentoDisciplinas = {}
 
@@ -154,6 +155,7 @@ def Extrair_Disciplinas_Aluno(linhasDisciplinas):
         passouDaMateria = False
 
         for token in tokens:
+            # Detecta transição de texto para números (notas/faltas)
             if ((',' in token and token.replace(',', '').replace('.', '').isdigit()) and not passouDaMateria):
                 passouDaMateria = True
             if (not passouDaMateria):
@@ -162,9 +164,19 @@ def Extrair_Disciplinas_Aluno(linhasDisciplinas):
                 partesDados.append(token)
 
         nomeDisciplina = " ".join(partesTexto).strip()
-        if (not nomeDisciplina or len(partesDados) < 5):
+        
+        # Filtra tokens descartáveis da tabela de notas
+        dadosValidos = []
+        for tok in partesDados:
+            if (tok in ["Cursando", "(Aguarda", "Carga", "Horária)", "Horária", "Aprovado", "Retido"] or "%" in tok):
+                continue
+            if (tok == "-" or tok.replace(',', '.').replace('.', '', 1).isdigit()):
+                dadosValidos.append(tok)
+
+        if (not nomeDisciplina or len(dadosValidos) < 4):
             continue
 
+        # Captura de Frequência
         calculoFreq = 100.0
         for token in tokens:
             if ("%" in token):
@@ -174,34 +186,27 @@ def Extrair_Disciplinas_Aluno(linhasDisciplinas):
                     pass
                 break
 
-        tokensFiltrados = []
-        for tok in partesDados:
-            if (tok in ["Cursando", "(Aguarda", "Carga", "Horária)", "Horária", "Aprovado", "Retido"] or "%" in tok):
-                continue
-            if (tok == "-" or tok.replace(',', '.').replace('.', '', 1).isdigit()):
-                tokensFiltrados.append(tok)
-
-        dadosTabela = tokensFiltrados[4:]
-
         notas = [0.0, 0.0, 0.0, 0.0]
         faltas = [0.0, 0.0, 0.0, 0.0]
 
+        # Extração sequencial pareada (Nota, Falta)
         pagDado = 0
         for etapa in range(4):
-            if (pagDado < len(dadosTabela)):
-                valNota = dadosTabela[pagDado].replace(',', '.')
+            if (pagDado < len(dadosValidos)):
+                valNota = dadosValidos[pagDado].replace(',', '.')
                 if (valNota.replace('.', '', 1).isdigit()):
                     notas[etapa] = float(valNota)
                 pagDado += 1
-            if (pagDado < len(dadosTabela)):
-                valFalta = dadosTabela[pagDado]
+            if (pagDado < len(dadosValidos)):
+                valFalta = dadosValidos[pagDado]
                 if (valFalta.isdigit()):
                     faltas[etapa] = float(valFalta)
                 pagDado += 1
 
+        # Média Final posicional
         mediaFinal = 0.0
-        if (pagDado < len(dadosTabela)):
-            valMedia = dadosTabela[pagDado].replace(',', '.')
+        if (pagDado < len(dadosValidos)):
+            valMedia = dadosValidos[pagDado].replace(',', '.')
             if (valMedia.replace('.', '', 1).isdigit()):
                 mediaFinal = float(valMedia)
         else:
@@ -217,9 +222,9 @@ def Extrair_Disciplinas_Aluno(linhasDisciplinas):
             }
     return mapeamentoDisciplinas
 
-# EXTRAÇÃO CORRIGIDA POR BLOCO COMPLETO DE TEXTO (ALUNO POR ALUNO)
 def extrairDados(arquivosPdf):
     dadosFinais = []
+    mapaNapneTemporario = {}
     numeroChamada = 0
 
     for arquivo in arquivosPdf:
@@ -230,12 +235,10 @@ def extrairDados(arquivosPdf):
             st.error(f"Erro ao ler o arquivo {arquivo.name}: {e}")
             continue
 
-        # 1. Extrai todo o texto do PDF do arquivo atual de forma contínua
         textoCompletoDocumento = ""
         for pagina in leitorPdf.pages:
             textoCompletoDocumento += pagina.extract_text() + "\n"
 
-        # Salva as fotos usando as páginas físicas
         for indexPag, pagFisica in enumerate(leitorPdf.pages):
             linhasTmp = pagFisica.extract_text().split('\n')
             for l in linhasTmp:
@@ -246,7 +249,6 @@ def extrairDados(arquivosPdf):
                         st.session_state.fotoAluno[nomeTmp] = fotoBytes
                     break
 
-        # 2. Divide o texto bruto por Aluno usando regex (Captura o bloco inteiro do aluno)
         blocosAlunos = re.split(r'(?=Aluno\s*:|Nome\s*:) ', textoCompletoDocumento)
         
         for bloco in blocosAlunos:
@@ -260,7 +262,6 @@ def extrairDados(arquivosPdf):
             matriculaAluno = "Não Identificada"
             serieAluno = "Não Identificada"
 
-            # Captura metadados no bloco isolado do aluno
             for linha in linhasBloco:
                 if "Aluno" in linha or "Nome" in linha:
                     nomeAluno = Extrair_Nome_Aluno(linha)
@@ -273,7 +274,6 @@ def extrairDados(arquivosPdf):
 
             numeroChamada += 1
 
-            # EXTRAÇÃO DO NAPNE SEM PERDURAR ERROS
             necEspeciais, tipoNecEspecial = "Não", "-"
             transtorno, tipoTranstorno = "Não", "-"
             superdotacao, tipoSuperdotacao = "Não", "-"
@@ -281,22 +281,21 @@ def extrairDados(arquivosPdf):
             match = re.search(r"Portador\(a\)\s+de\s+Necessidades\s+Especiais\s+(Sim|Não)", textoCorrido, re.IGNORECASE)
             if match: necEspeciais = match.group(1)
 
-            match = re.search(r"Tipo\s+de\s+Necessidade\s+Especial\s+-?\s*(.+?)\s*(?=Portador\(a\)|Transtorno|Superdotação|Notas|Faltas|$)", textoCorrido, re.IGNORECASE)
+            match = re.search(r"Tipo\s+de\s+Necessidade\s+Especial\s+-?\s*(.+?)\s*(?=Portador\(a\)|Transtorno|Superdotação|Notas|$)", textoCorrido, re.IGNORECASE)
             if match: tipoNecEspecial = match.group(1).strip()
 
             match = re.search(r"Portador\(a\)\s+de\s+Transtorno\s+(Sim|Não)", textoCorrido, re.IGNORECASE)
             if match: transtorno = match.group(1)
 
-            match = re.search(r"Tipo\s+de\s+Transtorno\s+-?\s*(.+?)\s*(?=Portador\(a\)|Necessidade|Superdotação|Notas|Faltas|$)", textoCorrido, re.IGNORECASE)
+            match = re.search(r"Tipo\s+de\s+Transtorno\s+-?\s*(.+?)\s*(?=Portador\(a\)|Necessidade|Superdotação|Notas|$)", textoCorrido, re.IGNORECASE)
             if match: tipoTranstorno = match.group(1).strip()
 
             match = re.search(r"Portador\(a\)\s+de\s+Superdotação\s+(Sim|Não)", textoCorrido, re.IGNORECASE)
             if match: superdotacao = match.group(1)
 
-            match = re.search(r"Superdotação\s+-?\s*(.+?)\s*(?=Notas|Faltas|Diretoria|$)", textoCorrido, re.IGNORECASE)
+            match = re.search(r"Superdotação\s+-?\s*(.+?)\s*(?=Notas|Diretoria|$)", textoCorrido, re.IGNORECASE)
             if match: tipoSuperdotacao = match.group(1).strip()
 
-            # Extrai disciplinas usando todas as linhas pertencentes a este aluno
             mapeamentoDisciplinas = Extrair_Disciplinas_Aluno(linhasBloco)
 
             for nomeDisp, blocos in mapeamentoDisciplinas.items():
@@ -324,6 +323,24 @@ def extrairDados(arquivosPdf):
                     'Superdotação': superdotacao,
                     'Tipo de Superdotação': tipoSuperdotacao
                 })
+
+            if nomeAluno and nomeAluno != "Não Identificado":
+                mapaNapneTemporario[nomeAluno.strip().upper()] = {
+                    'nec': necEspeciais, 'tipNec': tipoNecEspecial,
+                    'trans': transtorno, 'tipTrans': tipoTranstorno,
+                    'super': superdotacao, 'tipSuper': tipoSuperdotacao
+                }
+
+    for dado in dadosFinais:
+        alunoAlvo = dado['Aluno'].strip().upper()
+        if (alunoAlvo in mapaNapneTemporario):
+            info = mapaNapneTemporario[alunoAlvo]
+            dado['Necessidades Especiais'] = info['nec']
+            dado['Tipo de Necessidade Especial'] = info['tipNec']
+            dado['Transtorno'] = info['trans']
+            dado['Tipo de Transtorno'] = info['tipTrans']
+            dado['Superdotação'] = info['super']
+            dado['Tipo de Superdotação'] = info['tipSuper']
 
     return pd.DataFrame(dadosFinais)
 
