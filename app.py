@@ -154,7 +154,7 @@ def Extrair_Disciplinas_Aluno(linhasDisciplinas):
         passouDaMateria = False
 
         for token in tokens:
-            if ((', ' in token or (',' in token and token.replace(',', '').isdigit())) and not passouDaMateria):
+            if ((',' in token and token.replace(',', '').replace('.', '').isdigit()) and not passouDaMateria):
                 passouDaMateria = True
             if (not passouDaMateria):
                 partesTexto.append(token)
@@ -192,15 +192,11 @@ def Extrair_Disciplinas_Aluno(linhasDisciplinas):
                 valNota = dadosTabela[pagDado].replace(',', '.')
                 if (valNota.replace('.', '', 1).isdigit()):
                     notas[etapa] = float(valNota)
-                else:
-                    notas[etapa] = 0.0
                 pagDado += 1
             if (pagDado < len(dadosTabela)):
                 valFalta = dadosTabela[pagDado]
                 if (valFalta.isdigit()):
                     faltas[etapa] = float(valFalta)
-                else:
-                    faltas[etapa] = 0.0
                 pagDado += 1
 
         mediaFinal = 0.0
@@ -221,11 +217,10 @@ def Extrair_Disciplinas_Aluno(linhasDisciplinas):
             }
     return mapeamentoDisciplinas
 
-# EXTRAÇÃO CORRIGIDA DE FORMA LINEAR E UNIFICADA
+# EXTRAÇÃO CORRIGIDA POR BLOCO COMPLETO DE TEXTO (ALUNO POR ALUNO)
 def extrairDados(arquivosPdf):
     dadosFinais = []
     numeroChamada = 0
-    ultimoAlunoProcessado = ""
 
     for arquivo in arquivosPdf:
         memoriaPdf = io.BytesIO(arquivo.getvalue())
@@ -235,65 +230,74 @@ def extrairDados(arquivosPdf):
             st.error(f"Erro ao ler o arquivo {arquivo.name}: {e}")
             continue
 
-        # Estados persistentes por arquivo/aluno
-        nomeAluno = "Não Identificado"
-        matriculaAluno = "Não Identificada"
-        serieAluno = "Não Identificada"
-        necEspeciais, tipoNecEspecial = "Não", "-"
-        transtorno, tipoTranstorno = "Não", "-"
-        superdotacao, tipoSuperdotacao = "Não", "-"
+        # 1. Extrai todo o texto do PDF do arquivo atual de forma contínua
+        textoCompletoDocumento = ""
+        for pagina in leitorPdf.pages:
+            textoCompletoDocumento += pagina.extract_text() + "\n"
 
-        for paginaIndex, pagina in enumerate(leitorPdf.pages):
-            textoPagina = pagina.extract_text() + "\n"
-            linhas = textoPagina.split('\n')
-            textoCorrido = textoPagina.replace("\n", " ")
+        # Salva as fotos usando as páginas físicas
+        for indexPag, pagFisica in enumerate(leitorPdf.pages):
+            linhasTmp = pagFisica.extract_text().split('\n')
+            for l in linhasTmp:
+                if "Aluno" in l or "Nome" in l:
+                    nomeTmp = Extrair_Nome_Aluno(l)
+                    fotoBytes = Extrair_Foto(leitorPdf, pagFisica)
+                    if fotoBytes and nomeTmp != "Não Identificado":
+                        st.session_state.fotoAluno[nomeTmp] = fotoBytes
+                    break
 
-            # Detecta se é o início do registro de um novo aluno
-            inicioDeAluno = any(("Aluno" in l or "Nome" in l) for l in linhas)
+        # 2. Divide o texto bruto por Aluno usando regex (Captura o bloco inteiro do aluno)
+        blocosAlunos = re.split(r'(?=Aluno\s*:|Nome\s*:) ', textoCompletoDocumento)
+        
+        for bloco in blocosAlunos:
+            if not bloco.strip() or not any(x in bloco for x in ["Aluno", "Nome"]):
+                continue
 
-            if inicioDeAluno:
-                # Atualiza metadados básicos
-                for linha in linhas:
-                    if "Aluno" in linha or "Nome" in linha:
-                        nomeAluno = Extrair_Nome_Aluno(linha)
-                        matriculaAluno = Extrair_Matricula_Aluno(linha)
-                        serieAluno = Extrair_Serie_Aluno(linha)
-                        break
+            linhasBloco = bloco.split('\n')
+            textoCorrido = bloco.replace("\n", " ")
 
-                if nomeAluno == "Não Identificado" or not nomeAluno.strip():
-                    nomeAluno = arquivo.name.replace(".pdf", "").replace("Boletim", "").replace("_", " ").strip()
+            nomeAluno = "Não Identificado"
+            matriculaAluno = "Não Identificada"
+            serieAluno = "Não Identificada"
 
-                # Processa Foto
-                fotoBytes = Extrair_Foto(leitorPdf, pagina)
-                if fotoBytes:
-                    st.session_state.fotoAluno[nomeAluno] = fotoBytes
+            # Captura metadados no bloco isolado do aluno
+            for linha in linhasBloco:
+                if "Aluno" in linha or "Nome" in linha:
+                    nomeAluno = Extrair_Nome_Aluno(linha)
+                    matriculaAluno = Extrair_Matricula_Aluno(linha)
+                    serieAluno = Extrair_Serie_Aluno(linha)
+                    break
 
-                # Extrai dados do NAPNE diretamente do cabeçalho deste aluno
-                match = re.search(r"Portador\(a\)\s+de\s+Necessidades\s+Especiais\s+(Sim|Não)", textoCorrido, re.IGNORECASE)
-                if match: necEspeciais = match.group(1)
+            if nomeAluno == "Não Identificado" or not nomeAluno.strip():
+                nomeAluno = arquivo.name.replace(".pdf", "").replace("Boletim", "").replace("_", " ").strip()
 
-                match = re.search(r"Tipo\s+de\s+Necessidade\s+Especial\s+-?\s*(.+?)\s*(?=Portador\(a\)|Transtorno|Superdotação|Notas|$)", textoCorrido, re.IGNORECASE)
-                if match: tipoNecEspecial = match.group(1).strip()
+            numeroChamada += 1
 
-                match = re.search(r"Portador\(a\)\s+de\s+Transtorno\s+(Sim|Não)", textoCorrido, re.IGNORECASE)
-                if match: transtorno = match.group(1)
+            # EXTRAÇÃO DO NAPNE SEM PERDURAR ERROS
+            necEspeciais, tipoNecEspecial = "Não", "-"
+            transtorno, tipoTranstorno = "Não", "-"
+            superdotacao, tipoSuperdotacao = "Não", "-"
 
-                match = re.search(r"Tipo\s+de\s+Transtorno\s+-?\s*(.+?)\s*(?=Portador\(a\)|Necessidade|Superdotação|Notas|$)", textoCorrido, re.IGNORECASE)
-                if match: tipoTranstorno = match.group(1).strip()
+            match = re.search(r"Portador\(a\)\s+de\s+Necessidades\s+Especiais\s+(Sim|Não)", textoCorrido, re.IGNORECASE)
+            if match: necEspeciais = match.group(1)
 
-                match = re.search(r"Portador\(a\)\s+de\s+Superdotação\s+(Sim|Não)", textoCorrido, re.IGNORECASE)
-                if match: superdotacao = match.group(1)
+            match = re.search(r"Tipo\s+de\s+Necessidade\s+Especial\s+-?\s*(.+?)\s*(?=Portador\(a\)|Transtorno|Superdotação|Notas|Faltas|$)", textoCorrido, re.IGNORECASE)
+            if match: tipoNecEspecial = match.group(1).strip()
 
-                match = re.search(r"Superdotação\s+-?\s*(.+?)\s*(?=Notas|Diretoria|$)", textoCorrido, re.IGNORECASE)
-                if match: tipoSuperdotacao = match.group(1).strip()
+            match = re.search(r"Portador\(a\)\s+de\s+Transtorno\s+(Sim|Não)", textoCorrido, re.IGNORECASE)
+            if match: transtorno = match.group(1)
 
-                # Controle sequencial de número de chamada único
-                if nomeAluno != ultimoAlunoProcessado:
-                    numeroChamada += 1
-                    ultimoAlunoProcessado = nomeAluno
+            match = re.search(r"Tipo\s+de\s+Transtorno\s+-?\s*(.+?)\s*(?=Portador\(a\)|Necessidade|Superdotação|Notas|Faltas|$)", textoCorrido, re.IGNORECASE)
+            if match: tipoTranstorno = match.group(1).strip()
 
-            # Extrai as disciplinas da página atual sob o escopo do aluno vigente
-            mapeamentoDisciplinas = Extrair_Disciplinas_Aluno(linhas)
+            match = re.search(r"Portador\(a\)\s+de\s+Superdotação\s+(Sim|Não)", textoCorrido, re.IGNORECASE)
+            if match: superdotacao = match.group(1)
+
+            match = re.search(r"Superdotação\s+-?\s*(.+?)\s*(?=Notas|Faltas|Diretoria|$)", textoCorrido, re.IGNORECASE)
+            if match: tipoSuperdotacao = match.group(1).strip()
+
+            # Extrai disciplinas usando todas as linhas pertencentes a este aluno
+            mapeamentoDisciplinas = Extrair_Disciplinas_Aluno(linhasBloco)
 
             for nomeDisp, blocos in mapeamentoDisciplinas.items():
                 tecnico = any(kw in nomeDisp.upper() for kw in tecnicas)
@@ -377,7 +381,6 @@ else:
     else:
         BD['Observações'] = ""
 
-    # Garante ordenação limpa por número de chamada ativo
     BD['Nº Chamada'] = pd.to_numeric(BD['Nº Chamada'], errors='coerce').fillna(1).astype(int)
     ordemChamada = BD.sort_values(by='Nº Chamada', ascending=True)
     alunosLista = ordemChamada['Aluno'].unique().tolist()
