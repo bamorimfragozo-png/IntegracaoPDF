@@ -243,6 +243,59 @@ def Extrair_Disciplinas_Aluno(linhasDisciplinas):
         return mapeamentoDisciplinas
 
 #EXTRAÇÃO DE DADOS
+###############################################--Acréscimo Função--################################################################
+def Extrair_Dados_Napne(texto_napne):
+    """Extrai informações sobre necessidades especiais do texto do aluno."""
+    dados = {
+        "necEspeciais": "Não", "tipoNecEspecial": "-",
+        "transtorno": "Não", "tipoTranstorno": "-",
+        "superdotacao": "Não", "tipoSuperdotacao": "-"
+    }
+    match = re.search(r"Portador\(a\)\s+de\s+Necessidades\s+Especiais\s+(Sim|Não)", texto_napne, re.IGNORECASE)
+    if match: dados["necEspeciais"] = match.group(1)
+
+    match = re.search(r"Tipo\s+de\s+Necessidade\s+Especial\s+-?\s*(.+?)\s*(?=Portador\(a\)|$)", texto_napne, re.IGNORECASE)
+    if match: dados["tipoNecEspecial"] = match.group(1)
+
+    match = re.search(r"Portador\(a\)\s+de\s+Transtorno\s+(Sim|Não)", texto_napne, re.IGNORECASE)
+    if match: dados["transtorno"] = match.group(1)
+
+    match = re.search(r"Tipo\s+de\s+Transtorno\s+-?\s*(.+?)\s*(?=Portador\(a\)|$)", texto_napne, re.IGNORECASE)
+    if match: dados["tipoTranstorno"] = match.group(1)
+
+    match = re.search(r"Portador\(a\)\s+de\s+Superdotação\s+(Sim|Não)", texto_napne, re.IGNORECASE)
+    if match: dados["superdotacao"] = match.group(1)
+
+    match = re.search(r"Superdotação\s+-?\s*(.+?)\s*$", texto_napne, re.IGNORECASE)
+    if match: dados["tipoSuperdotacao"] = match.group(1)
+    return dados
+
+
+def Definir_Nucleo_Disciplina(nome_disciplina, lista_tecnicas):
+    """Identifica se a disciplina pertence ao núcleo Técnico ou Comum."""
+    for kw in lista_tecnicas:
+        if kw in nome_disciplina.upper():
+            return "Técnico"
+    return "Comum"
+
+
+def Calcular_Medias_Globais(df_aluno):
+    """Calcula as médias por núcleo, matemática e global de um aluno."""
+    media_comum = df_aluno[df_aluno['Núcleo'] == 'Comum']['Média Final'].mean()
+    media_tec = df_aluno[df_aluno['Núcleo'] == 'Técnico']['Média Final'].mean()
+    
+    nota_mat = df_aluno[df_aluno['Disciplina'].str.contains('Matemática', case=False)]
+    media_mat = nota_mat['Média Final'].values[0] if not nota_mat.empty else 0.0
+    
+    media_global = df_aluno['Média Final'].mean()
+    
+    return {
+        "comum": round(media_comum, 2) if pd.notna(media_comum) else 0.0,
+        "tecnico": round(media_tec, 2) if pd.notna(media_tec) else 0.0,
+        "matematica": round(float(media_mat), 2),
+        "global": round(media_global, 1) if pd.notna(media_global) else 0.0
+    }
+###############################################--Fim Acréscimo Função--############################################################
 def extrairDados(arquivosPdf):
     dadosFinais=[]
     ###########################--NAPNE--####################################################
@@ -319,16 +372,16 @@ def extrairDados(arquivosPdf):
         
         linhas=textoCompleto.split('\n')
         textoNapne=textoCompleto.replace("\n", " ") #<------------------------------------------------------------------teste NAPNE
-        nomeAluno="Não Identificado"
-        matriculaAluno="Não Identificada"
-        serieAluno="Não Identificada"
+        #nomeAluno="Não Identificado"
+        #matriculaAluno="Não Identificada"
+        #serieAluno="Não Identificada"
         ######################################--NAPNE--#################################################
-        necEspeciais="Não"
-        tipoNecEspecial="-"
-        transtorno="Não"
-        tipoTranstorno="-"
-        superdotacao="Não"
-        tipoSuperdotacao="-"
+        #necEspeciais="Não"
+        #tipoNecEspecial="-"
+        #transtorno="Não"
+        #tipoTranstorno="-"
+        #superdotacao="Não"
+        #tipoSuperdotacao="-"
         ########################################--NAPNE--#################################################
 
         #for linha in linhas:
@@ -357,30 +410,58 @@ def extrairDados(arquivosPdf):
             #serieAluno=Extrair_Serie_Aluno(linha)
         
         #######################--NAPNE--#############################################
-        match=re.search(r"Portador\(a\)\s+de\s+Necessidades\s+Especiais\s+(Sim|Não)", textoNapne, re.IGNORECASE)
-        if (match):
-            necEspeciais=match.group(1)
+        #match=re.search(r"Portador\(a\)\s+de\s+Necessidades\s+Especiais\s+(Sim|Não)", textoNapne, re.IGNORECASE)
+        #if (match):
+            #necEspeciais=match.group(1)
 
-        match=re.search(r"Tipo\s+de\s+Necessidade\s+Especial\s+-?\s*(.+?)\s*(?=Portador\(a\)|$)", textoNapne, re.IGNORECASE)
-        if (match):
-            tipoNecEspecial=match.group(1)
+        #match=re.search(r"Tipo\s+de\s+Necessidade\s+Especial\s+-?\s*(.+?)\s*(?=Portador\(a\)|$)", textoNapne, re.IGNORECASE)
+        #if (match):
+            #tipoNecEspecial=match.group(1)
 
-        match=re.search(r"Portador\(a\)\s+de\s+Transtorno\s+(Sim|Não)", textoNapne, re.IGNORECASE)
-        if (match):
-            transtorno=match.group(1)
+        #match=re.search(r"Portador\(a\)\s+de\s+Transtorno\s+(Sim|Não)", textoNapne, re.IGNORECASE)
+        #if (match):
+            #transtorno=match.group(1)
 
-        match=re.search(r"Tipo\s+de\s+Transtorno\s+-?\s*(.+?)\s*(?=Portador\(a\)|$)", textoNapne, re.IGNORECASE)
-        if (match):
-            tipoTranstorno=match.group(1)
+        #match=re.search(r"Tipo\s+de\s+Transtorno\s+-?\s*(.+?)\s*(?=Portador\(a\)|$)", textoNapne, re.IGNORECASE)
+        #if (match):
+            #tipoTranstorno=match.group(1)
 
-        match=re.search(r"Portador\(a\)\s+de\s+Superdotação\s+(Sim|Não)", textoNapne, re.IGNORECASE)
-        if (match):
-            superdotacao=match.group(1)
+        #match=re.search(r"Portador\(a\)\s+de\s+Superdotação\s+(Sim|Não)", textoNapne, re.IGNORECASE)
+        #if (match):
+            #superdotacao=match.group(1)
 
-        match=re.search(r"Superdotação\s+-?\s*(.+?)\s*$", textoNapne, re.IGNORECASE)
-        if (match):
-            tipoSuperdotacao=match.group(1)
+        #match=re.search(r"Superdotação\s+-?\s*(.+?)\s*$", textoNapne, re.IGNORECASE)
+        #if (match):
+            #tipoSuperdotacao=match.group(1)
         ############################--NAPNE--###########################
+        ########################################--FUNÇÃO--#################################################
+        dados_napne = Extrair_Dados_Napne(textoNapne)
+        for nomeDisp, blocos in mapeamentoDisciplinas.items():
+            # Define dinamicamente usando a função nova
+            nucleo = Definir_Nucleo_Disciplina(nomeDisp, tecnicas)
+
+            dadosFinais.append({
+                'Nº Chamada': int(numeroChamada),
+                'Aluno': nomeAluno,
+                'Matrícula': matriculaAluno,
+                'Série': serieAluno,
+                'Disciplina': nomeDisp,
+                '1º BI': blocos['notas'][0],
+                '2º BI': blocos['notas'][1],
+                '3º BI': blocos['notas'][2],
+                '4º BI': blocos['notas'][3],
+                'Média Final': blocos['mediaFinal'],
+                'Freq. Final': blocos['freqFinal'],
+                'Núcleo': nucleo,
+                'Observações': '',
+                'Necessidades Especiais': dados_napne["necEspeciais"],
+                'Tipo de Necessidade Especial': dados_napne["tipoNecEspecial"],
+                'Transtorno': dados_napne["transtorno"],
+                'Tipo de Transtorno': dados_napne["tipoTranstorno"],
+                'Superdotação': dados_napne["superdotacao"],
+                'Tipo de Superdotação': dados_napne["tipoSuperdotacao"]
+            })
+        ########################################--FIM FUNÇÃO--#############################################
         if (nomeAluno=="Não Identificado" or not nomeAluno.strip()):
             nomeAluno=arquivo.name.replace(".pdf", "").replace("Boletim", "").replace("_", " ").strip()
 
@@ -786,36 +867,46 @@ else:
 
         with m3:
             st.write("### Global")
-            mediaComum=BDAluno[BDAluno['Núcleo']=='Comum']['Média Final'].mean()
-            mediaTec=BDAluno[BDAluno['Núcleo']=='Técnico']['Média Final'].mean()
-            notaMat=BDAluno[BDAluno['Disciplina'].str.contains('Matemática', case=False)]
-            if (not notaMat.empty):
-              mediaMat=notaMat['Média Final'].values[0]
-            else:
-              mediaMat=0.0
+            #mediaComum=BDAluno[BDAluno['Núcleo']=='Comum']['Média Final'].mean()
+            #mediaTec=BDAluno[BDAluno['Núcleo']=='Técnico']['Média Final'].mean()
+            #notaMat=BDAluno[BDAluno['Disciplina'].str.contains('Matemática', case=False)]
+            #if (not notaMat.empty):
+              #mediaMat=notaMat['Média Final'].values[0]
+            #else:
+              #mediaMat=0.0
 
-            if (pd.notna(mediaComum)):
-              mediaComum=round(mediaComum, 2)
-            else:
-              mediaComum=0 
+            #if (pd.notna(mediaComum)):
+              #mediaComum=round(mediaComum, 2)
+            #else:
+              #mediaComum=0 
 
-            if (pd.notna(mediaTec)):
-              mediaTec=round(mediaTec, 2) 
-            else:
-              mediaTec=0
+            #if (pd.notna(mediaTec)):
+              #mediaTec=round(mediaTec, 2) 
+            #else:
+              #mediaTec=0
               
-            mediaMat=round(float(mediaMat),2)
-            st.write(f"Média Núcleo Comum: **{mediaComum}**")
-            st.write(f"Média Núcleo Técnico: **{mediaTec}**") 
-            st.write(f"Média Matemática: **{mediaMat}**")
+            #mediaMat=round(float(mediaMat),2)
+            #st.write(f"Média Núcleo Comum: **{mediaComum}**")
+            #st.write(f"Média Núcleo Técnico: **{mediaTec}**") 
+            #st.write(f"Média Matemática: **{mediaMat}**")
+            #st.divider()
+
+            #mediaGlobal=BDAluno['Média Final'].mean()             
+            #if (pd.notna(mediaGlobal)):
+              #mediaGlobal=round(mediaGlobal, 1)
+            #else:
+              #mediaGlobal=0.0
+            #st.metric("Média Global", f"{mediaGlobal}")
+            ####################################--FUNÇÃO--################################################
+            medias = Calcular_Medias_Globais(BDAluno)
+            
+            st.write(f"Média Núcleo Comum: **{medias['comum']}**")
+            st.write(f"Média Núcleo Técnico: **{medias['tecnico']}**") 
+            st.write(f"Média Matemática: **{medias['matematica']}**")
             st.divider()
 
-            mediaGlobal=BDAluno['Média Final'].mean()             
-            if (pd.notna(mediaGlobal)):
-              mediaGlobal=round(mediaGlobal, 1)
-            else:
-              mediaGlobal=0.0
-            st.metric("Média Global", f"{mediaGlobal}")
+            st.metric("Média Global", f"{medias['global']}")
+            ########################################--FIM FUNÇÃO--##########################################
 
         with m4:
             st.write("### Observações")
