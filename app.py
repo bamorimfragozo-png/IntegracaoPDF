@@ -90,7 +90,9 @@ if (st.sidebar.button("Dashboard")):
 
 # EXTRAÇÃO DE DADOS
 def extrair_dados_inclusao(texto_completo):
-    texto_limpo = texto_completo.replace("\n", " ")
+    # Deixamos em minúsculo para facilitar a busca
+    texto_limpo = texto_completo.lower()
+    
     dados = {
         'Necessidades Especiais': 'Não',
         'Tipo de Necessidade Especial': '-',
@@ -100,29 +102,25 @@ def extrair_dados_inclusao(texto_completo):
         'Tipo de Superdotação': '-'
     }
     
-    match_pne = re.search(r'(?:Portador\(a\)\s+de\s+)?Necessidades\s+Especiais\s*[:-]?\s*(Sim|Não)', texto_limpo, re.IGNORECASE)
-    if match_pne:
-        dados['Necessidades Especiais'] = match_pne.group(1).strip().capitalize()
-        
-    match_tipo_pne = re.search(r'Tipo\s+de\s+Necessidade\s+Especial\s*[:-]?\s*(.+?)(?=(?:Portador\(a\)|Transtorno|Superdotação|$))', texto_limpo, re.IGNORECASE)
-    if match_tipo_pne:
-        dados['Tipo de Necessidade Especial'] = match_tipo_pne.group(1).strip()
-
-    match_trans = re.search(r'(?:Portador\(a\)\s+de\s+)?Transtorno\s*[:-]?\s*(Sim|Não)', texto_limpo, re.IGNORECASE)
-    if match_trans:
-        dados['Transtorno'] = match_trans.group(1).strip().capitalize()
-        
-    match_tipo_trans = re.search(r'Tipo\s+de\s+Transtorno\s*[:-]?\s*(.+?)(?=(?:Portador\(a\)|Necessidades|Superdotação|$))', texto_limpo, re.IGNORECASE)
-    if match_tipo_trans:
-        dados['Tipo de Transtorno'] = match_tipo_trans.group(1).strip()
-
-    match_super = re.search(r'(?:Portador\(a\)\s+de\s+)?Superdotação\s*[:-]?\s*(Sim|Não)', texto_limpo, re.IGNORECASE)
-    if match_super:
-        dados['Superdotação'] = match_super.group(1).strip().capitalize()
-        
-    match_tipo_super = re.search(r'(?:Tipo\s+de\s+)?Superdotação\s*[:-]?\s*(.+?)$', texto_limpo, re.IGNORECASE)
-    if match_tipo_super and dados['Superdotação'] == 'Sim':
-        dados['Tipo de Superdotação'] = match_tipo_super.group(1).strip()
+    # 1. Busca por Necessidades Especiais
+    if "necessidades especiais" in texto_limpo:
+        # Pega as próximas palavras após o termo para ver se acha um "sim" perdido
+        trecho = re.search(r'necessidades\s+especiais\s*(?:.*\n?){0,3}?(sim|não)', texto_limpo)
+        if trecho and "sim" in trecho.group(1):
+            dados['Necessidades Especiais'] = 'Sim'
+            
+    # 2. Busca por Transtorno
+    if "transtorno" in texto_limpo:
+        # No PDF do SUAP, o "Sim" geralmente vem logo abaixo ou próximo do termo
+        trecho = re.search(r'transtorno\s*(?:.*\n?){0,5}?(sim|não)', texto_limpo)
+        if trecho and "sim" in trecho.group(1):
+            dados['Transtorno'] = 'Sim'
+            
+    # 3. Busca por Superdotação
+    if "superdotação" in texto_limpo:
+        trecho = re.search(r'superdotação\s*(?:.*\n?){0,5}?(sim|não)', texto_limpo)
+        if trecho and "sim" in trecho.group(1):
+            dados['Superdotação'] = 'Sim'
 
     return dados
 
@@ -339,20 +337,26 @@ def extrairDados(arquivosPdf):
             'Matrícula': matriculaAluno,
             'Série': serieAluno,
             'Disciplina': nomeDisp,
-            '1º BI': blocos['notas'][0],
-            '2º BI': blocos['notas'][1],
-            '3º BI': blocos['notas'][2],
-            '4º BI': blocos['notas'][3],
-            'Média Final': blocos['mediaFinal'],
-            'Freq. Final': blocos['freqFinal'],
-            'Núcleo': nucleo,
-            'Observações': '',
-            'Necessidades Especiais': necEspeciais,
-            'Tipo de Necessidade Especial': tipoNecEspecial,
-            'Transtorno': transtorno,
-            'Tipo de Transtorno': tipoTranstorno,
-            'Superdotação': superdotacao,
-            'Tipo de Superdotação': tipoSuperdotacao
+            'Sigla': siglaDisp,
+            'B1': n1,
+            'F1': f1,
+            'B2': n2,
+            'F2': f2,
+            'B3': n3,
+            'F3': f3,
+            'B4': n4,
+            'F4': f4,
+            'Média': med,
+            'Faltas': totF,
+            'Resultado': Sit,
+            'Observações': obs,
+            # Use os retornos corretos da função aqui:
+            'Necessidades Especiais': dados_napne['Necessidades Especiais'],
+            'Tipo de Necessidade Especial': dados_napne['Tipo de Necessidade Especial'],
+            'Transtorno': dados_napne['Transtorno'],
+            'Tipo de Transtorno': dados_napne['Tipo de Transtorno'],
+            'Portador Superdotação': dados_napne['Superdotação'],
+            'Superdotação': dados_napne['Tipo de Superdotação']
         })
         processar_mapeamento_disciplinas(chaves_disp, idx + 1, mapeamentoDisciplinas, nomeAluno, matriculaAluno, serieAluno, necEspeciais, tipoNecEspecial, transtorno, tipoTranstorno, superdotacao, tipoSuperdotacao)
 
