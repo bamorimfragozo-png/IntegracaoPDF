@@ -411,31 +411,12 @@ def extrairDados(arquivosPdf):
             novo_txt = processar_paginas_pdf(p_idx, paginas[p_idx], leitorPdf, txt, arquivo)
             return iterar_paginas(p_idx + 1, novo_txt)
 
+        # 1. Extrai todo o texto do PDF primeiro
         textoCompleto = iterar_paginas(0, textoCompleto)
         linhas = textoCompleto.split('\n')
-        #textoNapne = textoCompleto.replace("\n", " ")
+        textoNapne = textoCompleto.replace("\n", " ")
 
-        if nomeAluno:
-            # 1. Extrai os dados do NAPNE (12 espaços de recuo)
-            dados_napne = extrair_dados_inclusao(textoCompleto)
-            
-            # 2. Pega as chaves (Agora com 12 espaços de recuo, DENTRO do IF)
-            chaves_disp = list(mapeamentoDisciplinas.keys())
-            
-            # 3. Chama a função (Também com 12 espaços de recuo, DENTRO do IF)
-            processar_mapeamento_disciplinas(
-                chaves_disp, 
-                0, 
-                mapeamentoDisciplinas, 
-                nomeAluno, 
-                matriculaAluno, 
-                serieAluno, 
-                dados_napne
-            )
-            
-            # Avança o número da chamada (DENTRO do IF)
-            contexto_chamada["numeroChamada"] += 1
-        
+        # 2. Inicializa as variáveis com valores padrão antes de usá-las
         nomeAluno = "Não Identificado"
         matriculaAluno = "Não Identificada"
         serieAluno = "Não Identificada"
@@ -446,65 +427,78 @@ def extrairDados(arquivosPdf):
         superdotacao = "Não"
         tipoSuperdotacao = "-"
 
-        # 🎯 EXTRAÇÃO ATUALIZADA VIA REGEX (À PROVA DE QUEBRAS DE LINHA)
-        
-        # 1. Procura o Nome que vem logo a seguir a "BOLETIM DE NOTAS INDIVIDUAL"
+        # 3. Executa as buscas por Regex para preencher as variáveis do aluno corrente
         match_nome = re.search(
             r"Aluno\(a\):\s*(.*?)\s*Matrícula:",
             textoCompleto,
             re.DOTALL | re.IGNORECASE
         )
-
         if match_nome:
             nomeAluno = " ".join(match_nome.group(1).split())
 
-        # 2. Procura a Turma/Série baseada no padrão numérico do IF (ex: 20261.3.BTV...)
         match_serie = re.search(r"(\d{5}\.\d\.[A-Z0-9\.]+)", textoCompleto)
         if match_serie:
             serieAluno = match_serie.group(1).strip()
 
-        # 3. Procura a Matrícula chamando a sua função recursiva original
         matriculaAluno = buscar_matricula(0, linhas, matriculaAluno)
 
-        # RegEx NAPNE (Seu bloco original mantido)
-        match = re.search(r"Portador\(a\)\s+de\s+Necessidades\s+Especiais\s+(Sim|Não)", textoNapne, re.IGNORECASE)
-        if match: necEspeciais = match.group(1)
-        match = re.search(r"Tipo\s+de\s+Necessidade\s+Especial\s+-?\s*(.+?)\s*(?=Portador\(a\)|$)", textoNapne, re.IGNORECASE)
-        if match: tipoNecEspecial = match.group(1)
-        match = re.search(r"Portador\(a\)\s+de\s+Transtorno\s+(Sim|Não)", textoNapne, re.IGNORECASE)
-        if match: transtorno = match.group(1)
-        match = re.search(r"Tipo\s+de\s+Transtorno\s+-?\s*(.+?)\s*(?=Portador\(a\)|$)", textoNapne, re.IGNORECASE)
-        if match: tipoTranstorno = match.group(1)
-        match = re.search(r"Portador\(a\)\s+de\s+Superdotação\s+(Sim|Não)", textoNapne, re.IGNORECASE)
-        if match: superdotacao = match.group(1)
-        match = re.search(r"Superdotação\s+-?\s*(.+?)\s*$", textoNapne, re.IGNORECASE)
-        if match: tipoSuperdotacao = match.group(1)
-
-        # Proteção contra falhas: se não extrair nada, usa o nome do arquivo de forma limpa
+        # Se falhar na extração por regex, usa o nome do arquivo limpo
         if (nomeAluno == "Não Identificado" or not nomeAluno.strip()):
             nomeAluno = arquivo.name.split('.')[0].strip()
 
-        # Grava a foto usando a chave correta com o nome do aluno que acabou de ser extraído
-        fotos = processar_fotos(leitorPdf)
-        if (fotos):
-            st.session_state.fotoAluno[nomeAluno] = fotos
-        
-        mapeamentoDisciplinas = processar_linhas_disciplinas(0, linhas, {})
-        processar_mapeamento_disciplinas(list(mapeamentoDisciplinas.keys()), 0, mapeamentoDisciplinas, nomeAluno, matriculaAluno, serieAluno, dados_napne)
+        # 4. Agora que o nomeAluno EXISTE com certeza absoluta, rodamos as lógicas dependentes
+        if nomeAluno:
+            # Captura a foto do estudante
+            fotos = processar_fotos(leitorPdf)
+            if (fotos):
+                st.session_state.fotoAluno[nomeAluno] = fotos
 
-        if (contexto_chamada["ultimoNomeVisto"] is None):
-            contexto_chamada["ultimoNomeVisto"] = nomeAluno
-        
-        if (nomeAluno != contexto_chamada["ultimoNomeVisto"]):
-            contexto_chamada["numeroChamada"] += 1
-            contexto_chamada["ultimoNomeVisto"] = nomeAluno
+            # Extrai os dados novos do NAPNE através da função dedicada
+            dados_napne = extrair_dados_inclusao(textoCompleto)
 
-        if (nomeAluno and nomeAluno != "Não Identificado"):
+            # Processa e mapeia as disciplinas do aluno
+            mapeamentoDisciplinas = processar_linhas_disciplinas(0, linhas, {})
+            chaves_disp = list(mapeamentoDisciplinas.keys())
+            
+            processar_mapeamento_disciplinas(
+                chaves_disp, 
+                0, 
+                mapeamentoDisciplinas, 
+                nomeAluno, 
+                matriculaAluno, 
+                serieAluno, 
+                dados_napne,
+                linhas
+            )
+
+            # RegEx NAPNE legada (Mantida para alimentar o seu mapaNapneTemporario antigo se necessário)
+            match = re.search(r"Portador\(a\)\s+de\s+Necessidades\s+Especiais\s+(Sim|Não)", textoNapne, re.IGNORECASE)
+            if match: necEspeciais = match.group(1)
+            match = re.search(r"Tipo\s+de\s+Necessidade\s+Especial\s+-?\s*(.+?)\s*(?=Portador\(a\)|$)", textoNapne, re.IGNORECASE)
+            if match: tipoNecEspecial = match.group(1)
+            match = re.search(r"Portador\(a\)\s+de\s+Transtorno\s+(Sim|Não)", textoNapne, re.IGNORECASE)
+            if match: transtorno = match.group(1)
+            match = re.search(r"Tipo\s+de\s+Transtorno\s+-?\s*(.+?)\s*(?=Portador\(a\)|$)", textoNapne, re.IGNORECASE)
+            if match: tipoTranstorno = match.group(1)
+            match = re.search(r"Portador\(a\)\s+de\s+Superdotação\s+(Sim|Não)", textoNapne, re.IGNORECASE)
+            if match: superdotacao = match.group(1)
+            match = re.search(r"Superdotação\s+-?\s*(.+?)\s*$", textoNapne, re.IGNORECASE)
+            if match: tipoSuperdotacao = match.group(1)
+
+            if (contexto_chamada["ultimoNomeVisto"] is None):
+                contexto_chamada["ultimoNomeVisto"] = nomeAluno
+            
+            if (nomeAluno != contexto_chamada["ultimoNomeVisto"]):
+                contexto_chamada["numeroChamada"] += 1
+                contexto_chamada["ultimoNomeVisto"] = nomeAluno
+
             mapaNapneTemporario[nomeAluno.strip().upper()] = {
                 'nec': necEspeciais, 'tipNec': tipoNecEspecial,
                 'trans': transtorno, 'tipTrans': tipoTranstorno,
                 'super': superdotacao, 'tipSuper': tipoSuperdotacao
             }
+
+        # 5. Vai para o próximo arquivo PDF da fila
         iterar_arquivos_pdf(idx_arq + 1)
 
     def mapear_dados_finais_napne(idx):
