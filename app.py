@@ -337,7 +337,7 @@ def extrairDados(arquivosPdf):
                 return n1_a, f1_a, n2_a, f2_a, n3_a, f3_a, n4_a, f4_a, med_a, totF_a, Sit_a, obs_a
                 
             linha = linhas[idx_l].strip()
-            if linha.startswith(nomeDisp) or linha.startswith(siglaDisp):
+            if linha.startswith(nomeDisp) or nomeDisp in linha:
                 partes = linha.split()
                 if len(partes) >= 12:
                     return (partes[-11], partes[-10], partes[-9], partes[-8], 
