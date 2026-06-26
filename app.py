@@ -324,22 +324,20 @@ def extrairDados(arquivosPdf):
         return checar_tecnico(idx_t + 1, nomeDisp)
 
     def processar_mapeamento_disciplinas(chaves, idx_d, mapa, nomeAluno, matriculaAluno, serieAluno, dados_napne, linhas):
-        # Condição de parada da recursão
+        # Condição de parada da recursão: se percorreu todas as disciplinas do aluno
         if idx_d >= len(chaves):
             return
     
         nomeDisp = chaves[idx_d]
-        # CORREÇÃO: Buscamos os dados reais já extraídos no passo anterior (evita quebrar o startswith)
-        dados_materia = mapa[nomeDisp]
+        siglaDisp = mapa[nomeDisp]
     
-        # --- Bloco de busca adaptado para usar apenas o nome da disciplina ---
+        # --- Início do seu bloco original de busca de notas/faltas ---
         def buscar_notas_faltas(idx_l, n1_a, f1_a, n2_a, f2_a, n3_a, f3_a, n4_a, f4_a, med_a, totF_a, Sit_a, obs_a):
             if idx_l >= len(linhas):
                 return n1_a, f1_a, n2_a, f2_a, n3_a, f3_a, n4_a, f4_a, med_a, totF_a, Sit_a, obs_a
                 
             linha = linhas[idx_l].strip()
-            # CORREÇÃO: Validamos de forma segura se a linha diz respeito à disciplina atual
-            if linha.startswith(nomeDisp) or nomeDisp in linha:
+            if linha.startswith(nomeDisp) or linha.startswith(siglaDisp):
                 partes = linha.split()
                 if len(partes) >= 12:
                     return (partes[-11], partes[-10], partes[-9], partes[-8], 
@@ -348,15 +346,8 @@ def extrairDados(arquivosPdf):
             return buscar_notas_faltas(idx_l + 1, n1_a, f1_a, n2_a, f2_a, n3_a, f3_a, n4_a, f4_a, med_a, totF_a, Sit_a, obs_a)
             
         n1, f1, n2, f2, n3, f3, n4, f4, med, totF, Sit, obs = buscar_notas_faltas(0, "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-")
+        # --- Fim do bloco original ---
     
-        # Se a busca direta falhar, usamos os dados que o processar_linhas_disciplinas já tinha calculado
-        if n1 == "-":
-            n1, n2, n3, n4 = [str(n) for n in dados_materia['notas']]
-            f1, f2, f3, f4 = [str(f) for f in dados_materia['faltas']]
-            med = str(dados_materia['mediaFinal'])
-            totF = str(sum(dados_materia['faltas']))
-            Sit = "Aprovado" if dados_materia['mediaFinal'] >= 6.0 else "Retido"
-
         # Grava na lista final associando cada disciplina às colunas da planilha do Google Sheets
         dadosFinais.append({
             'Nº Chamada': int(contexto_chamada["numeroChamada"]),
@@ -364,7 +355,7 @@ def extrairDados(arquivosPdf):
             'Matrícula': matriculaAluno,
             'Série': serieAluno,
             'Disciplina': nomeDisp,
-            'Sigla': nomeDisp[:4].upper(), # Apenas uma string temporária baseada no nome para preencher o campo
+            'Sigla': siglaDisp,
             'B1': n1, 'F1': f1, 
             'B2': n2, 'F2': f2, 
             'B3': n3, 'F3': f3, 
@@ -382,7 +373,7 @@ def extrairDados(arquivosPdf):
             'Superdotação': dados_napne['Tipo de Superdotação']
         })
         
-        # Próxima disciplina
+        # Chamada recursiva para a próxima disciplina do aluno, repassando o dicionário completo e as linhas
         processar_mapeamento_disciplinas(chaves, idx_d + 1, mapa, nomeAluno, matriculaAluno, serieAluno, dados_napne, linhas)
 
     def processar_fotos(leitorPdf):
