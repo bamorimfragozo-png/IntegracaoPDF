@@ -490,7 +490,7 @@ else:
 
     linkSalaAtiva = DICIONARIO_SALAS[st.session_state.salaAtiva]
     try:
-    BD = conn.read(spreadsheet=linkSalaAtiva, ttl="0")
+        BD = conn.read(spreadsheet=linkSalaAtiva, ttl="0")
     except Exception as e:
         st.error(f"Erro ao ler planilha: {e}")
         st.write("Sala ativa:", st.session_state.salaAtiva)
