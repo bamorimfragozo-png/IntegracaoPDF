@@ -153,31 +153,8 @@ def extrairDados(arquivosPdf):
         return buscar_matricula(idx + 1, linhas, matriculaAluno)
 
     def extrair_linhas_metadados(idx, linhas, nomeAluno, serieAluno):
-        if idx >= len(linhas):
-            return nomeAluno, serieAluno
-        linha = linhas[idx]
-        
-        # Simplificado: se achar a palavra e o nome ainda for o padrão, extrai
-        if "aluno" in linha.lower() or "nome" in linha.lower():
-            if nomeAluno == "Não Identificado" or nomeAluno == "":
-                partes = linha.split(":")
-                if (len(partes) > 1):
-                    valNome = partes[1].strip()
-                else:
-                    # Remove de forma independente de maiúscula/minúscula
-                    valNome = re.sub(r'aluno|nome', '', linha, flags=re.IGNORECASE).strip()
-                nomeAluno = re.sub(r'\bMatrícula\b.*', '', valNome, flags=re.IGNORECASE).strip()
-
-        # Simplificado para a Série
-        if "série" in linha.lower() or "serie" in linha.lower() or "ano" in linha.lower() or "turma" in linha.lower() if "turma" in linha.lower() else False: 
-            # (ou apenas valide os termos em minúsculo):
-            if "série" in linha.lower() or "serie" in linha.lower() or "ano" in linha.lower() or "turma" in linha.lower():
-                if serieAluno == "Não Identificada" or serieAluno == "":
-                    partes = linha.split(":")
-                    if (len(partes) > 1):
-                        serieAluno = partes[1].strip()[:27]
-                
-        return extrair_linhas_metadados(idx + 1, linhas, nomeAluno, serieAluno)
+        # Mantida apenas para compatibilidade, retorna os valores sem alterar nada
+        return nomeAluno, serieAluno
 
     def verificar_filtro_palavras(linha):
         palavras = ["Notas das etapas", "Faltas nas etapas", "Diário", "Disciplina", "Total", "Este documento"]
@@ -382,11 +359,22 @@ def extrairDados(arquivosPdf):
         superdotacao = "Não"
         tipoSuperdotacao = "-"
 
-        # Extrações via recursão
-        nomeAluno, serieAluno = extrair_linhas_metadados(0, linhas, nomeAluno, serieAluno)
-        matriculaAluno = buscar_matricula(0, linhas, matriculaAluno)
+        # 🎯 EXTRAÇÃO ATUALIZADA VIA REGEX (À PROVA DE QUEBRAS DE LINHA)
+        
+        # 1. Procura o Nome que vem logo a seguir a "BOLETIM DE NOTAS INDIVIDUAL"
+        match_nome = re.search(r"BOLETIM DE NOTAS INDIVIDUAL\s+([^\n\r]+)", textoCompleto, re.IGNORECASE)
+        if match_nome:
+            nomeAluno = match_nome.group(1).strip()
 
-        # RegEx NAPNE
+        # 2. Procura a Turma/Série baseada no padrão numérico do IF (ex: 20261.3.BTV...)
+        match_serie = re.search(r"(\d{5}\.\d\.[A-Z0-9\.]+)", textoCompleto)
+        if match_serie:
+            serieAluno = match_serie.group(1).strip()
+
+        # 3. Procura a Matrícula chamando a sua função recursiva original
+        matriculaAluno = buscar_matricula(0, lines, matriculaAluno)
+
+        # RegEx NAPNE (Seu bloco original mantido)
         match = re.search(r"Portador\(a\)\s+de\s+Necessidades\s+Especiais\s+(Sim|Não)", textoNapne, re.IGNORECASE)
         if match: necEspeciais = match.group(1)
         match = re.search(r"Tipo\s+de\s+Necessidade\s+Especial\s+-?\s*(.+?)\s*(?=Portador\(a\)|$)", textoNapne, re.IGNORECASE)
@@ -400,9 +388,11 @@ def extrairDados(arquivosPdf):
         match = re.search(r"Superdotação\s+-?\s*(.+?)\s*$", textoNapne, re.IGNORECASE)
         if match: tipoSuperdotacao = match.group(1)
 
+        # Proteção contra falhas: se não extrair nada, usa o nome do arquivo de forma limpa
         if (nomeAluno == "Não Identificado" or not nomeAluno.strip()):
             nomeAluno = arquivo.name.split('.')[0].strip()
 
+        # Grava a foto usando a chave correta com o nome do aluno que acabou de ser extraído
         fotos = processar_fotos(leitorPdf)
         if (fotos):
             st.session_state.fotoAluno[nomeAluno] = fotos
