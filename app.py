@@ -325,11 +325,11 @@ def extrairDados(arquivosPdf):
 
     def processar_mapeamento_disciplinas(chaves, idx_d, mapa, nomeAluno, matriculaAluno, serieAluno, dados_napne):
     # Condição de parada da recursão: se percorreu todas as disciplinas do aluno
-    if idx_d >= len(chaves):
-        return
+        if idx_d >= len(chaves):
+            return
     
-    nomeDisp = chaves[idx_d]
-    siglaDisp = mapa[nomeDisp]
+        nomeDisp = chaves[idx_d]
+        siglaDisp = mapa[nomeDisp]
     
     # --- Início do seu bloco original de busca de notas/faltas ---
     # (Ele continua igual, buscando N1, F1, N2, F2... no PDF)
