@@ -350,11 +350,11 @@ def extrairDados(arquivosPdf):
             'Faltas': totF,
             'Resultado': Sit,
             'Observações': obs,
-            # Use os retornos corretos da função aqui:
-            'Necessidades Especiais': dados_napne['Necessidades Especiais'],
-            'Tipo de Necessidade Especial': dados_napne['Tipo de Necessidade Especial'],
-            'Transtorno': dados_napne['Transtorno'],
-            'Tipo de Transtorno': dados_napne['Tipo de Transtorno'],
+            # DEVE FICAR ASSIM PARA CASAR COM A SUA PLANILHA:
+            'Portador Necessidades Especiais': dados_napne['Necessidades Especiais'],
+            'Tipo Necessidade Especial': dados_napne['Tipo de Necessidade Especial'],
+            'Portador Transtorno': dados_napne['Transtorno'],
+            'Tipo Transtorno': dados_napne['Tipo de Transtorno'],
             'Portador Superdotação': dados_napne['Superdotação'],
             'Superdotação': dados_napne['Tipo de Superdotação']
         })
