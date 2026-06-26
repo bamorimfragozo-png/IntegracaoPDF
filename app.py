@@ -368,9 +368,14 @@ def extrairDados(arquivosPdf):
         # 🎯 EXTRAÇÃO ATUALIZADA VIA REGEX (À PROVA DE QUEBRAS DE LINHA)
         
         # 1. Procura o Nome que vem logo a seguir a "BOLETIM DE NOTAS INDIVIDUAL"
-        match_nome = re.search(r"BOLETIM DE NOTAS INDIVIDUAL\s+([^\n\r]+)", textoCompleto, re.IGNORECASE)
+        match_nome = re.search(
+            r"Aluno\(a\):\s*(.*?)\s*Matrícula:",
+            textoCompleto,
+            re.DOTALL | re.IGNORECASE
+        )
+
         if match_nome:
-            nomeAluno = match_nome.group(1).strip()
+            nomeAluno = " ".join(match_nome.group(1).split())
 
         # 2. Procura a Turma/Série baseada no padrão numérico do IF (ex: 20261.3.BTV...)
         match_serie = re.search(r"(\d{5}\.\d\.[A-Z0-9\.]+)", textoCompleto)
