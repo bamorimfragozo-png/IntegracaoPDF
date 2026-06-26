@@ -372,7 +372,7 @@ def extrairDados(arquivosPdf):
             serieAluno = match_serie.group(1).strip()
 
         # 3. Procura a Matrícula chamando a sua função recursiva original
-        matriculaAluno = buscar_matricula(0, lines, matriculaAluno)
+        matriculaAluno = buscar_matricula(0, linhas, matriculaAluno)
 
         # RegEx NAPNE (Seu bloco original mantido)
         match = re.search(r"Portador\(a\)\s+de\s+Necessidades\s+Especiais\s+(Sim|Não)", textoNapne, re.IGNORECASE)
