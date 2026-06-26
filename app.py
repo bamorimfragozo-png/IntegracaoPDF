@@ -413,7 +413,7 @@ def extrairDados(arquivosPdf):
 
         textoCompleto = iterar_paginas(0, textoCompleto)
         linhas = textoCompleto.split('\n')
-        textoNapne = textoCompleto.replace("\n", " ")
+        #textoNapne = textoCompleto.replace("\n", " ")
 
         if nomeAluno:
             # 1. Extrai os dados do NAPNE (12 espaços de recuo)
