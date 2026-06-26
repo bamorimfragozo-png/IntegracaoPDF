@@ -484,7 +484,7 @@ def extrairDados(arquivosPdf):
             st.session_state.fotoAluno[nomeAluno] = fotos
         
         mapeamentoDisciplinas = processar_linhas_disciplinas(0, linhas, {})
-        processar_mapeamento_disciplinas(list(mapeamentoDisciplinas.keys()), 0, mapeamentoDisciplinas, nomeAluno, matriculaAluno, serieAluno, necEspeciais, tipoNecEspecial, transtorno, tipoTranstorno, superdotacao, tipoSuperdotacao)
+        processar_mapeamento_disciplinas(list(mapeamentoDisciplinas.keys()), 0, mapeamentoDisciplinas, nomeAluno, matriculaAluno, serieAluno, dados_napne)
 
         if (contexto_chamada["ultimoNomeVisto"] is None):
             contexto_chamada["ultimoNomeVisto"] = nomeAluno
