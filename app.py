@@ -323,42 +323,61 @@ def extrairDados(arquivosPdf):
             return True
         return checar_tecnico(idx_t + 1, nomeDisp)
 
-    def processar_mapeamento_disciplinas(chaves_disp, idx, mapeamentoDisciplinas, nomeAluno, matriculaAluno, serieAluno, necEspeciais, tipoNecEspecial, transtorno, tipoTranstorno, superdotacao, tipoSuperdotacao):
-        if idx >= len(chaves_disp):
-            return
-        nomeDisp = chaves_disp[idx]
-        blocos = mapeamentoDisciplinas[nomeDisp]
+    def processar_mapeamento_disciplinas(chaves, idx_d, mapa, nomeAluno, matriculaAluno, serieAluno, dados_napne):
+    # Condição de parada da recursão: se percorreu todas as disciplinas do aluno
+    if idx_d >= len(chaves):
+        return
+    
+    nomeDisp = chaves[idx_d]
+    siglaDisp = mapa[nomeDisp]
+    
+    # --- Início do seu bloco original de busca de notas/faltas ---
+    # (Ele continua igual, buscando N1, F1, N2, F2... no PDF)
+    def buscar_notas_faltas(idx_l, n1_a, f1_a, n2_a, f2_a, n3_a, f3_a, n4_a, f4_a, med_a, totF_a, Sit_a, obs_a):
+        if idx_l >= len(linhas):
+            return n1_a, f1_a, n2_a, f2_a, n3_a, f3_a, n4_a, f4_a, med_a, totF_a, Sit_a, obs_a
+            
+        linha = linhas[idx_l].strip()
+        if linha.startswith(nomeDisp) or linha.startswith(siglaDisp):
+            partes = linha.split()
+            if len(partes) >= 12:
+                # Exemplo padrão de captura do seu código original
+                return (partes[-11], partes[-10], partes[-9], partes[-8], 
+                        partes[-7], partes[-6], partes[-5], partes[-4], 
+                        partes[-3], partes[-2], partes[-1], "-")
+        return buscar_notas_faltas(idx_l + 1, n1_a, f1_a, n2_a, f2_a, n3_a, f3_a, n4_a, f4_a, med_a, totF_a, Sit_a, obs_a)
         
-        nucleo = "Técnico" if checar_tecnico(0, nomeDisp) else "Comum"
+    n1, f1, n2, f2, n3, f3, n4, f4, med, totF, Sit, obs = buscar_notas_faltas(0, "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-")
+    # --- Fim do bloco original ---
 
-        dadosFinais.append({
-            'Nº Chamada': int(contexto_chamada["numeroChamada"]),
-            'Aluno': nomeAluno,
-            'Matrícula': matriculaAluno,
-            'Série': serieAluno,
-            'Disciplina': nomeDisp,
-            'Sigla': siglaDisp,
-            'B1': n1,
-            'F1': f1,
-            'B2': n2,
-            'F2': f2,
-            'B3': n3,
-            'F3': f3,
-            'B4': n4,
-            'F4': f4,
-            'Média': med,
-            'Faltas': totF,
-            'Resultado': Sit,
-            'Observações': obs,
-            # DEVE FICAR ASSIM PARA CASAR COM A SUA PLANILHA:
-            'Portador Necessidades Especiais': dados_napne['Necessidades Especiais'],
-            'Tipo Necessidade Especial': dados_napne['Tipo de Necessidade Especial'],
-            'Portador Transtorno': dados_napne['Transtorno'],
-            'Tipo Transtorno': dados_napne['Tipo de Transtorno'],
-            'Portador Superdotação': dados_napne['Superdotação'],
-            'Superdotação': dados_napne['Tipo de Superdotação']
-        })
-        processar_mapeamento_disciplinas(chaves_disp, idx + 1, mapeamentoDisciplinas, nomeAluno, matriculaAluno, serieAluno, dados_napne)
+    # Grava na lista final associando cada disciplina às colunas da planilha do Google Sheets
+    dadosFinais.append({
+        'Nº Chamada': int(contexto_chamada["numeroChamada"]),
+        'Aluno': nomeAluno,
+        'Matrícula': matriculaAluno,
+        'Série': serieAluno,
+        'Disciplina': nomeDisp,
+        'Sigla': siglaDisp,
+        'B1': n1, 'F1': f1, 
+        'B2': n2, 'F2': f2, 
+        'B3': n3, 'F3': f3, 
+        'B4': n4, 'F4': f4,
+        'Média': med, 
+        'Faltas': totF, 
+        'Resultado': Sit, 
+        'Observações': obs,
+        
+        # Colunas de inclusão mapeadas com as chaves exatas do seu Sheets:
+        'Portador Necessidades Especiais': dados_napne['Necessidades Especiais'],
+        'Tipo Necessidade Especial': dados_napne['Tipo de Necessidade Especial'],
+        'Portador Transtorno': dados_napne['Transtorno'],
+        'Tipo Transtorno': dados_napne['Tipo de Transtorno'],
+        'Portador Superdotação': dados_napne['Superdotação'],
+        'Superdotação': dados_napne['Tipo de Superdotação']
+    })
+    
+    # Chamada recursiva para a próxima disciplina do aluno, repassando o dicionário completo
+    processar_mapeamento_disciplinas(chaves, idx_d + 1, mapa, nomeAluno, matriculaAluno, serieAluno, dados_napne))
 
     def processar_fotos(leitorPdf):
         try:
@@ -397,6 +416,19 @@ def extrairDados(arquivosPdf):
         textoNapne = textoCompleto.replace("\n", " ")
 
         dados_napne = extrair_dados_inclusao(textoCompleto)
+
+        chaves_disp = list(mapeamentoDisciplinas.keys())
+        processar_mapeamento_disciplinas(
+            chaves_disp, 
+            0, 
+            mapeamentoDisciplinas, 
+            nomeAluno, 
+            matriculaAluno, 
+            serieAluno, 
+            dados_napne
+        )
+        
+        contexto_chamada["numeroChamada"] += 1
         
         nomeAluno = "Não Identificado"
         matriculaAluno = "Não Identificada"
