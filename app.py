@@ -489,8 +489,7 @@ else:
     st.sidebar.write(f"Visualizando: **{st.session_state.salaAtiva}**")
 
     linkSalaAtiva = DICIONARIO_SALAS[st.session_state.salaAtiva]
-    BD = conn.read(spreadsheet=linkSalaAtiva, ttl="0")
-    BD.columns = BD.columns.str.strip()
+    BD = conn.read(spreadsheet=linkSalaAtiva, ttl="10m")
     
     colunasNumericas = ['1º BI', '2º BI', '3º BI', '4º BI', 'Média Final', 'Freq. Final']
     
