@@ -323,7 +323,7 @@ def extrairDados(arquivosPdf):
             return True
         return checar_tecnico(idx_t + 1, nomeDisp)
 
-    def processar_mapeamento_disciplinas(chaves, idx_d, mapa, nomeAluno, matriculaAluno, serieAluno, dados_napne):
+    def processar_mapeamento_disciplinas(chaves, idx_d, mapa, nomeAluno, matriculaAluno, serieAluno, dados_napne, linhas):
         # Condição de parada da recursão: se percorreu todas as disciplinas do aluno
         if idx_d >= len(chaves):
             return
