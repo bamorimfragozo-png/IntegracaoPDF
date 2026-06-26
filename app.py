@@ -489,13 +489,7 @@ else:
     st.sidebar.write(f"Visualizando: **{st.session_state.salaAtiva}**")
 
     linkSalaAtiva = DICIONARIO_SALAS[st.session_state.salaAtiva]
-    try:
-        BD = conn.read(spreadsheet=linkSalaAtiva, ttl="0")
-    except Exception as e:
-        st.error(f"Erro ao ler planilha: {e}")
-        st.write("Sala ativa:", st.session_state.salaAtiva)
-        st.write("Link:", linkSalaAtiva)
-        st.stop()
+    BD = conn.read(spreadsheet=linkSalaAtiva, ttl="0")
     BD.columns = BD.columns.str.strip()
     
     colunasNumericas = ['1º BI', '2º BI', '3º BI', '4º BI', 'Média Final', 'Freq. Final']
