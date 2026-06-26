@@ -168,7 +168,10 @@ def extrairDados(arquivosPdf):
             partes = linha.split(":")
             if (len(partes) > 1):
                 serieAluno = partes[1].strip()[:27]
-        return extrair_linhas_metadados(idx + 1, lines, nomeAluno, serieAluno)
+        nomeAluno = ""
+
+        serieAluno = ""
+        return extrair_linhas_metadados(idx + 1, linhas, nomeAluno, serieAluno)
 
     def verificar_filtro_palavras(linha):
         palavras = ["Notas das etapas", "Faltas nas etapas", "Diário", "Disciplina", "Total", "Este documento"]
