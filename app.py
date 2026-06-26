@@ -509,7 +509,6 @@ else:
     else:
         BD['Observações'] = ""
         
-    st.write(BD.columns.tolist())
     ordemChamada = BD.sort_values(by='Nº Chamada', ascending=True)
     alunosLista = ordemChamada['Aluno'].unique().tolist()
     
