@@ -415,20 +415,26 @@ def extrairDados(arquivosPdf):
         linhas = textoCompleto.split('\n')
         textoNapne = textoCompleto.replace("\n", " ")
 
-        dados_napne = extrair_dados_inclusao(textoCompleto)
-
-        chaves_disp = list(mapeamentoDisciplinas.keys())
-        processar_mapeamento_disciplinas(
-            chaves_disp, 
-            0, 
-            mapeamentoDisciplinas, 
-            nomeAluno, 
-            matriculaAluno, 
-            serieAluno, 
-            dados_napne
-        )
-        
-        contexto_chamada["numeroChamada"] += 1
+        if nomeAluno:
+            # 1. Extrai os dados do NAPNE (12 espaços de recuo)
+            dados_napne = extrair_dados_inclusao(textoCompleto)
+            
+            # 2. Pega as chaves (Agora com 12 espaços de recuo, DENTRO do IF)
+            chaves_disp = list(mapeamentoDisciplinas.keys())
+            
+            # 3. Chama a função (Também com 12 espaços de recuo, DENTRO do IF)
+            processar_mapeamento_disciplinas(
+                chaves_disp, 
+                0, 
+                mapeamentoDisciplinas, 
+                nomeAluno, 
+                matriculaAluno, 
+                serieAluno, 
+                dados_napne
+            )
+            
+            # Avança o número da chamada (DENTRO do IF)
+            contexto_chamada["numeroChamada"] += 1
         
         nomeAluno = "Não Identificado"
         matriculaAluno = "Não Identificada"
