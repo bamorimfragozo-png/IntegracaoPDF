@@ -171,11 +171,11 @@ def extrairDados(arquivosPdf):
         # Simplificado para a Série
         if "série" in linha.lower() or "serie" in linha.lower() or "ano" in linha.lower() or "turma" in inline.lower() if "turma" in linha.lower() else False: 
             # (ou apenas valide os termos em minúsculo):
-        if "série" in linha.lower() or "serie" in linha.lower() or "ano" in linha.lower() or "turma" in linha.lower():
-            if serieAluno == "Não Identificada" or serieAluno == "":
-                partes = linha.split(":")
-                if (len(partes) > 1):
-                    serieAluno = partes[1].strip()[:27]
+            if "série" in linha.lower() or "serie" in linha.lower() or "ano" in linha.lower() or "turma" in linha.lower():
+                if serieAluno == "Não Identificada" or serieAluno == "":
+                    partes = linha.split(":")
+                    if (len(partes) > 1):
+                        serieAluno = partes[1].strip()[:27]
                 
         return extrair_linhas_metadados(idx + 1, linhas, nomeAluno, serieAluno)
 
