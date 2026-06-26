@@ -358,7 +358,7 @@ def extrairDados(arquivosPdf):
             'Portador Superdotação': dados_napne['Superdotação'],
             'Superdotação': dados_napne['Tipo de Superdotação']
         })
-        processar_mapeamento_disciplinas(chaves_disp, idx + 1, mapeamentoDisciplinas, nomeAluno, matriculaAluno, serieAluno, necEspeciais, tipoNecEspecial, transtorno, tipoTranstorno, superdotacao, tipoSuperdotacao)
+        processar_mapeamento_disciplinas(chaves_disp, idx + 1, mapeamentoDisciplinas, nomeAluno, matriculaAluno, serieAluno, dados_napne)
 
     def processar_fotos(leitorPdf):
         try:
