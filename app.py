@@ -169,7 +169,7 @@ def extrairDados(arquivosPdf):
                 nomeAluno = re.sub(r'\bMatrícula\b.*', '', valNome, flags=re.IGNORECASE).strip()
 
         # Simplificado para a Série
-        if "série" in linha.lower() or "serie" in linha.lower() or "ano" in linha.lower() or "turma" in inline.lower() if "turma" in linha.lower() else False: 
+        if "série" in linha.lower() or "serie" in linha.lower() or "ano" in linha.lower() or "turma" in linha.lower() if "turma" in linha.lower() else False: 
             # (ou apenas valide os termos em minúsculo):
             if "série" in linha.lower() or "serie" in linha.lower() or "ano" in linha.lower() or "turma" in linha.lower():
                 if serieAluno == "Não Identificada" or serieAluno == "":
