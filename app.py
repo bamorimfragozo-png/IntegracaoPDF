@@ -156,19 +156,27 @@ def extrairDados(arquivosPdf):
         if idx >= len(linhas):
             return nomeAluno, serieAluno
         linha = linhas[idx]
-        if ("aluno" in linha.lower() or "nome" in linha.lower()) and (nomeAluno == "" or nomeAluno == "Não Identificado"):
-            partes = linha.split(":")
-            if (len(partes) > 1):
-                valNome = partes[1].strip()
-            else:
-                valNome = linha.replace("Aluno", "").replace("Nome", "").strip()
-            nomeAluno = re.sub(r'\bMatrícula\b.*', '', valNome, flags=re.IGNORECASE).strip()
+        
+        # Simplificado: se achar a palavra e o nome ainda for o padrão, extrai
+        if "aluno" in linha.lower() or "nome" in linha.lower():
+            if nomeAluno == "Não Identificado" or nomeAluno == "":
+                partes = linha.split(":")
+                if (len(partes) > 1):
+                    valNome = partes[1].strip()
+                else:
+                    # Remove de forma independente de maiúscula/minúscula
+                    valNome = re.sub(r'aluno|nome', '', linha, flags=re.IGNORECASE).strip()
+                nomeAluno = re.sub(r'\bMatrícula\b.*', '', valNome, flags=re.IGNORECASE).strip()
 
-        if ("série" in linha.lower() or "serie" in linha.lower() or "ano" in linha.lower() or "turma" in linha.lower()) and (serieAluno == "" or serieAluno == "Não Identificada"):
-            partes = linha.split(":")
-            if (len(partes) > 1):
-                serieAluno = partes[1].strip()[:27]
-
+        # Simplificado para a Série
+        if "série" in linha.lower() or "serie" in linha.lower() or "ano" in linha.lower() or "turma" in inline.lower() if "turma" in linha.lower() else False: 
+            # (ou apenas valide os termos em minúsculo):
+        if "série" in linha.lower() or "serie" in linha.lower() or "ano" in linha.lower() or "turma" in linha.lower():
+            if serieAluno == "Não Identificada" or serieAluno == "":
+                partes = linha.split(":")
+                if (len(partes) > 1):
+                    serieAluno = partes[1].strip()[:27]
+                
         return extrair_linhas_metadados(idx + 1, linhas, nomeAluno, serieAluno)
 
     def verificar_filtro_palavras(linha):
@@ -393,7 +401,7 @@ def extrairDados(arquivosPdf):
         if match: tipoSuperdotacao = match.group(1)
 
         if (nomeAluno == "Não Identificado" or not nomeAluno.strip()):
-            nomeAluno = arquivo.name.replace(".pdf", "").replace("Boletim", "").replace("_", " ").strip()
+            nomeAluno = arquivo.name.split('.')[0].strip()
 
         fotos = processar_fotos(leitorPdf)
         if (fotos):
