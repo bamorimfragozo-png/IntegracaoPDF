@@ -377,7 +377,7 @@ def extrairDados(arquivosPdf):
     })
     
     # Chamada recursiva para a próxima disciplina do aluno, repassando o dicionário completo
-    processar_mapeamento_disciplinas(chaves, idx_d + 1, mapa, nomeAluno, matriculaAluno, serieAluno, dados_napne))
+    processar_mapeamento_disciplinas(chaves, idx_d + 1, mapa, nomeAluno, matriculaAluno, serieAluno, dados_napne)
 
     def processar_fotos(leitorPdf):
         try:
