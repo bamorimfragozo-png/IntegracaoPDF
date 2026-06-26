@@ -99,15 +99,21 @@ def extrairDados(arquivosPdf):
     # FUNÇÕES SUBSTITUTAS DOS LOOPS 'FOR'
 
     def processar_linhas_nome(linha, nomeNestaPagina):
-        if ("Aluno" in linha or "Nome" in linha):
-            partes = linha.split(":")
-            if (len(partes) > 1):
-                valNome = partes[1].strip()  
-            else:
-                valNome = linha.replace("Aluno", "").replace("Nome", "").strip()
-            return re.sub(r'\bMatrícula\b.*', '', valNome, flags=re.IGNORECASE).strip()
-        return nomeNestaPagina
-
+    if "Aluno" in linha or "Nome" in linha:
+        # 1. Remove tudo a partir da palavra 'Matrícula'
+        linha_limpa = re.split(r'\bMatrícula\b', linha, flags=re.IGNORECASE)[0]
+        
+        # 2. Divide nos dois-pontos (:) para separar os rótulos do nome
+        partes = linha_limpa.split(":")
+        
+        # 3. Pega a última parte (que será o nome) e limpa os espaços
+        if len(partes) > 1:
+            return partes[-1].strip()
+        
+        # Caso não haja dois-pontos, remove os rótulos diretos
+        return linha_limpa.replace("Aluno(a)", "").replace("Aluno", "").replace("Nome", "").strip()
+        
+    return nomeNestaPagina
     def processar_paginas_pdf(paginaIndex, pagina, leitorPdf, textoCompleto, arquivo):
         textoCompleto += pagina.extract_text() + "\n"
         textoPagina = textoCompleto
