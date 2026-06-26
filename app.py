@@ -515,7 +515,8 @@ else:
         BD['Observações'] = BD['Observações'].astype(str).replace('nan', '')
     else:
         BD['Observações'] = ""
-
+        
+    st.write(BD.columns.tolist())
     ordemChamada = BD.sort_values(by='Nº Chamada', ascending=True)
     alunosLista = ordemChamada['Aluno'].unique().tolist()
     
