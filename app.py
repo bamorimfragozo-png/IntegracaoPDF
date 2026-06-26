@@ -156,7 +156,7 @@ def extrairDados(arquivosPdf):
         if idx >= len(linhas):
             return nomeAluno, serieAluno
         linha = linhas[idx]
-        if ("Aluno" in linha or "Nome" in linha):
+        if ("aluno" in linha.lower() or "nome" in linha.lower()) and (nomeAluno == "" or nomeAluno == "Não Identificado"):
             partes = linha.split(":")
             if (len(partes) > 1):
                 valNome = partes[1].strip()
@@ -164,7 +164,7 @@ def extrairDados(arquivosPdf):
                 valNome = linha.replace("Aluno", "").replace("Nome", "").strip()
             nomeAluno = re.sub(r'\bMatrícula\b.*', '', valNome, flags=re.IGNORECASE).strip()
 
-        if ("Série" in linha or "Serie" in linha or "Ano" in linha or "Turma" in linha):
+        if ("série" in linha.lower() or "serie" in linha.lower() or "ano" in linha.lower() or "turma" in linha.lower()) and (serieAluno == "" or serieAluno == "Não Identificada"):
             partes = linha.split(":")
             if (len(partes) > 1):
                 serieAluno = partes[1].strip()[:27]
@@ -333,19 +333,10 @@ def extrairDados(arquivosPdf):
     def processar_fotos(leitorPdf):
         try:
             primeiraPagina = leitorPdf.pages[0]
-            if ("/XObject" in primeiraPagina["/Resources"]):
-                xobject = primeiraPagina["/Resources"]["/XObject"].get_object()
-                chaves_obj = list(xobject.keys())
-                
-                def iterar_xobjects(o_idx):
-                    if o_idx >= len(chaves_obj):
-                        return None
-                    obj = chaves_obj[o_idx]
-                    if (xobject[obj]["/Subtype"] == "/Image"):
-                        return xobject[obj].get_data()
-                    return iterar_xobjects(o_idx + 1)
-                    
-                return iterar_xobjects(0)
+            # Se a página contiver imagens extraíveis diretamente
+            if hasattr(primeiraPagina, 'images') and len(primeiraPagina.images) > 0:
+                # Retorna os bytes da primeira imagem encontrada na página do aluno
+                return primeiraPagina.images[0].data
         except Exception:
             pass
         return None
