@@ -89,6 +89,43 @@ if (st.sidebar.button("Dashboard")):
     st.rerun()
 
 # EXTRAÇÃO DE DADOS
+def extrair_dados_inclusao(texto_completo):
+    texto_limpo = texto_completo.replace("\n", " ")
+    dados = {
+        'Necessidades Especiais': 'Não',
+        'Tipo de Necessidade Especial': '-',
+        'Transtorno': 'Não',
+        'Tipo de Transtorno': '-',
+        'Superdotação': 'Não',
+        'Tipo de Superdotação': '-'
+    }
+    
+    match_pne = re.search(r'(?:Portador\(a\)\s+de\s+)?Necessidades\s+Especiais\s*[:-]?\s*(Sim|Não)', texto_limpo, re.IGNORECASE)
+    if match_pne:
+        dados['Necessidades Especiais'] = match_pne.group(1).strip().capitalize()
+        
+    match_tipo_pne = re.search(r'Tipo\s+de\s+Necessidade\s+Especial\s*[:-]?\s*(.+?)(?=(?:Portador\(a\)|Transtorno|Superdotação|$))', texto_limpo, re.IGNORECASE)
+    if match_tipo_pne:
+        dados['Tipo de Necessidade Especial'] = match_tipo_pne.group(1).strip()
+
+    match_trans = re.search(r'(?:Portador\(a\)\s+de\s+)?Transtorno\s*[:-]?\s*(Sim|Não)', texto_limpo, re.IGNORECASE)
+    if match_trans:
+        dados['Transtorno'] = match_trans.group(1).strip().capitalize()
+        
+    match_tipo_trans = re.search(r'Tipo\s+de\s+Transtorno\s*[:-]?\s*(.+?)(?=(?:Portador\(a\)|Necessidades|Superdotação|$))', texto_limpo, re.IGNORECASE)
+    if match_tipo_trans:
+        dados['Tipo de Transtorno'] = match_tipo_trans.group(1).strip()
+
+    match_super = re.search(r'(?:Portador\(a\)\s+de\s+)?Superdotação\s*[:-]?\s*(Sim|Não)', texto_limpo, re.IGNORECASE)
+    if match_super:
+        dados['Superdotação'] = match_super.group(1).strip().capitalize()
+        
+    match_tipo_super = re.search(r'(?:Tipo\s+de\s+)?Superdotação\s*[:-]?\s*(.+?)$', texto_limpo, re.IGNORECASE)
+    if match_tipo_super and dados['Superdotação'] == 'Sim':
+        dados['Tipo de Superdotação'] = match_tipo_super.group(1).strip()
+
+    return dados
+
 def extrairDados(arquivosPdf):
     dadosFinais = []
     mapaNapneTemporario = {}
@@ -354,6 +391,8 @@ def extrairDados(arquivosPdf):
         textoCompleto = iterar_paginas(0, textoCompleto)
         linhas = textoCompleto.split('\n')
         textoNapne = textoCompleto.replace("\n", " ")
+
+        dados_napne = extrair_dados_inclusao(textoCompleto)
         
         nomeAluno = "Não Identificado"
         matriculaAluno = "Não Identificada"
