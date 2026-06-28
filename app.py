@@ -359,22 +359,20 @@ def extrairDados(arquivosPdf):
             'Matrícula': matriculaAluno,
             'Série': serieAluno,
             'Disciplina': nomeDisp,
-            'Sigla': siglaDisp,
-            'B1': n1, 'F1': f1, 
-            'B2': n2, 'F2': f2, 
-            'B3': n3, 'F3': f3, 
-            'B4': n4, 'F4': f4,
-            'Média': med, 
-            'Faltas': totF, 
-            'Resultado': Sit, 
+            '1º BI': n1, 
+            '2º BI': n2, 
+            '3º BI': n3, 
+            '4º BI': n4,
+            'Média Final': med, 
+            'Freq. Final': calculoFreq, 
+            'Núcleo': nucleoVal,
             'Observações': obs,
-            
-            'Portador Necessidades Especiais': dadosNapne['Necessidades Especiais'],
-            'Tipo Necessidade Especial': dadosNapne['Tipo de Necessidade Especial'],
-            'Portador Transtorno': dadosNapne['Transtorno'],
-            'Tipo Transtorno': dadosNapne['Tipo de Transtorno'],
-            'Portador Superdotação': dadosNapne['Superdotação'],
-            'Superdotação': dadosNapne['Tipo de Superdotação']
+            'Necessidades Especiais': dadosNapne['Necessidades Especiais'],
+            'Tipo de Necessidade Especial': dadosNapne['Tipo de Necessidade Especial'],
+            'Transtorno': dadosNapne['Transtorno'],
+            'Tipo de Transtorno': dadosNapne['Tipo de Transtorno'],
+            'Superdotação': dadosNapne['Superdotação'],
+            'Tipo de Superdotação': dadosNapne['Tipo de Superdotação']
         })
         
         # Chamada recursiva para a próxima disciplina do aluno, repassando o dicionário completo e as linhas
