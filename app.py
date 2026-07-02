@@ -123,6 +123,7 @@ def extrairDadosInclusao(texto_completo):
 
     return dados
 
+#EXTERNA Extrai dados do arquivo PDF
 def extrairDados(arquivosPdf):
     dadosFinais=[]
     mapaNapneTemporario={}
@@ -131,7 +132,10 @@ def extrairDados(arquivosPdf):
     dadosRastreamento={"numeroChamada": 1, "ultimoAlunoLido": "", "ultimoNomeVisto": None}
 
     # FUNÇÕES SUBSTITUTAS DOS LOOPS 'FOR'
+    #=====PROCESSA LINHA A LINHA DO ARQUIVO PDF
     def processarLinhasNome(linha, nomeNestaPagina):
+        
+        #verifica aluno-retorna o nome do aluno
         if ("Aluno" in linha or "Nome" in linha):
             # 1. Remove tudo a partir da palavra 'Matrícula'
             linha_limpa=re.split(r'\bMatrícula\b', linha, flags=re.IGNORECASE)[0]
@@ -147,6 +151,9 @@ def extrairDados(arquivosPdf):
             return linha_limpa.replace("Aluno(a)", "").replace("Aluno", "").replace("Nome", "").strip()
         
         return nomeNestaPagina
+        
+    #INTERNA======================================
+    #OBTEM O NOME DO ALUNO (processaPaginasPdf chama ProcessaLinhasNome)
     def processarPaginasPdf(paginaIndex, pagina, leitorPdf, textoCompleto, arquivo):
         textoCompleto+=pagina.extract_text() + "\n"
         textoPagina=textoCompleto
@@ -154,11 +161,13 @@ def extrairDados(arquivosPdf):
         
         # Substituição do for linha in textoPagina.split('\n')
         linhasPag=textoPagina.split('\n')
+
+        #INTERNA======================================FUNCAO RECURSIVA---ajustar para iterativa
         def iterarLinhasNome(idx, nomeAtual):
             if (idx>=len(linhasPag)):
                 return nomeAtual
             novoNome=processarLinhasNome(linhasPag[idx], nomeAtual)
-            return iterarLinhasNome(idx + 1, novoNome)
+            return iterarLinhasNome(idx + 1, novoNome) #vai empilhando até achar o nome
             
         nomeNestaPagina=iterarLinhasNome(0, nomeNestaPagina)
         
@@ -171,6 +180,7 @@ def extrairDados(arquivosPdf):
         dadosRastreamento["ultimoAlunoLido"]=nomeNestaPagina
         return textoPagina
 
+    #INTERNA ======================================
     def buscarMatricula(idx, linhas, matriculaAluno):
         if (idx>=len(linhas)):
             return matriculaAluno
@@ -190,11 +200,12 @@ def extrairDados(arquivosPdf):
         if (resultado):
             return resultado
         return buscarMatricula(idx+1, linhas, matriculaAluno)
-
+    #INTERNA ======================================
     def extrairLinhasMetadados(idx, linhas, nomeAluno, serieAluno):
         # Mantida apenas para compatibilidade, retorna os valores sem alterar nada
         return nomeAluno, serieAluno
-
+        
+    #INTERNA ======================================
     def verificarFiltroPalavras(linha):
         palavras=["Notas das etapas", "Faltas nas etapas", "Diário", "Disciplina", "Total", "Este documento"]
         def iterarPalavras(p_idx):
@@ -205,6 +216,7 @@ def extrairDados(arquivosPdf):
             return iterarPalavras(p_idx+1)
         return iterarPalavras(0)
 
+    #INTERNA ======================================
     def extrairFrequencia(idx, tokens, calculoFreq):
         if (idx>=len(tokens)):
             return calculoFreq
@@ -216,6 +228,7 @@ def extrairDados(arquivosPdf):
             return calculoFreq
         return extrairFrequencia(idx + 1, tokens, calculoFreq)
 
+    #INTERNA ======================================
     def filtrarTokens(idx, partesDados, tokensFiltrados):
         if (idx>=len(partesDados)):
             return tokensFiltrados
@@ -226,6 +239,7 @@ def extrairDados(arquivosPdf):
             tokensFiltrados.append(tok)
         return filtrarTokens(idx+1, partesDados, tokensFiltrados)
 
+    #INTERNA ======================================
     def preencherEtapas(etapa, pagDado, dadosTabela, notas, faltas):
         if (etapa>=4):
             return pagDado
@@ -244,7 +258,8 @@ def extrairDados(arquivosPdf):
                 faltas[etapa]=0.0
             pagDado+=1
         return preencherEtapas(etapa + 1, pagDado, dadosTabela, notas, faltas)
-
+        
+    #INTERNA ======================================
     def recolherNotasLancadas(idx, notas, notasLancadas):
         if (idx>=len(notas)):
             return notasLancadas
@@ -252,6 +267,7 @@ def extrairDados(arquivosPdf):
             notasLancadas.append(notas[idx])
         return recolherNotasLancadas(idx+1, notas, notasLancadas)
 
+    #INTERNA ======================================
     def processarLinhasDisciplinas(idx, linhas, mapeamentoDisciplinas):
         if (idx>=len(linhas)):
             return mapeamentoDisciplinas
@@ -319,7 +335,8 @@ def extrairDados(arquivosPdf):
                 'freqFinal': calculoFreq
             }
         return processarLinhasDisciplinas(idx+1, linhas, mapeamentoDisciplinas)
-
+        
+    #INTERNA ======================================
     def checarTecnico(idx_t, nomeDisp):
         if (idx_t>=len(tecnicas)):
             return False
@@ -327,6 +344,7 @@ def extrairDados(arquivosPdf):
             return True
         return checarTecnico(idx_t+1, nomeDisp)
 
+    #INTERNA ======================================
     def processarMapeamentoDisciplinas(chaves, idx_d, mapa, nomeAluno, matriculaAluno, serieAluno, dadosNapne, linhas):
         # Condição de parada da recursão: se percorreu todas as disciplinas do aluno
         if idx_d>=len(chaves):
@@ -336,6 +354,8 @@ def extrairDados(arquivosPdf):
         siglaDisp=mapa[nomeDisp]
     
         # --- Início do bloco original de busca de notas/faltas ---
+        
+        #INTERNA ======================================
         def buscarNotasFaltas(idx_l, n1_a, f1_a, n2_a, f2_a, n3_a, f3_a, n4_a, f4_a, med_a, totF_a, Sit_a, obs_a):   ######################################################################################################################
             if (idx_l>=len(linhas)):
                 return n1_a, f1_a, n2_a, f2_a, n3_a, f3_a, n4_a, f4_a, med_a, totF_a, Sit_a, obs_a
@@ -378,6 +398,7 @@ def extrairDados(arquivosPdf):
         # Chamada recursiva para a próxima disciplina do aluno, repassando o dicionário completo e as linhas
         processarMapeamentoDisciplinas(chaves, idx_d+1, mapa, nomeAluno, matriculaAluno, serieAluno, dadosNapne, linhas)
 
+    #INTERNA ======================================
     def processarFotos(leitorPdf):
         try:
             primeiraPagina=leitorPdf.pages[0]
@@ -389,6 +410,7 @@ def extrairDados(arquivosPdf):
             pass
         return None
 
+    #INTERNA ======================================
     def iterarArquivosPdf(idx_arq):
         if (idx_arq>=len(arquivosPdf)):
             return
@@ -403,7 +425,8 @@ def extrairDados(arquivosPdf):
 
         textoCompleto=""
         paginas=leitorPdf.pages
-        
+
+        #INTERNA ======================================
         def iterarPaginas(p_idx, txt):
             if (p_idx>=len(paginas)):
                 return txt
@@ -506,6 +529,7 @@ def extrairDados(arquivosPdf):
         # 5. Vai para o próximo arquivo PDF da fila
         iterarArquivosPdf(idx_arq + 1)
 
+    #INTERNA ======================================
     def mapearDadosFinaisNapne(idx):
         if idx>=len(dadosFinais):
             return
@@ -526,6 +550,8 @@ def extrairDados(arquivosPdf):
     mapearDadosFinaisNapne(0)
     
     return pd.DataFrame(dadosFinais)
+
+#FIM FUNCAO EXTRAIR DADOS ==============
 
 
 # UPLOAD DOS RELATÓRIOS EM PDF
