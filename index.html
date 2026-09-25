@@ -1,1 +1,506 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conselho de Classe IFSP - Ficha Individual</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { background-color: #f4f6f9; font-family: 'Segoe UI', system-ui, sans-serif; font-size: 0.9rem; position: relative; }
+        .card-custom { border: none; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); background: white; }
+        .sparkline-container { width: 130px; height: 45px; }
+        .napne-box { background-color: #fff8e1; border-left: 4px solid #ffa000; }
+        .table-sm td, .table-sm th { vertical-align: middle; padding: 0.6rem 0.5rem; }
 
+        .nota-vermelha { color: #dc3545; font-weight: bold; }
+        .nota-laranja { color: #fd7e14; font-weight: bold; }
+        .nota-verde { color: #198754; font-weight: bold; }
+
+        .nav-btn-side {
+            position: fixed; top: 0; bottom: 0; width: 32px;
+            background-color: rgba(33, 37, 41, 0.08); color: #495057; border: none;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.4rem; cursor: pointer; transition: all 0.2s ease-in-out; z-index: 1000;
+        }
+        .nav-btn-side:hover { background-color: rgba(13, 110, 253, 0.85); color: white; width: 38px; }
+        .nav-btn-left { left: 0; border-top-right-radius: 8px; border-bottom-right-radius: 8px; }
+        .nav-btn-right { right: 0; border-top-left-radius: 8px; border-bottom-left-radius: 8px; }
+        .container-wrapper { margin-left: 28px; margin-right: 28px; }
+    </style>
+</head>
+<body class="p-3">
+
+    <button class="nav-btn-side nav-btn-left" onclick="navegarAluno(-1)" title="Aluno Anterior">
+        <i class="bi bi-chevron-left"></i>
+    </button>
+    <button class="nav-btn-side nav-btn-right" onclick="navegarAluno(1)" title="Próximo Aluno">
+        <i class="bi bi-chevron-right"></i>
+    </button>
+
+    <div class="container-wrapper">
+        <!-- BOTÃO ATIVIDADE 2: Recarregar dados do JSON -->
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="text-muted small"><i class="bi bi-info-circle me-1"></i> Dados integrados via JSON do Python</span>
+            <button class="btn btn-sm btn-outline-primary fw-bold" onclick="carregarJsonServidor()">
+                <i class="bi bi-arrow-repeat me-1"></i> Ler dados_alunos.json
+            </button>
+        </div>
+
+        <div class="card card-custom p-3 mb-3">
+            <div class="row align-items-center g-3">
+                <div class="col-md-4">
+                    <label for="selectAluno" class="form-label fw-bold text-secondary mb-1">
+                        <i class="bi bi-person-bounding-box me-1"></i> Selecionar Aluno (Conselho de Classe):
+                    </label>
+                    <select id="selectAluno" class="form-select form-select-sm fw-bold" onchange="carregarDadosAluno()">
+                    </select>
+                </div>
+                <div class="col-md-5">
+                    <h5 class="fw-bold mb-0 text-dark" id="txtNomeAluno">---</h5>
+                    <small class="text-muted">Prontuário: <span id="txtProntuario" class="fw-semibold">---</span> | Curso: <span id="txtCurso" class="fw-semibold">---</span> | Turma: <span id="txtTurma" class="fw-semibold">---</span></small>
+                </div>
+                <div class="col-md-3 text-end">
+                    <span id="badgeStatusGeral" class="badge p-2 fs-6">---</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3 mb-3">
+            <div class="col-md-3">
+                <div class="card card-custom p-2 text-center border-start border-4 border-primary">
+                    <small class="text-muted fw-bold">MÉDIA GERAL</small>
+                    <h3 class="fw-bold mb-0" id="kpiMediaGeral">0.0</h3>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card card-custom p-2 text-center border-start border-4 border-info">
+                    <small class="text-muted fw-bold">FREQUÊNCIA GLOBAL</small>
+                    <h3 class="fw-bold mb-0" id="kpiFrequencia">0%</h3>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card card-custom p-2 text-center border-start border-4 border-danger">
+                    <small class="text-muted fw-bold">DISCIPLINAS RETIDAS (&lt; 6.0)</small>
+                    <h3 class="fw-bold mb-0 text-danger" id="kpiRetencoes">0</h3>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card card-custom p-2 text-center border-start border-4 border-warning">
+                    <small class="text-muted fw-bold">ACOMPANHAMENTO NAPNE</small>
+                    <h3 class="fw-bold mb-0 text-warning" id="kpiNapneStatus">NÃO</h3>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3 mb-3">
+            <div class="col-md-8">
+                <div class="card card-custom p-3 h-100">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="fw-bold text-secondary mb-0">
+                            <i class="bi bi-sort-numeric-down me-1"></i> Desempenho por Disciplina
+                        </h6>
+                        <small class="text-muted">*Média Mínima de Aprovação: 6.0</small>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Disciplina</th>
+                                    <th class="text-center">B1</th>
+                                    <th class="text-center">B2</th>
+                                    <th class="text-center">B3</th>
+                                    <th class="text-center">B4</th>
+                                    <th class="text-center">Média</th>
+                                    <th class="text-center">Falta(s)</th>
+                                    <th class="text-center">Evolução Bimestral</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbodyDisciplinasCriticas">
+                            </tbody>
+                            <tbody id="tbodyDisciplinasAprovadas" style="display: none;">
+                            </tbody>
+                        </table>
+                        <div class="p-2 text-center bg-light border-top">
+                            <button id="btnToggleAprovadas" class="btn btn-sm btn-outline-secondary fw-semibold" onclick="toggleAprovadas()">
+                                <i class="bi bi-plus-circle me-1"></i> Exibir Disciplinas Aprovadas (<span id="countAprovadas">0</span>)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card card-custom p-3 h-100">
+                    <h6 class="fw-bold text-secondary mb-2">Evolução da Média Geral (Barras + Linhas)</h6>
+                    <canvas id="chartEvolucaoGeral" height="220"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="card card-custom p-3 napne-box">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="fw-bold text-dark mb-0">
+                    <i class="bi bi-journal-medical me-1 text-warning"></i> Parecer do NAPNE &amp; Observações Pedagógicas
+                </h6>
+                <span class="badge bg-warning text-dark" id="badgePNE">Atendimento Especializado</span>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="fw-bold text-muted small">Anotações / Adaptações Curriculares (NAPNE):</label>
+                    <div class="p-2 bg-white rounded border text-secondary mb-2" id="txtNotasNapne" style="min-height: 60px;">
+                        Nenhum registro encontrado.
+                    </div>
+                    <div class="input-group input-group-sm mb-2">
+                        <input type="text" id="inputNovaAcaoNapne" class="form-control" placeholder="Adicionar nova ação pedagógica/NAPNE...">
+                        <button class="btn btn-warning fw-bold text-dark" onclick="salvarAcaoNapne()">
+                            <i class="bi bi-plus-circle me-1"></i> Salvar e Adicionar Ação
+                        </button>
+                    </div>
+                    <small class="fw-bold text-muted">Histórico de Ações Registradas:</small>
+                    <ul class="list-group list-group-flush bg-white rounded border p-1" id="listaAcoesNapne" style="max-height: 100px; overflow-y: auto;">
+                    </ul>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="fw-bold text-muted small">Encaminhamento / Deliberação do Conselho de Classe:</label>
+                    <textarea class="form-control form-control-sm mb-2" id="txtDeliberacaoConselho" rows="4" placeholder="Digite as deliberações do conselho..."></textarea>
+                    <div class="text-end">
+                        <button class="btn btn-sm btn-primary" onclick="salvarDeliberacaoConselho()">
+                            <i class="bi bi-save me-1"></i> Salvar Deliberação
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // O Python vai injetar os dados extraídos do JSON aqui
+        let bancoAlunos = __DADOS_JSON_INJETADOS__;
+
+        let sparklinesCharts = [];
+        let chartEvolucaoGeralInstance = null;
+
+        function inicializar() {
+            const select = document.getElementById('selectAluno');
+            select.innerHTML = '';
+            if (!bancoAlunos || bancoAlunos.length === 0) {
+                select.innerHTML = '<option value="">Nenhum aluno carregado</option>';
+                return;
+            }
+            bancoAlunos.forEach((aluno, index) => {
+                select.innerHTML += `<option value="${index}">${aluno.nome} (${aluno.prontuario})</option>`;
+            });
+            carregarDadosAluno();
+        }
+
+        // ATIVIDADE 2: Função para ler o JSON via Fetch se o botão for clicado
+        async function carregarJsonServidor() {
+            try {
+                const resposta = await fetch('dados_alunos.json');
+                if (!resposta.ok) throw new Error("Não foi possível acessar dados_alunos.json");
+                const dadosBrutos = await resposta.json();
+                processarEAtualizar(dadosBrutos);
+                alert("Dados atualizados com sucesso!");
+            } catch (erro) {
+                console.error(erro);
+                alert("Erro ao ler dados_alunos.json. Certifique-se de ter processado os PDFs primeiro.");
+            }
+        }
+
+        function processarEAtualizar(dadosBrutos) {
+            const alunosMapeados = {};
+            dadosBrutos.forEach(item => {
+                const prontuario = item['Matrícula'] || item['prontuario'] || 'BT300000';
+                if (!alunosMapeados[prontuario]) {
+                    alunosMapeados[prontuario] = {
+                        prontuario: prontuario,
+                        nome: item['Aluno'],
+                        curso: item['Série'] || 'Técnico em Informática',
+                        turma: '3º Semestre',
+                        frequencia: parseFloat(item['Freq. Final']) || 100,
+                        napne: (item['Necessidades Especiais'] === 'Sim' || item['Transtorno'] === 'Sim'),
+                        pneInfo: `PNE: ${item['Tipo de Necessidade Especial'] || '-'} | Transtorno: ${item['Tipo de Transtorno'] || '-'}`,
+                        acoesNapne: [],
+                        deliberacao: item['Observações'] || '',
+                        disciplinas: []
+                    };
+                }
+                alunosMapeados[prontuario].disciplinas.push({
+                    nome: item['Disciplina'],
+                    b1: item['1º BI'] !== undefined ? item['1º BI'] : null,
+                    b2: item['2º BI'] !== undefined ? item['2º BI'] : null,
+                    b3: item['3º BI'] !== undefined ? item['3º BI'] : null,
+                    b4: item['4º BI'] !== undefined ? item['4º BI'] : null,
+                    faltas: 0
+                });
+            });
+
+            bancoAlunos = Object.values(alunosMapeados);
+            inicializar();
+        }
+
+        function navegarAluno(direcao) {
+            const select = document.getElementById('selectAluno');
+            let total = select.options.length;
+            if (total <= 1 && !select.value) return;
+            let atual = parseInt(select.value);
+            let novoIndex = (atual + direcao + total) % total;
+            select.value = novoIndex;
+            carregarDadosAluno();
+        }
+
+        function obterClasseNota(valor) {
+            if (valor === null || valor === undefined) return '';
+            if (valor < 4.0) return 'nota-vermelha';
+            if (valor < 6.0) return 'nota-laranja';
+            return 'nota-verde';
+        }
+
+        function formatarNota(valor) {
+            return (valor !== null && valor !== undefined) ? valor.toFixed(1) : '-';
+        }
+
+        function carregarDadosAluno() {
+            const select = document.getElementById('selectAluno');
+            if (!select.value && select.value !== "0") return;
+            const index = select.value;
+            const aluno = bancoAlunos[index];
+            if (!aluno) return;
+
+            document.getElementById('txtNomeAluno').innerText = aluno.nome;
+            document.getElementById('txtProntuario').innerText = aluno.prontuario;
+            document.getElementById('txtCurso').innerText = aluno.curso;
+            document.getElementById('txtTurma').innerText = aluno.turma;
+
+            const disciplinasProcessadas = aluno.disciplinas.map(d => {
+                const notasValidas = [d.b1, d.b2, d.b3, d.b4].filter(n => n !== null && n !== undefined);
+                const media = notasValidas.length > 0 ? (notasValidas.reduce((a, b) => a + b, 0) / notasValidas.length) : null;
+                return { ...d, media: media };
+            }).sort((a, b) => {
+                if (a.media === null) return 1;
+                if (b.media === null) return -1;
+                return a.media - b.media;
+            });
+
+            const mediasValidas = disciplinasProcessadas.map(d => d.media).filter(m => m !== null);
+            const mediaGeral = mediasValidas.length > 0 ? (mediasValidas.reduce((a, b) => a + b, 0) / mediasValidas.length) : 0;
+            const retencoes = disciplinasProcessadas.filter(d => d.media !== null && d.media < 6.0).length;
+
+            document.getElementById('kpiMediaGeral').innerText = mediaGeral.toFixed(1);
+            document.getElementById('kpiMediaGeral').className = `fw-bold mb-0 ${obterClasseNota(mediaGeral)}`;
+            
+            document.getElementById('kpiFrequencia').innerText = aluno.frequencia.toFixed(1) + '%';
+            document.getElementById('kpiFrequencia').className = `fw-bold mb-0 ${aluno.frequencia < 75.0 ? 'text-danger' : 'text-info'}`;
+            
+            document.getElementById('kpiRetencoes').innerText = retencoes;
+            document.getElementById('kpiNapneStatus').innerText = aluno.napne ? "SIM" : "NÃO";
+
+            const badgeStatus = document.getElementById('badgeStatusGeral');
+            if (retencoes > 3 || aluno.frequencia < 75.0) {
+                badgeStatus.innerText = "SITUAÇÃO CRÍTICA";
+                badgeStatus.className = "badge bg-danger p-2 fs-6";
+            } else if (retencoes > 0) {
+                badgeStatus.innerText = "EM ATENÇÃO";
+                badgeStatus.className = "badge bg-warning text-dark p-2 fs-6";
+            } else {
+                badgeStatus.innerText = "PROMOVIDO / SATISFATÓRIO";
+                badgeStatus.className = "badge bg-success p-2 fs-6";
+            }
+
+            document.getElementById('txtNotasNapne').innerText = aluno.pneInfo;
+            document.getElementById('txtDeliberacaoConselho').value = aluno.deliberacao;
+            document.getElementById('inputNovaAcaoNapne').value = '';
+            
+            renderListaAcoesNapne(aluno.acoesNapne);
+            renderTabelaDisciplinas(disciplinasProcessadas);
+            renderGraficoEvolucaoGeral(disciplinasProcessadas);
+        }
+
+        function renderTabelaDisciplinas(disciplinas) {
+            sparklinesCharts.forEach(chart => chart.destroy());
+            sparklinesCharts = [];
+
+            const tbodyCriticas = document.getElementById('tbodyDisciplinasCriticas');
+            const tbodyAprovadas = document.getElementById('tbodyDisciplinasAprovadas');
+            
+            tbodyCriticas.innerHTML = '';
+            tbodyAprovadas.innerHTML = '';
+
+            let aprovadasCount = 0;
+
+            disciplinas.forEach((d, i) => {
+                const classeMedia = obterClasseNota(d.media);
+                const canvasId = `sparkline_${i}`;
+
+                const row = `
+                    <tr>
+                        <td class="fw-semibold">${d.nome}</td>
+                        <td class="text-center ${obterClasseNota(d.b1)}">${formatarNota(d.b1)}</td>
+                        <td class="text-center ${obterClasseNota(d.b2)}">${formatarNota(d.b2)}</td>
+                        <td class="text-center ${obterClasseNota(d.b3)}">${formatarNota(d.b3)}</td>
+                        <td class="text-center ${obterClasseNota(d.b4)}">${formatarNota(d.b4)}</td>
+                        <td class="text-center ${classeMedia}">${formatarNota(d.media)}</td>
+                        <td class="text-center">${d.faltas}</td>
+                        <td class="text-center">
+                            <div class="sparkline-container mx-auto">
+                                <canvas id="${canvasId}"></canvas>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+
+                if (d.media !== null && d.media >= 6.0) {
+                    tbodyAprovadas.innerHTML += row;
+                    aprovadasCount++;
+                } else {
+                    tbodyCriticas.innerHTML += row;
+                }
+            });
+
+            document.getElementById('countAprovadas').innerText = aprovadasCount;
+
+            setTimeout(() => {
+                disciplinas.forEach((d, i) => {
+                    const canvas = document.getElementById(`sparkline_${i}`);
+                    if (!canvas) return;
+                    
+                    const ctx = canvas.getContext('2d');
+                    let corLinha = '#198754';
+                    if (d.media !== null && d.media < 4.0) corLinha = '#dc3545';
+                    else if (d.media !== null && d.media < 6.0) corLinha = '#fd7e14';
+
+                    const chart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: ['B1', 'B2', 'B3', 'B4'],
+                            datasets: [{
+                                data: [d.b1, d.b2, d.b3, d.b4],
+                                borderColor: corLinha,
+                                borderWidth: 2,
+                                pointRadius: 3,
+                                pointBackgroundColor: corLinha,
+                                fill: false,
+                                spanGaps: true
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: { legend: { display: false } },
+                            scales: { x: { display: false }, y: { display: false, min: 0, max: 10 } }
+                        }
+                    });
+                    sparklinesCharts.push(chart);
+                });
+            }, 50);
+        }
+
+        function toggleAprovadas() {
+            const tbodyAprovadas = document.getElementById('tbodyDisciplinasAprovadas');
+            const btn = document.getElementById('btnToggleAprovadas');
+            
+            if (tbodyAprovadas.style.display === 'none') {
+                tbodyAprovadas.style.display = 'table-row-group';
+                btn.innerHTML = `<i class="bi bi-minus-circle me-1"></i> Ocultar Disciplinas Aprovadas`;
+            } else {
+                tbodyAprovadas.style.display = 'none';
+                btn.innerHTML = `<i class="bi bi-plus-circle me-1"></i> Exibir Disciplinas Aprovadas (<span id="countAprovadas">${document.getElementById('countAprovadas').innerText}</span>)`;
+            }
+        }
+
+        function renderGraficoEvolucaoGeral(disciplinas) {
+            const bimestres = ['b1', 'b2', 'b3', 'b4'];
+            const mediasBimestrais = bimestres.map(b => {
+                const notasValidas = disciplinas.map(d => d[b]).filter(n => n !== null && n !== undefined);
+                return notasValidas.length > 0 ? (notasValidas.reduce((a, b) => a + b, 0) / notasValidas.length) : null;
+            });
+
+            const coresPontosLinhas = mediasBimestrais.map(m => {
+                if (m === null) return '#000000';
+                if (m < 4.0) return '#dc3545';
+                if (m < 6.0) return '#fd7e14';
+                return '#198754';
+            });
+
+            const ctx = document.getElementById('chartEvolucaoGeral').getContext('2d');
+            if (chartEvolucaoGeralInstance) chartEvolucaoGeralInstance.destroy();
+
+            chartEvolucaoGeralInstance = new Chart(ctx, {
+                data: {
+                    labels: ['1º Bim', '2º Bim', '3º Bim', '4º Bim'],
+                    datasets: [
+                        {
+                            type: 'line',
+                            label: 'Evolução (Média)',
+                            data: mediasBimestrais,
+                            borderColor: '#fd7e14',
+                            pointBackgroundColor: coresPontosLinhas,
+                            pointBorderColor: coresPontosLinhas,
+                            pointRadius: 6,
+                            borderWidth: 3,
+                            fill: false,
+                            tension: 0.2,
+                            spanGaps: true
+                        },
+                        {
+                            type: 'bar',
+                            label: 'Média Global',
+                            data: mediasBimestrais,
+                            backgroundColor: '#ffe58f',
+                            borderColor: '#ffd591',
+                            borderWidth: 1,
+                            barPercentage: 0.5
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    scales: { y: { min: 0, max: 10 } }
+                }
+            });
+        }
+
+        function renderListaAcoesNapne(acoes) {
+            const ul = document.getElementById('listaAcoesNapne');
+            ul.innerHTML = '';
+            if (!acoes || acoes.length === 0) {
+                ul.innerHTML = '<li class="list-group-item text-muted small p-1 border-0">Nenhuma ação registrada.</li>';
+                return;
+            }
+            acoes.forEach((acao) => {
+                ul.innerHTML += `<li class="list-group-item small p-1 border-0"><i class="bi bi-check2-square text-success me-1"></i>${acao}</li>`;
+            });
+        }
+
+        function salvarAcaoNapne() {
+            const index = document.getElementById('selectAluno').value;
+            const input = document.getElementById('inputNovaAcaoNapne');
+            const textoAcao = input.value.trim();
+            if (!textoAcao || !bancoAlunos[index]) return;
+
+            const dataAtual = new Date().toLocaleDateString('pt-BR');
+            const acaoFormatada = `${dataAtual}: ${textoAcao}`;
+
+            if (!bancoAlunos[index].acoesNapne) bancoAlunos[index].acoesNapne = [];
+            bancoAlunos[index].acoesNapne.push(acaoFormatada);
+
+            renderListaAcoesNapne(bancoAlunos[index].acoesNapne);
+            input.value = '';
+        }
+
+        function salvarDeliberacaoConselho() {
+            const index = document.getElementById('selectAluno').value;
+            if (bancoAlunos[index]) {
+                bancoAlunos[index].deliberacao = document.getElementById('txtDeliberacaoConselho').value;
+                alert("Deliberação salva com sucesso!");
+            }
+        }
+
+        window.onload = inicializar;
+    </script>
+</body>
+</html>
