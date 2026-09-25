@@ -461,7 +461,6 @@ else:
     else:
         linkSalaAtiva = DICIONARIO_SALAS[st.session_state.salaAtiva]
         df_sheet = conn.read(spreadsheet=linkSalaAtiva, ttl="0")
-        # Substitui NaN por None para gerar JSON válido sem erros no JS
         dados_para_html = df_sheet.where(pd.notnull(df_sheet), None).to_dict(orient="records")
 
     # 2. Agrupa e estrutura por aluno para o JavaScript
@@ -486,7 +485,6 @@ else:
                 "disciplinas": []
             }
 
-        # Função auxiliar para tratar notas numéricas ou manter null
         def tratar_nota(v):
             if v is None: return None
             try: return float(str(v).replace(',', '.'))
@@ -501,15 +499,26 @@ else:
             "faltas": 0
         })
 
-    # Converte o dicionário Python final para uma string JSON que o JS lê perfeitamente
+    # Converte o dicionário Python final para a string JSON
     json_estruturado = json.dumps(list(alunosMapeados.values()), ensure_ascii=False)
 
-    # 3. Renderiza o HTML injetando a variável bancoAlunos
+    # 3. Renderização segura via iframe HTML para evitar erro no React do Streamlit
     if os.path.exists("index.html"):
         with open("index.html", "r", encoding="utf-8") as f:
             html_content = f.read()
 
         html_injetado = html_content.replace("__DADOS_JSON_INJETADOS__", json_estruturado)
-        components.html(html_injetado, height=1050, scrolling=True)
+        
+        # Converte para base64 para evitar falhas de manipulação no DOM do navegador
+        import base64
+        b64_html = base64.b64encode(html_injetado.encode('utf-8')).decode('utf-8')
+        
+        iframe_code = f"""
+        <iframe 
+            src="data:text/html;charset=utf-8;base64,{b64_html}"
+            style="width: 100%; height: 1100px; border: none; border-radius: 8px;"
+        ></iframe>
+        """
+        st.markdown(iframe_code, unsafe_allow_html=True)
     else:
         st.error("O arquivo 'index.html' não foi encontrado no repositório GitHub.")
