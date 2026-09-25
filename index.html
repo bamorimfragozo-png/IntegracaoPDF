@@ -40,11 +40,11 @@
     </button>
 
     <div class="container-wrapper">
-        <!-- BOTÃO DA ATIVIDADE 2 -->
+        <!-- BOTÃO ATIVIDADE 2 -->
         <div class="d-flex justify-content-between align-items-center mb-3">
             <span class="text-muted small"><i class="bi bi-info-circle me-1"></i> Ficha Individual do Conselho</span>
             <button class="btn btn-primary btn-sm fw-bold" onclick="carregarJsonServidor()">
-                <i class="bi bi-arrow-repeat me-1"></i> Ler JSON e Atualizar Painel
+                <i class="bi bi-arrow-repeat me-1"></i> Ler dados_alunos.json
             </button>
         </div>
 
@@ -178,38 +178,8 @@
     </div>
 
     <script>
-        const bancoAlunos = [
-            {
-                prontuario: "BT300123",
-                nome: "João Silva",
-                curso: "Técnico em Informática",
-                turma: "3º Semestre",
-                frequencia: 68.0,
-                napne: true,
-                pneInfo: "PEI Ativo - TDAH (Tempo adicional em avaliações)",
-                acoesNapne: ["05/03/2026: Entregue mapa mental.", "10/04/2026: Concedido 30min adicionais."],
-                deliberacao: "Encaminhar para tutoria. Reunião agendada com responsáveis.",
-                disciplinas: [
-                    { nome: "Algoritmos e Estrutura de Dados", b1: 3.0, b2: 3.5, b3: 4.0, b4: 3.5, faltas: 18 },
-                    { nome: "Matemática Discreta", b1: 4.0, b2: 4.5, b3: 5.0, b4: 4.5, faltas: 14 },
-                    { nome: "Redes de Computadores", b1: 5.5, b2: 5.0, b3: 4.5, b4: 5.0, faltas: 8 },
-                    { nome: "Banco de Dados I", b1: 3.8, b2: 3.0, b3: 4.2, b4: 3.0, faltas: 10 },
-                    { nome: "Programação Web I", b1: 4.5, b2: 5.0, b3: 5.5, b4: 5.0, faltas: 6 },
-                    { nome: "Sistemas Operacionais", b1: 6.0, b2: 6.5, b3: 7.0, b4: 6.5, faltas: 4 },
-                    { nome: "Arquitetura de Computadores", b1: 7.0, b2: 7.5, b3: 8.0, b4: 7.5, faltas: 2 },
-                    { nome: "Língua Portuguesa", b1: 8.0, b2: 8.5, b3: 8.0, b4: 8.5, faltas: 2 },
-                    { nome: "Inglês Técnico", b1: 9.0, b2: 9.0, b3: 8.5, b4: 9.0, faltas: 0 },
-                    { nome: "Engenharia de Software", b1: 6.5, b2: 6.0, b3: 7.0, b4: 6.5, faltas: 4 },
-                    { nome: "Análise de Sistemas", b1: 7.0, b2: 7.0, b3: 7.5, b4: 8.0, faltas: 2 },
-                    { nome: "Ética e Cidadania", b1: 9.5, b2: 9.0, b3: 9.5, b4: 10.0, faltas: 0 },
-                    { nome: "Fundamentos de Hardware", b1: 6.0, b2: 6.0, b3: 6.5, b4: 7.0, faltas: 2 },
-                    { nome: "Metodologia Científica", b1: 8.0, b2: 8.5, b3: 9.0, b4: 8.5, faltas: 0 },
-                    { nome: "Gestão de Projetos", b1: 7.5, b2: 8.0, b3: 7.0, b4: 7.5, faltas: 2 },
-                    { nome: "Sistemas Distribuídos", b1: null, b2: null, b3: 3.5, b4: 4.0, faltas: 12 },
-                    { nome: "Segurança da Informação", b1: 6.0, b2: 6.5, b3: 6.0, b4: 6.5, faltas: 4 }
-                ]
-            }
-        ];
+        // O PYTHON INJETA OS DADOS REAIS DO DADOS_ALUNOS.JSON AQUI
+        let bancoAlunos = __DADOS_JSON_INJETADOS__;
 
         let sparklinesCharts = [];
         let chartEvolucaoGeralInstance = null;
@@ -217,72 +187,66 @@
         function inicializar() {
             const select = document.getElementById('selectAluno');
             select.innerHTML = '';
+            if (!bancoAlunos || bancoAlunos.length === 0) {
+                select.innerHTML = '<option value="">Nenhum aluno cadastrado</option>';
+                return;
+            }
             bancoAlunos.forEach((aluno, index) => {
                 select.innerHTML += `<option value="${index}">${aluno.nome} (${aluno.prontuario})</option>`;
             });
             carregarDadosAluno();
         }
 
-        // ATIVIDADE 2: Leitura do arquivo JSON gerado pelo Python
+        // ATIVIDADE 2: Leitura remota do arquivo JSON via JS
         async function carregarJsonServidor() {
             try {
                 const resposta = await fetch('dados_alunos.json');
-                if (!resposta.ok) {
-                    throw new Error(`Erro ao buscar JSON: ${resposta.statusText}`);
-                }
-                
+                if (!resposta.ok) throw new Error("Erro no acesso ao arquivo JSON");
                 const dadosBrutos = await resposta.json();
-                const alunosMapeados = {};
+                processarEAtualizar(dadosBrutos);
+                alert("Dados recarregados com sucesso a partir do arquivo JSON!");
+            } catch (erro) {
+                alert("Para recarregar via JS, certifique-se de ter feito o processamento dos PDFs.");
+            }
+        }
 
-                dadosBrutos.forEach(item => {
-                    const prontuario = item['Matrícula'] || item['prontuario'] || 'BT300000';
-                    
-                    if (!alunosMapeados[prontuario]) {
-                        alunosMapeados[prontuario] = {
-                            prontuario: prontuario,
-                            nome: item['Aluno'],
-                            curso: item['Série'] || 'Técnico em Informática',
-                            turma: '3º Semestre',
-                            frequencia: parseFloat(item['Freq. Final']) || 100,
-                            napne: (item['Necessidades Especiais'] === 'Sim' || item['Transtorno'] === 'Sim'),
-                            pneInfo: `PNE: ${item['Tipo de Necessidade Especial'] || '-'} | Transtorno: ${item['Tipo de Transtorno'] || '-'}`,
-                            acoesNapne: [],
-                            deliberacao: item['Observações'] || '',
-                            disciplinas: []
-                        };
-                    }
-
-                    alunosMapeados[prontuario].disciplinas.push({
-                        nome: item['Disciplina'],
-                        b1: (item['1º BI'] !== undefined && item['1º BI'] !== null) ? parseFloat(item['1º BI']) : null,
-                        b2: (item['2º BI'] !== undefined && item['2º BI'] !== null) ? parseFloat(item['2º BI']) : null,
-                        b3: (item['3º BI'] !== undefined && item['3º BI'] !== null) ? parseFloat(item['3º BI']) : null,
-                        b4: (item['4º BI'] !== undefined && item['4º BI'] !== null) ? parseFloat(item['4º BI']) : null,
-                        faltas: 0
-                    });
-                });
-
-                const novosAlunos = Object.values(alunosMapeados);
-                
-                if (novosAlunos.length > 0) {
-                    bancoAlunos.length = 0;
-                    novosAlunos.forEach(aluno => bancoAlunos.push(aluno));
-                    
-                    inicializar();
-                    alert("Painel atualizado com sucesso a partir do arquivo JSON!");
-                } else {
-                    alert("Nenhum dado encontrado no JSON.");
+        function processarEAtualizar(dadosBrutos) {
+            const alunosMapeados = {};
+            dadosBrutos.forEach(item => {
+                const prontuario = item['Matrícula'] || item['prontuario'] || 'BT300000';
+                if (!alunosMapeados[prontuario]) {
+                    alunosMapeados[prontuario] = {
+                        prontuario: prontuario,
+                        nome: item['Aluno'],
+                        curso: item['Série'] || 'Técnico em Redes de Computadores',
+                        turma: '3º Semestre',
+                        frequencia: parseFloat(item['Freq. Final']) || 100,
+                        napne: (String(item['Necessidades Especiais']).toLowerCase() === 'sim' || String(item['Transtorno']).toLowerCase() === 'sim'),
+                        pneInfo: `PNE: ${item['Tipo de Necessidade Especial'] || '-'} | Transtorno: ${item['Tipo de Transtorno'] || '-'}`,
+                        acoesNapne: [],
+                        deliberacao: item['Observações'] || '',
+                        disciplinas: []
+                    };
                 }
 
-            } catch (erro) {
-                console.error("Erro ao carregar o JSON:", erro);
-                alert("Falha ao ler o arquivo JSON. Certifique-se de que o arquivo 'dados_alunos.json' foi gerado e está na mesma pasta.");
-            }
+                alunosMapeados[prontuario].disciplinas.push({
+                    nome: item['Disciplina'],
+                    b1: item['1º BI'] !== null && item['1º BI'] !== undefined ? parseFloat(item['1º BI']) : null,
+                    b2: item['2º BI'] !== null && item['2º BI'] !== undefined ? parseFloat(item['2º BI']) : null,
+                    b3: item['3º BI'] !== null && item['3º BI'] !== undefined ? parseFloat(item['3º BI']) : null,
+                    b4: item['4º BI'] !== null && item['4º BI'] !== undefined ? parseFloat(item['4º BI']) : null,
+                    faltas: 0
+                });
+            });
+
+            bancoAlunos = Object.values(alunosMapeados);
+            inicializar();
         }
 
         function navegarAluno(direcao) {
             const select = document.getElementById('selectAluno');
             let total = select.options.length;
+            if (total <= 1 && !select.value) return;
             let atual = parseInt(select.value);
             let novoIndex = (atual + direcao + total) % total;
             select.value = novoIndex;
@@ -290,25 +254,29 @@
         }
 
         function obterClasseNota(valor) {
-            if (valor === null || valor === undefined) return '';
+            if (valor === null || valor === undefined || isNaN(valor)) return '';
             if (valor < 4.0) return 'nota-vermelha';
             if (valor < 6.0) return 'nota-laranja';
             return 'nota-verde';
         }
 
         function formatarNota(valor) {
-            return (valor !== null && valor !== undefined) ? valor.toFixed(1) : '-';
+            return (valor !== null && valor !== undefined && !isNaN(valor)) ? valor.toFixed(1) : '-';
         }
 
         function carregarDadosAluno() {
-            const index = document.getElementById('selectAluno').value;
+            const select = document.getElementById('selectAluno');
+            if (!select.value && select.value !== "0") return;
+            const index = select.value;
             const aluno = bancoAlunos[index];
+            if (!aluno) return;
 
             document.getElementById('txtNomeAluno').innerText = aluno.nome;
             document.getElementById('txtProntuario').innerText = aluno.prontuario;
             document.getElementById('txtCurso').innerText = aluno.curso;
             document.getElementById('txtTurma').innerText = aluno.turma;
 
+            // Ordenação das disciplinas da Menor Nota/Média para a Maior
             const disciplinasProcessadas = aluno.disciplinas.map(d => {
                 const notasValidas = [d.b1, d.b2, d.b3, d.b4].filter(n => n !== null && n !== undefined && !isNaN(n));
                 const media = notasValidas.length > 0 ? (notasValidas.reduce((a, b) => a + b, 0) / notasValidas.length) : null;
@@ -513,7 +481,7 @@
             const index = document.getElementById('selectAluno').value;
             const input = document.getElementById('inputNovaAcaoNapne');
             const textoAcao = input.value.trim();
-            if (!textoAcao) return;
+            if (!textoAcao || !bancoAlunos[index]) return;
 
             const dataAtual = new Date().toLocaleDateString('pt-BR');
             const acaoFormatada = `${dataAtual}: ${textoAcao}`;
@@ -527,8 +495,10 @@
 
         function salvarDeliberacaoConselho() {
             const index = document.getElementById('selectAluno').value;
-            bancoAlunos[index].deliberacao = document.getElementById('txtDeliberacaoConselho').value;
-            alert("Deliberação salva com sucesso!");
+            if (bancoAlunos[index]) {
+                bancoAlunos[index].deliberacao = document.getElementById('txtDeliberacaoConselho').value;
+                alert("Deliberação salva com sucesso!");
+            }
         }
 
         window.onload = inicializar;
