@@ -37,6 +37,21 @@ if "dadosCarregados" not in st.session_state:
 if "salaAtiva" not in st.session_state:
     st.session_state.salaAtiva = "Redes 1"
 
+# Captura de salvamento via query params (comunicação iframe -> streamlit)
+query_params = st.query_params
+if "action" in query_params and query_params["action"] == "salvar_obs":
+    aluno_alvo = query_params.get("aluno", "")
+    nova_obs = query_params.get("obs", "")
+    sala_alvo = st.session_state.salaAtiva
+    linkSala = DICIONARIO_SALAS[sala_alvo]
+    
+    df_sheet = conn.read(spreadsheet=linkSala)
+    if "Aluno" in df_sheet.columns and "Observações" in df_sheet.columns:
+        df_sheet.loc[df_sheet["Aluno"].astype(str).str.strip().str.upper() == aluno_alvo.strip().upper(), "Observações"] = nova_obs
+        conn.update(spreadsheet=linkSala, data=df_sheet)
+        st.toast(f"Deliberação de {aluno_alvo} salva com sucesso no Google Sheets!", icon="✅")
+    st.query_params.clear()
+
 st.sidebar.title("Conselho de Classe")
 st.sidebar.markdown("---")
 
@@ -49,10 +64,8 @@ if st.sidebar.button("📊 Ficha do Conselho (Dashboard)", use_container_width=T
     st.rerun()
 
 
-# EXTRAÇÃO DE MULTIPLOS ALUNOS E DADOS DO NAPNE
 def extrairDados(arquivosPdf):
     dadosFinais = []
-    mapaNapneTemporario = {}
     numeroChamada = 1
 
     for arquivo in arquivosPdf:
@@ -67,51 +80,48 @@ def extrairDados(arquivosPdf):
         for pagina in leitorPdf.pages:
             textoCompleto += pagina.extract_text() + "\n"
 
-        # Divide o texto completo em blocos individuais caso haja mais de 1 boletim no mesmo PDF
+        # Divisão estrita por boletim individual
         blocosBoletins = re.split(r"(?=BOLETIM DE NOTAS INDIVIDUAL|Aluno\(a\):)", textoCompleto)
 
         for bloco in blocosBoletins:
             if "Disciplina" not in bloco and "TÉCNICO" not in bloco:
                 continue
 
-            linhas = bloco.split('\n')
-            textoNapne = bloco.replace("\n", " ")
+            # Limpeza do bloco para regex do NAPNE
+            blocoLimpo = re.sub(r'\s+', ' ', bloco)
 
             nomeAluno = ""
             matriculaAluno = ""
             serieAluno = ""
             freqGlobal = 100.0
 
-            # Nome
-            mNome = re.search(r"Aluno\(a\):\s*\n*([^\n]+)", bloco, re.IGNORECASE)
+            # Nome do Aluno
+            mNome = re.search(r"Aluno\(a\):\s*([^\n|]+)", bloco, re.IGNORECASE)
             if mNome:
                 nomeAluno = mNome.group(1).strip()
                 nomeAluno = re.sub(r"Matrícula:.*", "", nomeAluno, flags=re.IGNORECASE).strip()
 
             if not nomeAluno:
-                mNome2 = re.search(r"BOLETIM DE NOTAS INDIVIDUAL\s*\n*([^\n]+)", bloco, re.IGNORECASE)
+                mNome2 = re.search(r"BOLETIM DE NOTAS INDIVIDUAL\s*([^\n]+)", bloco, re.IGNORECASE)
                 if mNome2:
                     nomeAluno = mNome2.group(1).strip()
 
-            # Matrícula
+            # Matrícula e Turma
             mMat = re.search(r"BT\d{7}", bloco)
-            if mMat:
-                matriculaAluno = mMat.group(0).strip()
+            if mMat: matriculaAluno = mMat.group(0).strip()
 
-            # Série / Turma
             mTurma = re.search(r"202\d[12]\.\d\.[A-Z0-9\.]+", bloco)
-            if mTurma:
-                serieAluno = mTurma.group(0).strip()
+            if mTurma: serieAluno = mTurma.group(0).strip()
 
-            # Frequência
-            mFreq = re.search(r"Frequência:\s*\|\s*(\d+[\.,]?\d*)\s*%", bloco)
+            # Frequência isolada do aluno atual
+            mFreq = re.search(r"Frequência\s*:\s*\|?\s*(\d+[\.,]?\d*)\s*%", blocoLimpo, re.IGNORECASE)
             if mFreq:
                 freqGlobal = float(mFreq.group(1).replace(",", "."))
 
             if not nomeAluno or nomeAluno == "Não Identificado":
                 nomeAluno = arquivo.name.replace(".pdf", "").replace("Boletim", "").replace("_", " ").strip()
 
-            # NAPNE
+            # Captura precisa do NAPNE (versão flexível com e sem dois-pontos)
             necEspeciais = "Não"
             tipoNecEspecial = "-"
             transtorno = "Não"
@@ -119,28 +129,28 @@ def extrairDados(arquivosPdf):
             superdotacao = "Não"
             tipoSuperdotacao = "-"
 
-            mPne = re.search(r"Portador\(a\)\s+de\s+Necessidades\s+Especiais\s+(Sim|Não)", textoNapne, re.IGNORECASE)
-            if mPne: necEspeciais = mPne.group(1)
-            mTipPne = re.search(r"Tipo\s+de\s+Necessidade\s+Especial\s*-?\s*([^\n]+)", textoNapne, re.IGNORECASE)
-            if mTipPne: tipoNecEspecial = mTipPne.group(1).strip()
+            # Necessidades Especiais
+            mPne = re.search(r"Portador\(a\)\s+de\s+Necessidades\s+Especiais\s*:?\s*(Sim|Não)", blocoLimpo, re.IGNORECASE)
+            if mPne: necEspeciais = mPne.group(1).capitalize()
+            mTipPne = re.search(r"Tipo\s+de\s+Necessidade\s+Especial\s*:?\s*(.*?)(?=Portador|\bTranstorno\b|\bSuperdotação\b|Disciplina|\Z)", blocoLimpo, re.IGNORECASE)
+            if mTipPne and mTipPne.group(1).strip() not in ["-", ""]:
+                tipoNecEspecial = mTipPne.group(1).strip()
 
-            mTrans = re.search(r"Portador\(a\)\s+de\s+Transtorno\s+(Sim|Não)", textoNapne, re.IGNORECASE)
-            if mTrans: transtorno = mTrans.group(1)
-            mTipTrans = re.search(r"Tipo\s+de\s+Transtorno\s*-?\s*([^\n]+)", textoNapne, re.IGNORECASE)
-            if mTipTrans: tipoTranstorno = mTipTrans.group(1).strip()
+            # Transtorno
+            mTrans = re.search(r"Portador\(a\)\s+de\s+Transtorno\s*:?\s*(Sim|Não)", blocoLimpo, re.IGNORECASE)
+            if mTrans: transtorno = mTrans.group(1).capitalize()
+            mTipTrans = re.search(r"Tipo\s+de\s+Transtorno\s*:?\s*(.*?)(?=Portador|\bSuperdotação\b|Disciplina|\Z)", blocoLimpo, re.IGNORECASE)
+            if mTipTrans and mTipTrans.group(1).strip() not in ["-", ""]:
+                tipoTranstorno = mTipTrans.group(1).strip()
 
-            mSuper = re.search(r"Portador\(a\)\s+de\s+Superdotação\s+(Sim|Não)", textoNapne, re.IGNORECASE)
-            if mSuper: superdotacao = mSuper.group(1)
-            mTipSuper = re.search(r"Superdotação\s*-?\s*([^\n]+)", textoNapne, re.IGNORECASE)
-            if mTipSuper: tipoSuperdotacao = mTipSuper.group(1).strip()
+            # Superdotação
+            mSuper = re.search(r"Portador\(a\)\s+de\s+Superdotação\s*:?\s*(Sim|Não)", blocoLimpo, re.IGNORECASE)
+            if mSuper: superdotacao = mSuper.group(1).capitalize()
+            mTipSuper = re.search(r"Tipo\s+de\s+Superdotação\s*:?\s*(.*?)(?=Disciplina|\Z)", blocoLimpo, re.IGNORECASE)
+            if mTipSuper and mTipSuper.group(1).strip() not in ["-", ""]:
+                tipoSuperdotacao = mTipSuper.group(1).strip()
 
-            mapaNapneTemporario[nomeAluno.strip().upper()] = {
-                'nec': necEspeciais, 'tipNec': tipoNecEspecial,
-                'trans': transtorno, 'tipTrans': tipoTranstorno,
-                'super': superdotacao, 'tipSuper': tipoSuperdotacao
-            }
-
-            # DISCIPLINAS
+            # Disciplinas
             padraoBloco = re.findall(
                 r"(INT\.\d{5}\s*\([A-Z0-9]+\)\s*-\s*[^0-9\n]+)([\s\S]*?)(?=(?:INT\.\d{5}|Total|Este documento|Boituva|\Z))",
                 bloco
@@ -199,18 +209,6 @@ def extrairDados(arquivosPdf):
 
             numeroChamada += 1
 
-    # Atualização cruzada do NAPNE
-    for dado in dadosFinais:
-        alunoAlvo = dado['Aluno'].strip().upper()
-        if alunoAlvo in mapaNapneTemporario:
-            info = mapaNapneTemporario[alunoAlvo]
-            dado['Necessidades Especiais'] = info['nec']
-            dado['Tipo de Necessidade Especial'] = info['tipNec']
-            dado['Transtorno'] = info['trans']
-            dado['Tipo de Transtorno'] = info['tipTrans']
-            dado['Superdotação'] = info['super']
-            dado['Tipo de Superdotação'] = info['tipSuper']
-
     return pd.DataFrame(dadosFinais)
 
 
@@ -241,6 +239,7 @@ if not st.session_state.dadosCarregados:
                 if not BDNovo.empty:
                     conn.update(spreadsheet=linkSalaAtiva, data=df_final)
 
+                    # Exportação direta para o JSON local
                     dicionario_dados = df_final.to_dict(orient="records")
                     with open("dados_alunos.json", "w", encoding="utf-8") as f:
                         json.dump(dicionario_dados, f, ensure_ascii=False, indent=4)
@@ -276,9 +275,12 @@ else:
 
         if prontuario not in alunosMapeados:
             pneTexto = []
-            if str(item.get("Necessidades Especiais")).lower() == "sim": pneTexto.append(f"PNE: {item.get('Tipo de Necessidade Especial') or '-'}")
-            if str(item.get("Transtorno")).lower() == "sim": pneTexto.append(f"Transtorno: {item.get('Tipo de Transtorno') or '-'}")
-            if str(item.get("Superdotação")).lower() == "sim": pneTexto.append(f"Superdotação: {item.get('Tipo de Superdotação') or '-'}")
+            if str(item.get("Necessidades Especiais")).strip().lower() == "sim": 
+                pneTexto.append(f"PNE: {item.get('Tipo de Necessidade Especial') or '-'}")
+            if str(item.get("Transtorno")).strip().lower() == "sim": 
+                pneTexto.append(f"Transtorno: {item.get('Tipo de Transtorno') or '-'}")
+            if str(item.get("Superdotação")).strip().lower() == "sim": 
+                pneTexto.append(f"Superdotação: {item.get('Tipo de Superdotação') or '-'}")
 
             infoNapne = " | ".join(pneTexto) if pneTexto else "Nenhum registro de PNE/Transtorno/Superdotação."
 
