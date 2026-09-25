@@ -3,12 +3,12 @@ import json
 import os
 import re
 import pandas as pd
+import plotly.express as px
 import streamlit as st
-
 from pypdf import PdfReader
 from streamlit_gsheets import GSheetsConnection
 
-# CONFIGURAÇÃO DA PÁGINA E CSS (Seus estilos originais)
+# CONFIGURAR PÁGINA / CSS ORIGINAL
 st.set_page_config(page_title="Dashboard Acadêmico", layout="wide")
 
 tecnicas = [
@@ -89,7 +89,7 @@ if st.sidebar.button("Dashboard"):
     st.rerun()
 
 
-# EXTRAÇÃO DE DADOS (SUA LÓGICA ORIGINAL RESTAURADA 100%)
+# FUNÇÃO DE EXTRAÇÃO DE DADOS DOS PDFS CORRIGIDA
 def extrairDados(arquivosPdf):
     dadosFinais = []
     mapaNapneTemporario = {}
@@ -105,30 +105,10 @@ def extrairDados(arquivosPdf):
             continue
 
         textoCompleto = ""
-        for paginaIndex, pagina in enumerate(leitorPdf.pages):
+        for pagina in leitorPdf.pages:
             textoCompleto += pagina.extract_text() + "\n"
-            textoPagina = textoCompleto
-            nomeNestaPagina = "Não Identificado"
 
-            for linha in textoPagina.split('\n'):
-                if "Aluno" in linha or "Nome" in linha:
-                    partes = linha.split(":")
-                    if len(partes) > 1:
-                        valNome = partes[1].strip()
-                    else:
-                        valNome = linha.replace("Aluno", "").replace("Nome", "").strip()
-                    nomeNestaPagina = re.sub(r'\bMatrícula\b.*', '', valNome, flags=re.IGNORECASE).strip()
-
-            if nomeNestaPagina == "Não Identificado" or not nomeNestaPagina.strip():
-                nomeNestaPagina = arquivo.name.replace(".pdf", "").strip()
-
-            if ultimoAlunoLido != "" and nomeNestaPagina != ultimoAlunoLido:
-                numeroChamada += 1
-
-            ultimoAlunoLido = nomeNestaPagina
-            textoCompleto = textoPagina
-
-        # EXTRAÇÃO DA FOTO DO PDF
+        # EXTRAÇÃO DA FOTO
         fotos = None
         try:
             primeiraPagina = leitorPdf.pages[0]
@@ -143,56 +123,37 @@ def extrairDados(arquivosPdf):
 
         linhas = textoCompleto.split('\n')
         textoNapne = textoCompleto.replace("\n", " ")
+
         nomeAluno = "Não Identificado"
         matriculaAluno = "Não Identificada"
         serieAluno = "Não Identificada"
 
-        necEspeciais = "Não"
-        tipoNecEspecial = "-"
-        transtorno = "Não"
-        tipoTranstorno = "-"
-        superdotacao = "Não"
-        tipoSuperdotacao = "-"
-
-        for linha in linhas:
-            if "Aluno" in linha or "Nome" in linha:
+        # CAPTURA EXATA DE NOME, MATRÍCULA E SÉRIE NO SUAP
+        for i, linha in enumerate(linhas):
+            if "Aluno" in linha or "Aluno(a):" in linha:
+                # Tenta pegar na mesma linha ou na linha seguinte se estiver quebrado
                 partes = linha.split(":")
-                if len(partes) > 1:
+                if len(partes) > 1 and partes[1].strip():
                     valNome = partes[1].strip()
+                elif i + 1 < len(linhas):
+                    valNome = linhas[i + 1].strip()
                 else:
-                    valNome = linha.replace("Aluno", "").replace("Nome", "").strip()
+                    valNome = ""
                 nomeAluno = re.sub(r'\bMatrícula\b.*', '', valNome, flags=re.IGNORECASE).strip()
 
             for termo in ["matrícula", "matricula", "prontuário", "prontuario"]:
                 if termo in linha.lower():
-                    buscaBT = re.search(r"cula:\s*(.{9})", linha, re.IGNORECASE)
+                    buscaBT = re.search(r"BT\d+", linha, re.IGNORECASE)
                     if buscaBT:
-                        matriculaAluno = buscaBT.group(1).strip()
+                        matriculaAluno = buscaBT.group(0).strip()
                         break
 
-            if "Série" in linha or "Serie" in linha or "Ano" in linha or "Turma" in linha:
+            if "Turma:" in linha or "Curso:" in linha or "202" in linha:
                 partes = linha.split(":")
                 if len(partes) > 1:
-                    serieAluno = partes[1].strip()[:27]
-
-        # NAPNE
-        match = re.search(r"Portador\(a\)\s+de\s+Necessidades\s+Especiais\s+(Sim|Não)", textoNapne, re.IGNORECASE)
-        if match: necEspeciais = match.group(1)
-
-        match = re.search(r"Tipo\s+de\s+Necessidade\s+Especial\s+-?\s*(.+?)\s*(?=Portador\(a\)|$)", textoNapne, re.IGNORECASE)
-        if match: tipoNecEspecial = match.group(1)
-
-        match = re.search(r"Portador\(a\)\s+de\s+Transtorno\s+(Sim|Não)", textoNapne, re.IGNORECASE)
-        if match: transtorno = match.group(1)
-
-        match = re.search(r"Tipo\s+de\s+Transtorno\s+-?\s*(.+?)\s*(?=Portador\(a\)|$)", textoNapne, re.IGNORECASE)
-        if match: tipoTranstorno = match.group(1)
-
-        match = re.search(r"Portador\(a\)\s+de\s+Superdotação\s+(Sim|Não)", textoNapne, re.IGNORECASE)
-        if match: superdotacao = match.group(1)
-
-        match = re.search(r"Superdotação\s+-?\s*(.+?)\s*$", textoNapne, re.IGNORECASE)
-        if match: tipoSuperdotacao = match.group(1)
+                    valSerie = partes[1].strip()
+                    if "202" in valSerie or "RED" in valSerie or "AUT" in valSerie:
+                        serieAluno = valSerie[:27]
 
         if nomeAluno == "Não Identificado" or not nomeAluno.strip():
             nomeAluno = arquivo.name.replace(".pdf", "").replace("Boletim", "").replace("_", " ").strip()
@@ -200,6 +161,40 @@ def extrairDados(arquivosPdf):
         if fotos:
             st.session_state.fotoAluno[nomeAluno] = fotos
 
+        if ultimoAlunoLido != "" and nomeAluno != ultimoAlunoLido:
+            numeroChamada += 1
+        ultimoAlunoLido = nomeAluno
+
+        # DADOS DO NAPNE
+        necEspeciais = "Não"
+        tipoNecEspecial = "-"
+        transtorno = "Não"
+        tipoTranstorno = "-"
+        superdotacao = "Não"
+        tipoSuperdotacao = "-"
+
+        mPne = re.search(r"Portador\(a\)\s+de\s+Necessidades\s+Especiais\s+(Sim|Não)", textoNapne, re.IGNORECASE)
+        if mPne: necEspeciais = mPne.group(1)
+        mTipPne = re.search(r"Tipo\s+de\s+Necessidade\s+Especial\s+-?\s*(.+?)\s*(?=Portador\(a\)|$)", textoNapne, re.IGNORECASE)
+        if mTipPne: tipoNecEspecial = mTipPne.group(1).strip()
+
+        mTrans = re.search(r"Portador\(a\)\s+de\s+Transtorno\s+(Sim|Não)", textoNapne, re.IGNORECASE)
+        if mTrans: transtorno = mTrans.group(1)
+        mTipTrans = re.search(r"Tipo\s+de\s+Transtorno\s+-?\s*(.+?)\s*(?=Portador\(a\)|$)", textoNapne, re.IGNORECASE)
+        if mTipTrans: tipoTranstorno = mTipTrans.group(1).strip()
+
+        mSuper = re.search(r"Portador\(a\)\s+de\s+Superdotação\s+(Sim|Não)", textoNapne, re.IGNORECASE)
+        if mSuper: superdotacao = mSuper.group(1)
+        mTipSuper = re.search(r"Superdotação\s+-?\s*(.+?)\s*$", textoNapne, re.IGNORECASE)
+        if mTipSuper: tipoSuperdotacao = mTipSuper.group(1).strip()
+
+        mapaNapneTemporario[nomeAluno.strip().upper()] = {
+            'nec': necEspeciais, 'tipNec': tipoNecEspecial,
+            'trans': transtorno, 'tipTrans': tipoTranstorno,
+            'super': superdotacao, 'tipSuper': tipoSuperdotacao
+        }
+
+        # PROCESSAMENTO DAS DISCIPLINAS E NOTAS DA TABELA
         mapeamentoDisciplinas = {}
 
         for linha in linhas:
@@ -221,7 +216,7 @@ def extrairDados(arquivosPdf):
             passouDaMateria = False
 
             for token in tokens:
-                if (',' in token and token.replace(',', '').isdigit()) and not passouDaMateria:
+                if (',' in token or '.' in token) and token.replace(',', '').replace('.', '').isdigit() and not passouDaMateria:
                     passouDaMateria = True
                 if not passouDaMateria:
                     partesTexto.append(token)
@@ -229,7 +224,7 @@ def extrairDados(arquivosPdf):
                     partesDados.append(token)
 
             nomeDisciplina = " ".join(partesTexto).strip()
-            if not nomeDisciplina or len(partesDados) < 5:
+            if not nomeDisciplina:
                 continue
 
             calculoFreq = 100.0
@@ -248,7 +243,7 @@ def extrairDados(arquivosPdf):
                 if tok == "-" or tok.replace(',', '.').replace('.', '', 1).isdigit():
                     tokensFiltrados.append(tok)
 
-            dadosTabela = tokensFiltrados[4:]
+            dadosTabela = tokensFiltrados[4:] if len(tokensFiltrados) >= 4 else tokensFiltrados
 
             notas = [0.0, 0.0, 0.0, 0.0]
             faltas = [0.0, 0.0, 0.0, 0.0]
@@ -259,28 +254,15 @@ def extrairDados(arquivosPdf):
                     valNota = dadosTabela[pagDado].replace(',', '.')
                     if valNota.replace('.', '', 1).isdigit():
                         notas[etapa] = float(valNota)
-                    else:
-                        notas[etapa] = 0.0
                     pagDado += 1
                 if pagDado < len(dadosTabela):
                     valFalta = dadosTabela[pagDado]
                     if valFalta.isdigit():
                         faltas[etapa] = float(valFalta)
-                    else:
-                        faltas[etapa] = 0.0
                     pagDado += 1
 
-            mediaFinal = 0.0
-            if pagDado < len(dadosTabela):
-                valMedia = dadosTabela[pagDado].replace(',', '.')
-                if valMedia.replace('.', '', 1).isdigit():
-                    mediaFinal = float(valMedia)
-                else:
-                    notasLancadas = [n for n in notas if n > 0]
-                    mediaFinal = sum(notasLancadas) / len(notasLancadas) if notasLancadas else 0.0
-            else:
-                notasLancadas = [n for n in notas if n > 0]
-                mediaFinal = sum(notasLancadas) / len(notasLancadas) if notasLancadas else 0.0
+            notasLancadas = [n for n in notas if n > 0.0]
+            mediaFinal = round(sum(notasLancadas) / len(notasLancadas), 2) if notasLancadas else 0.0
 
             if len(nomeDisciplina) > 3:
                 mapeamentoDisciplinas[nomeDisciplina] = {
@@ -316,20 +298,7 @@ def extrairDados(arquivosPdf):
                 'Tipo de Superdotação': tipoSuperdotacao
             })
 
-        if 'ultimoNomeVisto' not in locals():
-            ultimoNomeVisto = nomeAluno
-
-        if nomeAluno != ultimoNomeVisto:
-            numeroChamada += 1
-            ultimoNomeVisto = nomeAluno
-
-        if nomeAluno and nomeAluno != "Não Identificado":
-            mapaNapneTemporario[nomeAluno.strip().upper()] = {
-                'nec': necEspeciais, 'tipNec': tipoNecEspecial,
-                'trans': transtorno, 'tipTrans': tipoTranstorno,
-                'super': superdotacao, 'tipSuper': tipoSuperdotacao
-            }
-
+    # Atualização cruzada do NAPNE
     for dado in dadosFinais:
         alunoAlvo = dado['Aluno'].strip().upper()
         if alunoAlvo in mapaNapneTemporario:
@@ -351,25 +320,29 @@ if not st.session_state.dadosCarregados:
 
     salaSelecionada = st.selectbox("Selecione a Sala:", list(DICIONARIO_SALAS.keys()))
     st.session_state.salaAtiva = salaSelecionada
-    arquivosEnviados = st.file_uploader("Faça o upload de quantos PDFs desejar aqui:", type=["pdf"], accept_multiple_files=True, key=f"uploader_{salaSelecionada}")
+    arquivosEnviados = st.file_uploader("Faça o upload dos PDFs dos boletins:", type=["pdf"], accept_multiple_files=True, key=f"uploader_{salaSelecionada}")
 
     if st.button("PROCESSAR E ATUALIZAR DASHBOARD"):
         if arquivosEnviados:
-            with st.spinner("Processando arquivos e atualizando planilhas de notas..."):
+            with st.spinner("Processando arquivos, atualizando planilhas e gerando JSON..."):
                 BDNovo = extrairDados(arquivosEnviados)
 
                 linkSalaAtiva = DICIONARIO_SALAS[salaSelecionada]
                 df_atual = conn.read(spreadsheet=linkSalaAtiva)
-                
-                # SEU LÓGICA EXACTA DE MERGE: concatena e descarta duplicatas mantendo o 'last' (substitui o aluno reprocessado sem apagar os outros)
+
+                # Limpa registros inválidos antes de dar merge
+                if "Aluno" in df_atual.columns:
+                    df_atual = df_atual[df_atual["Aluno"] != "Não Identificado"]
+
+                # Merge que atualiza os dados do aluno reprocessado mantendo os demais
                 df_final = pd.concat([df_atual, BDNovo], ignore_index=True)
                 df_final = df_final.drop_duplicates(subset=["Aluno", "Disciplina"], keep="last")
 
                 if not BDNovo.empty:
-                    # 1. Atualiza na planilha Google Sheets
+                    # 1. Salva na planilha Google Sheets
                     conn.update(spreadsheet=linkSalaAtiva, data=df_final)
 
-                    # 2. ATIVIDADE 1: Converte e salva o dicionário gerado em arquivo JSON
+                    # 2. ATIVIDADE 1: Grava o dicionário em arquivo JSON
                     dicionario_dados = df_final.to_dict(orient="records")
                     with open("dados_alunos.json", "w", encoding="utf-8") as f:
                         json.dump(dicionario_dados, f, ensure_ascii=False, indent=4)
@@ -384,7 +357,7 @@ if not st.session_state.dadosCarregados:
         else:
             st.error("Por favor, selecione e envie os arquivos PDF para processar.")
 
-# EXIBIÇÃO VISUAL DO DASHBOARD ACADÊMICO (MANTIDO O SEU LAYOUT ORIGINAL STREAMLIT)
+# EXIBIÇÃO VISUAL DO DASHBOARD ACADÊMICO
 else:
     if "salaAtiva" not in st.session_state or not st.session_state.salaAtiva:
         st.info("Nenhum relatório foi carregado ainda.")
@@ -392,6 +365,15 @@ else:
         st.stop()
 
     st.sidebar.write(f"Visualizando: **{st.session_state.salaAtiva}**")
+
+    # BOTÃO DA ATIVIDADE 2 NO TOPO DO DASHBOARD STREAMLIT
+    colB1, colB2 = st.columns([3, 1])
+    with colB2:
+        if st.button("🔄 Ler dados_alunos.json", use_container_width=True):
+            if os.path.exists("dados_alunos.json"):
+                st.success("JSON lido com sucesso!")
+            else:
+                st.error("Arquivo dados_alunos.json não encontrado!")
 
     linkSalaAtiva = DICIONARIO_SALAS[st.session_state.salaAtiva]
     BD = conn.read(spreadsheet=linkSalaAtiva, ttl="0")
@@ -407,11 +389,14 @@ else:
     else:
         BD['Observações'] = ""
 
+    # Elimina possíveis linhas corrompidas de "Não Identificado"
+    BD = BD[BD["Aluno"] != "Não Identificado"]
+
     ordemChamada = BD.sort_values(by='Nº Chamada', ascending=True)
     alunosLista = ordemChamada['Aluno'].unique().tolist()
 
     if not alunosLista:
-        st.info("Nenhum relatório foi carregado ainda.")
+        st.info("Nenhum relatório válido foi carregado ainda.")
         st.write("Faça o upload dos PDFs na tela de Upload para visualizar o Dashboard.")
         st.stop()
 
@@ -467,7 +452,8 @@ else:
 
     st.divider()
 
-    ordenarPor = st.radio("Ordenar disciplinas por:", ["Nota", "Frequência"], horizontal=True)
+    # ORDENAÇÃO OBRIGATÓRIA DA MENOR NOTA/FREQUÊNCIA PARA A MAIOR
+    ordenarPor = st.radio("Ordenar disciplinas por (da menor para a maior):", ["Nota", "Frequência"], horizontal=True)
 
     if ordenarPor != st.session_state.ordenacao:
         st.session_state.materiaSelecionada = None
@@ -482,6 +468,7 @@ else:
         if ordenarPor == "Frequência" and 'Freq. Final' in BDAluno.columns:
             colunaRef = 'Freq. Final'
 
+        # ORDENAÇÃO CRESCENTE (MENOR PARA MAIOR)
         BDLista = BDAluno.sort_values(by=colunaRef, ascending=True)
         disciplinasOrdenadas = BDLista['Disciplina'].unique().tolist()
 
@@ -510,7 +497,6 @@ else:
                 "Percentual": [porcentagemPresenca, porcentagemFaltas]
             })
 
-            import plotly.express as px
             graficoFreq = px.pie(
                 BDFreqRosca,
                 names="Status",
