@@ -1,3 +1,4 @@
+import json
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -565,16 +566,23 @@ if not (st.session_state.dadosCarregados):
 
     if (st.button("PROCESSAR E ATUALIZAR DASHBOARD")):
         if (arquivosEnviados):
-            with st.spinner("Processando arquivos e atualizando planilhas de notas..."):
+            with st.spinner("Processando arquivos, atualizando planilhas e gerando JSON..."):
                 BDNovo=extrairDados(arquivosEnviados)
 
                 linkSalaAtiva=DICIONARIO_SALAS[salaSelecionada]
-                df_atual=conn.read(spreadsheet=linkSalaAtiva)
-                df_final=pd.concat([df_atual, BDNovo], ignore_index=True)
-                df_final=df_final.drop_duplicates(subset=["Aluno", "Disciplina"], keep="last")
+                df_atual = conn.read(spreadsheet=linkSalaAtiva)
+                df_final = pd.concat([df_atual, BDNovo], ignore_index=True)
+                df_final = df_final.drop_duplicates(subset=["Aluno", "Disciplina"], keep="last")
 
-                if not (BDNovo.empty):
-                    conn.update(spreadsheet=linkSalaAtiva, data=df_final) 
+                if (not BDNovo.empty):
+                    # 1. Continua salvando no Google Sheets normalmente
+                    conn.update(spreadsheet=linkSalaAtiva, data=df_final)
+
+                    # 2. ATIVIDADE 1: Salva o dicionário gerado em um arquivo JSON
+                    dicionario_dados = df_final.to_dict(orient="records")
+                    with open("dados_alunos.json", "w", encoding="utf-8") as f:
+                        json.dump(dicionario_dados, f, ensure_ascii=False, indent=4)
+
                     st.session_state.salaAtiva=salaSelecionada
                     st.session_state.dadosCarregados=True
                     st.session_state.materiaSelecionada=None
