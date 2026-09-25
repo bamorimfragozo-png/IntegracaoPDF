@@ -4,16 +4,12 @@ import os
 import re
 import pandas as pd
 import streamlit as st
-import streamlit.components.v1 as components
+
 from pypdf import PdfReader
 from streamlit_gsheets import GSheetsConnection
 
-# CONFIGURAÇÃO DA PÁGINA
-st.set_page_config(
-    page_title="Conselho de Classe - IFSP Boituva",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
+# CONFIGURAÇÃO DA PÁGINA E CSS (Seus estilos originais)
+st.set_page_config(page_title="Dashboard Acadêmico", layout="wide")
 
 tecnicas = [
     "ILPR", "MAIN", "ININ", "LDPR", "RDCO", "LPWE", "SOPE", "INSO", "IPRE",
@@ -21,6 +17,33 @@ tecnicas = [
     "DCAD", "CAUT", "PROG", "PCOE", "EDIG", "PRI1", "ELIN", "CISUT", "INTI",
     "MAPI", "CNCM", "CLPR", "REPI", "HIEP", "MIMP", "PRI2"
 ]
+
+st.markdown("""
+<style>
+[data-testid="stColumn"] {
+    border: 2px solid black !important;
+    border-radius: 15px !important;
+    padding: 20px !important;
+    background-color: white !important;
+    margin-bottom: 10px;
+}
+.stButton>button {
+    width: 100%;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    text-align: left;
+}
+.stRadio > div {
+    flex-direction: row;
+    gap: 20px;
+}
+.info-box {
+    background-color: #fdfdfd;
+    font-size: 16px;
+    padding: 5px 0px;
+}
+</style>
+""", unsafe_allow_html=True)
 
 # CONEXÃO COM PLANILHAS
 conn = st.connection("gsheets", type=GSheetsConnection)
@@ -31,29 +54,42 @@ DICIONARIO_SALAS = {
     "Redes 3": st.secrets["connections"]["gsheets"]["Redes3"],
     "Automação 1": st.secrets["connections"]["gsheets"]["Automacao1"],
     "Automação 2": st.secrets["connections"]["gsheets"]["Automacao2"],
-    "Automação 3": st.secrets["connections"]["gsheets"]["Automacao3"],
+    "Automação 3": st.secrets["connections"]["gsheets"]["Automacao3"]
 }
 
-# ESTADOS DE SESSÃO
+# ESTADO DE ATUALIZAÇÃO DO DASHBOARD
 if "dadosCarregados" not in st.session_state:
     st.session_state.dadosCarregados = False
+if "pagAluno" not in st.session_state:
+    st.session_state.pagAluno = 0
+if "materiaSelecionada" not in st.session_state:
+    st.session_state.materiaSelecionada = None
+if "resetObs" not in st.session_state:
+    st.session_state.resetObs = 0
 if "salaAtiva" not in st.session_state:
     st.session_state.salaAtiva = "Redes 1"
+if "fotoAluno" not in st.session_state:
+    st.session_state.fotoAluno = {}
+if "ordenacao" not in st.session_state:
+    st.session_state.ordenacao = "Nota"
 
-# MENU LATERAL
-st.sidebar.title("Conselho de Classe")
-st.sidebar.markdown("---")
+# MENU DE NAVEGAÇÃO
+st.sidebar.markdown("### Navegação")
 
-if st.sidebar.button("📁 Tela de Upload / Processamento", use_container_width=True):
+if st.sidebar.button("Tela de Upload"):
     st.session_state.dadosCarregados = False
+    st.session_state.materiaSelecionada = None
+    st.session_state.pagAluno = 0
     st.rerun()
 
-if st.sidebar.button("📊 Ficha do Conselho (Dashboard)", use_container_width=True):
+if st.sidebar.button("Dashboard"):
     st.session_state.dadosCarregados = True
+    st.session_state.materiaSelecionada = None
+    st.session_state.pagAluno = 0
     st.rerun()
 
 
-# FUNÇÃO APERFEIÇOADA DE EXTRAÇÃO DE DADOS DOS PDFS
+# EXTRAÇÃO DE DADOS (SUA LÓGICA ORIGINAL RESTAURADA 100%)
 def extrairDados(arquivosPdf):
     dadosFinais = []
     mapaNapneTemporario = {}
@@ -69,38 +105,48 @@ def extrairDados(arquivosPdf):
             continue
 
         textoCompleto = ""
-        for pagina in leitorPdf.pages:
+        for paginaIndex, pagina in enumerate(leitorPdf.pages):
             textoCompleto += pagina.extract_text() + "\n"
+            textoPagina = textoCompleto
+            nomeNestaPagina = "Não Identificado"
 
-        # IDENTIFICAÇÃO DO ALUNO
+            for linha in textoPagina.split('\n'):
+                if "Aluno" in linha or "Nome" in linha:
+                    partes = linha.split(":")
+                    if len(partes) > 1:
+                        valNome = partes[1].strip()
+                    else:
+                        valNome = linha.replace("Aluno", "").replace("Nome", "").strip()
+                    nomeNestaPagina = re.sub(r'\bMatrícula\b.*', '', valNome, flags=re.IGNORECASE).strip()
+
+            if nomeNestaPagina == "Não Identificado" or not nomeNestaPagina.strip():
+                nomeNestaPagina = arquivo.name.replace(".pdf", "").strip()
+
+            if ultimoAlunoLido != "" and nomeNestaPagina != ultimoAlunoLido:
+                numeroChamada += 1
+
+            ultimoAlunoLido = nomeNestaPagina
+            textoCompleto = textoPagina
+
+        # EXTRAÇÃO DA FOTO DO PDF
+        fotos = None
+        try:
+            primeiraPagina = leitorPdf.pages[0]
+            if "/XObject" in primeiraPagina["/Resources"]:
+                xobject = primeiraPagina["/Resources"]["/XObject"].get_object()
+                for obj in xobject:
+                    if xobject[obj]["/Subtype"] == "/Image":
+                        fotos = xobject[obj].get_data()
+                        break
+        except Exception:
+            fotos = None
+
+        linhas = textoCompleto.split('\n')
+        textoNapne = textoCompleto.replace("\n", " ")
         nomeAluno = "Não Identificado"
         matriculaAluno = "Não Identificada"
         serieAluno = "Não Identificada"
-        freqGlobal = 100.0
 
-        for linha in textoCompleto.split("\n"):
-            if "Aluno(a):" in linha or "Aluno:" in linha:
-                nomeAluno = linha.split(":")[-1].strip()
-            elif "Matrícula:" in linha:
-                buscaMat = re.search(r"BT\d+", linha, re.IGNORECASE)
-                if buscaMat:
-                    matriculaAluno = buscaMat.group(0).strip()
-            elif "Curso:" in linha or "Turma:" in linha:
-                if "2026" in linha or "TÉCNICO" in linha:
-                    serieAluno = linha.split(":")[-1].strip()
-            elif "Frequência:" in linha:
-                buscaFreq = re.search(r"(\d+[\.,]?\d*)\s*%", linha)
-                if buscaFreq:
-                    freqGlobal = float(buscaFreq.group(1).replace(",", "."))
-
-        if nomeAluno == "Não Identificado" or not nomeAluno:
-            nomeAluno = arquivo.name.replace(".pdf", "").replace("Boletim", "").replace("_", " ").strip()
-
-        if ultimoAlunoLido != "" and nomeAluno != ultimoAlunoLido:
-            numeroChamada += 1
-        ultimoAlunoLido = nomeAluno
-
-        # EXTRAÇÃO DE DADOS DO NAPNE
         necEspeciais = "Não"
         tipoNecEspecial = "-"
         transtorno = "Não"
@@ -108,202 +154,478 @@ def extrairDados(arquivosPdf):
         superdotacao = "Não"
         tipoSuperdotacao = "-"
 
-        mPne = re.search(r"Portador\(a\)\s+de\s+Necessidades\s+Especiais\s+(Sim|Não)", textoCompleto, re.IGNORECASE)
-        if mPne: necEspeciais = mPne.group(1)
-        mTipPne = re.search(r"Tipo\s+de\s+Necessidade\s+Especial\s+-?\s*([^\n]+)", textoCompleto, re.IGNORECASE)
-        if mTipPne: tipoNecEspecial = mTipPne.group(1).strip()
+        for linha in linhas:
+            if "Aluno" in linha or "Nome" in linha:
+                partes = linha.split(":")
+                if len(partes) > 1:
+                    valNome = partes[1].strip()
+                else:
+                    valNome = linha.replace("Aluno", "").replace("Nome", "").strip()
+                nomeAluno = re.sub(r'\bMatrícula\b.*', '', valNome, flags=re.IGNORECASE).strip()
 
-        mTrans = re.search(r"Portador\(a\)\s+de\s+Transtorno\s+(Sim|Não)", textoCompleto, re.IGNORECASE)
-        if mTrans: transtorno = mTrans.group(1)
-        mTipTrans = re.search(r"Tipo\s+de\s+Transtorno\s+-?\s*([^\n]+)", textoCompleto, re.IGNORECASE)
-        if mTipTrans: tipoTranstorno = mTipTrans.group(1).strip()
+            for termo in ["matrícula", "matricula", "prontuário", "prontuario"]:
+                if termo in linha.lower():
+                    buscaBT = re.search(r"cula:\s*(.{9})", linha, re.IGNORECASE)
+                    if buscaBT:
+                        matriculaAluno = buscaBT.group(1).strip()
+                        break
 
-        mSuper = re.search(r"Portador\(a\)\s+de\s+Superdotação\s+(Sim|Não)", textoCompleto, re.IGNORECASE)
-        if mSuper: superdotacao = mSuper.group(1)
-        mTipSuper = re.search(r"Superdotação\s+-?\s*([^\n]+)", textoCompleto, re.IGNORECASE)
-        if mTipSuper: tipoSuperdotacao = mTipSuper.group(1).strip()
+            if "Série" in linha or "Serie" in linha or "Ano" in linha or "Turma" in linha:
+                partes = linha.split(":")
+                if len(partes) > 1:
+                    serieAluno = partes[1].strip()[:27]
 
-        mapaNapneTemporario[nomeAluno.strip().upper()] = {
-            "nec": necEspeciais, "tipNec": tipoNecEspecial,
-            "trans": transtorno, "tipTrans": tipoTranstorno,
-            "super": superdotacao, "tipSuper": tipoSuperdotacao
-        }
+        # NAPNE
+        match = re.search(r"Portador\(a\)\s+de\s+Necessidades\s+Especiais\s+(Sim|Não)", textoNapne, re.IGNORECASE)
+        if match: necEspeciais = match.group(1)
 
-        # EXTRAÇÃO DAS DISCIPLINAS E NOTAS
-        # Padrão para capturar a linha da disciplina (ex: INT.11287 (BTVPOR3) - LÍNGUA PORTUGUESA 3)
-        linhasPadrao = re.findall(r"([A-Z]{3,4}\.\d{4,5}\s*\([A-Z0-9]+\)\s*-\s*[^0-9\n]+)([\s\S]*?)(?=[A-Z]{3,4}\.\d{4,5}\s*\([A-Z0-9]+\)|Total|Este documento|$)", textoCompleto)
+        match = re.search(r"Tipo\s+de\s+Necessidade\s+Especial\s+-?\s*(.+?)\s*(?=Portador\(a\)|$)", textoNapne, re.IGNORECASE)
+        if match: tipoNecEspecial = match.group(1)
 
-        for matchDisci in linhasPadrao:
-            nomeDisciplina = matchDisci[0].strip()
-            blocoTexto = matchDisci[1].strip()
+        match = re.search(r"Portador\(a\)\s+de\s+Transtorno\s+(Sim|Não)", textoNapne, re.IGNORECASE)
+        if match: transtorno = match.group(1)
 
-            # Captura todas as notas (ex: 10,00, 9.50, 8.5) no bloco da disciplina
-            valoresEncontrados = re.findall(r"\b(\d{1,2}[\.,]\d{1,2})\b", blocoTexto)
-            notasFloat = []
-            for v in valoresEncontrados:
-                try:
-                    val = float(v.replace(",", "."))
-                    if val <= 10.0:  # Descarta cargas horárias (ex: 60.0, 80.0)
-                        notasFloat.append(val)
-                except ValueError:
-                    pass
+        match = re.search(r"Tipo\s+de\s+Transtorno\s+-?\s*(.+?)\s*(?=Portador\(a\)|$)", textoNapne, re.IGNORECASE)
+        if match: tipoTranstorno = match.group(1)
 
-            # Atribui aos bimestres
-            b1 = notasFloat[0] if len(notasFloat) > 0 else None
-            b2 = notasFloat[1] if len(notasFloat) > 1 else None
-            b3 = notasFloat[2] if len(notasFloat) > 2 else None
-            b4 = notasFloat[3] if len(notasFloat) > 3 else None
+        match = re.search(r"Portador\(a\)\s+de\s+Superdotação\s+(Sim|Não)", textoNapne, re.IGNORECASE)
+        if match: superdotacao = match.group(1)
 
-            notasValidas = [n for n in [b1, b2, b3, b4] if n is not None]
-            mediaFinal = round(sum(notasValidas) / len(notasValidas), 2) if notasValidas else 0.0
+        match = re.search(r"Superdotação\s+-?\s*(.+?)\s*$", textoNapne, re.IGNORECASE)
+        if match: tipoSuperdotacao = match.group(1)
 
-            # Identificação de Núcleo Técnico ou Comum
-            tecnico = any(kw in nomeDisciplina.upper() for kw in tecnicas)
+        if nomeAluno == "Não Identificado" or not nomeAluno.strip():
+            nomeAluno = arquivo.name.replace(".pdf", "").replace("Boletim", "").replace("_", " ").strip()
+
+        if fotos:
+            st.session_state.fotoAluno[nomeAluno] = fotos
+
+        mapeamentoDisciplinas = {}
+
+        for linha in linhas:
+            encontrou = False
+            for p in ["Notas das etapas", "Faltas nas etapas", "Diário", "Disciplina", "Total", "Este documento"]:
+                if p in linha:
+                    encontrou = True
+                    break
+            if encontrou:
+                continue
+
+            linhaLimpa = re.sub(r'^\d{5,6}\s+', '', linha.strip())
+            if not re.search(r'[A-Z]{3,4}\.\d{4,5}|\([A-Z0-9]{5,}\)', linhaLimpa):
+                continue
+
+            tokens = linhaLimpa.split()
+            partesTexto = []
+            partesDados = []
+            passouDaMateria = False
+
+            for token in tokens:
+                if (',' in token and token.replace(',', '').isdigit()) and not passouDaMateria:
+                    passouDaMateria = True
+                if not passouDaMateria:
+                    partesTexto.append(token)
+                else:
+                    partesDados.append(token)
+
+            nomeDisciplina = " ".join(partesTexto).strip()
+            if not nomeDisciplina or len(partesDados) < 5:
+                continue
+
+            calculoFreq = 100.0
+            for token in tokens:
+                if "%" in token:
+                    try:
+                        calculoFreq = float(token.replace("%", "").replace(",", "."))
+                    except ValueError:
+                        pass
+                    break
+
+            tokensFiltrados = []
+            for tok in partesDados:
+                if tok in ["Cursando", "(Aguarda", "Carga", "Horária)", "Horária", "Aprovado", "Retido"] or "%" in tok:
+                    continue
+                if tok == "-" or tok.replace(',', '.').replace('.', '', 1).isdigit():
+                    tokensFiltrados.append(tok)
+
+            dadosTabela = tokensFiltrados[4:]
+
+            notas = [0.0, 0.0, 0.0, 0.0]
+            faltas = [0.0, 0.0, 0.0, 0.0]
+
+            pagDado = 0
+            for etapa in range(4):
+                if pagDado < len(dadosTabela):
+                    valNota = dadosTabela[pagDado].replace(',', '.')
+                    if valNota.replace('.', '', 1).isdigit():
+                        notas[etapa] = float(valNota)
+                    else:
+                        notas[etapa] = 0.0
+                    pagDado += 1
+                if pagDado < len(dadosTabela):
+                    valFalta = dadosTabela[pagDado]
+                    if valFalta.isdigit():
+                        faltas[etapa] = float(valFalta)
+                    else:
+                        faltas[etapa] = 0.0
+                    pagDado += 1
+
+            mediaFinal = 0.0
+            if pagDado < len(dadosTabela):
+                valMedia = dadosTabela[pagDado].replace(',', '.')
+                if valMedia.replace('.', '', 1).isdigit():
+                    mediaFinal = float(valMedia)
+                else:
+                    notasLancadas = [n for n in notas if n > 0]
+                    mediaFinal = sum(notasLancadas) / len(notasLancadas) if notasLancadas else 0.0
+            else:
+                notasLancadas = [n for n in notas if n > 0]
+                mediaFinal = sum(notasLancadas) / len(notasLancadas) if notasLancadas else 0.0
+
+            if len(nomeDisciplina) > 3:
+                mapeamentoDisciplinas[nomeDisciplina] = {
+                    'notas': notas,
+                    'faltas': faltas,
+                    'mediaFinal': mediaFinal,
+                    'freqFinal': calculoFreq
+                }
+
+        for nomeDisp, blocos in mapeamentoDisciplinas.items():
+            tecnico = any(kw in nomeDisp.upper() for kw in tecnicas)
             nucleo = "Técnico" if tecnico else "Comum"
 
             dadosFinais.append({
-                "Nº Chamada": int(numeroChamada),
-                "Aluno": nomeAluno,
-                "Matrícula": matriculaAluno,
-                "Série": serieAluno,
-                "Disciplina": nomeDisciplina,
-                "1º BI": b1,
-                "2º BI": b2,
-                "3º BI": b3,
-                "4º BI": b4,
-                "Média Final": mediaFinal,
-                "Freq. Final": freqGlobal,
-                "Núcleo": nucleo,
-                "Observações": "",
-                "Necessidades Especiais": necEspeciais,
-                "Tipo de Necessidade Especial": tipoNecEspecial,
-                "Transtorno": transtorno,
-                "Tipo de Transtorno": tipoTranstorno,
-                "Superdotação": superdotacao,
-                "Tipo de Superdotação": tipoSuperdotacao,
+                'Nº Chamada': int(numeroChamada),
+                'Aluno': nomeAluno,
+                'Matrícula': matriculaAluno,
+                'Série': serieAluno,
+                'Disciplina': nomeDisp,
+                '1º BI': blocos['notas'][0],
+                '2º BI': blocos['notas'][1],
+                '3º BI': blocos['notas'][2],
+                '4º BI': blocos['notas'][3],
+                'Média Final': blocos['mediaFinal'],
+                'Freq. Final': blocos['freqFinal'],
+                'Núcleo': nucleo,
+                'Observações': '',
+                'Necessidades Especiais': necEspeciais,
+                'Tipo de Necessidade Especial': tipoNecEspecial,
+                'Transtorno': transtorno,
+                'Tipo de Transtorno': tipoTranstorno,
+                'Superdotação': superdotacao,
+                'Tipo de Superdotação': tipoSuperdotacao
             })
 
-    # Atualiza dados NAPNE cruzados
+        if 'ultimoNomeVisto' not in locals():
+            ultimoNomeVisto = nomeAluno
+
+        if nomeAluno != ultimoNomeVisto:
+            numeroChamada += 1
+            ultimoNomeVisto = nomeAluno
+
+        if nomeAluno and nomeAluno != "Não Identificado":
+            mapaNapneTemporario[nomeAluno.strip().upper()] = {
+                'nec': necEspeciais, 'tipNec': tipoNecEspecial,
+                'trans': transtorno, 'tipTrans': tipoTranstorno,
+                'super': superdotacao, 'tipSuper': tipoSuperdotacao
+            }
+
     for dado in dadosFinais:
-        alunoAlvo = dado["Aluno"].strip().upper()
+        alunoAlvo = dado['Aluno'].strip().upper()
         if alunoAlvo in mapaNapneTemporario:
             info = mapaNapneTemporario[alunoAlvo]
-            dado["Necessidades Especiais"] = info["nec"]
-            dado["Tipo de Necessidade Especial"] = info["tipNec"]
-            dado["Transtorno"] = info["trans"]
-            dado["Tipo de Transtorno"] = info["tipTrans"]
-            dado["Superdotação"] = info["super"]
-            dado["Tipo de Superdotação"] = info["tipSuper"]
+            dado['Necessidades Especiais'] = info['nec']
+            dado['Tipo de Necessidade Especial'] = info['tipNec']
+            dado['Transtorno'] = info['trans']
+            dado['Tipo de Transtorno'] = info['tipTrans']
+            dado['Superdotação'] = info['super']
+            dado['Tipo de Superdotação'] = info['tipSuper']
 
     return pd.DataFrame(dadosFinais)
 
 
-# TELA 1: UPLOAD DE BOLETINS
+# UPLOAD DOS RELATÓRIOS EM PDF
 if not st.session_state.dadosCarregados:
-    st.title("Upload de PDFs do Conselho de Classe")
-    st.subheader("Selecione a turma e envie os relatórios para gerar o JSON e atualizar a planilha.")
+    st.title("Upload de PDFs")
+    st.subheader("Selecione a sala correspondente e faça o upload dos relatórios em PDF.")
 
-    salaSelecionada = st.selectbox("Selecione a Sala/Turma:", list(DICIONARIO_SALAS.keys()))
+    salaSelecionada = st.selectbox("Selecione a Sala:", list(DICIONARIO_SALAS.keys()))
     st.session_state.salaAtiva = salaSelecionada
+    arquivosEnviados = st.file_uploader("Faça o upload de quantos PDFs desejar aqui:", type=["pdf"], accept_multiple_files=True, key=f"uploader_{salaSelecionada}")
 
-    arquivosEnviados = st.file_uploader(
-        "Envie os PDFs dos boletins dos alunos:",
-        type=["pdf"],
-        accept_multiple_files=True,
-        key=f"uploader_{salaSelecionada}",
-    )
-
-    if st.button("PROCESSAR E ATUALIZAR DASHBOARD", type="primary"):
+    if st.button("PROCESSAR E ATUALIZAR DASHBOARD"):
         if arquivosEnviados:
-            with st.spinner("Processando PDFs, atualizando Planilha e gerando JSON..."):
+            with st.spinner("Processando arquivos e atualizando planilhas de notas..."):
                 BDNovo = extrairDados(arquivosEnviados)
 
+                linkSalaAtiva = DICIONARIO_SALAS[salaSelecionada]
+                df_atual = conn.read(spreadsheet=linkSalaAtiva)
+                
+                # SEU LÓGICA EXACTA DE MERGE: concatena e descarta duplicatas mantendo o 'last' (substitui o aluno reprocessado sem apagar os outros)
+                df_final = pd.concat([df_atual, BDNovo], ignore_index=True)
+                df_final = df_final.drop_duplicates(subset=["Aluno", "Disciplina"], keep="last")
+
                 if not BDNovo.empty:
-                    linkSalaAtiva = DICIONARIO_SALAS[salaSelecionada]
-                    df_atual = conn.read(spreadsheet=linkSalaAtiva)
-                    df_final = pd.concat([df_atual, BDNovo], ignore_index=True)
-                    df_final = df_final.drop_duplicates(subset=["Aluno", "Disciplina"], keep="last")
-                    
+                    # 1. Atualiza na planilha Google Sheets
                     conn.update(spreadsheet=linkSalaAtiva, data=df_final)
 
-                    # ATIVIDADE 1: Salva o dicionário gerado em JSON
+                    # 2. ATIVIDADE 1: Converte e salva o dicionário gerado em arquivo JSON
                     dicionario_dados = df_final.to_dict(orient="records")
                     with open("dados_alunos.json", "w", encoding="utf-8") as f:
                         json.dump(dicionario_dados, f, ensure_ascii=False, indent=4)
 
+                    st.session_state.salaAtiva = salaSelecionada
                     st.session_state.dadosCarregados = True
-                    st.success("Planilha atualizada e dados_alunos.json gerado com sucesso!")
+                    st.session_state.materiaSelecionada = None
+                    st.session_state.pagAluno = 0
                     st.rerun()
                 else:
-                    st.error("Nenhum dado estruturado pôde ser extraído.")
+                    st.error("Não foi possível extrair dados estruturados válidos.")
         else:
-            st.error("Selecione ao menos um arquivo PDF.")
+            st.error("Por favor, selecione e envie os arquivos PDF para processar.")
 
-# TELA 2: DASHBOARD (HTML / JS INTEGRADO - ATIVIDADE 2)
+# EXIBIÇÃO VISUAL DO DASHBOARD ACADÊMICO (MANTIDO O SEU LAYOUT ORIGINAL STREAMLIT)
 else:
-    st.sidebar.write(f"Turma Ativa: **{st.session_state.salaAtiva}**")
+    if "salaAtiva" not in st.session_state or not st.session_state.salaAtiva:
+        st.info("Nenhum relatório foi carregado ainda.")
+        st.write("Faça o upload dos PDFs na tela de Upload para visualizar o Dashboard.")
+        st.stop()
 
-    dados_para_html = []
-    if os.path.exists("dados_alunos.json"):
-        with open("dados_alunos.json", "r", encoding="utf-8") as f:
-            dados_para_html = json.load(f)
+    st.sidebar.write(f"Visualizando: **{st.session_state.salaAtiva}**")
+
+    linkSalaAtiva = DICIONARIO_SALAS[st.session_state.salaAtiva]
+    BD = conn.read(spreadsheet=linkSalaAtiva, ttl="0")
+    BD.columns = BD.columns.str.strip()
+
+    colunasNumericas = ['1º BI', '2º BI', '3º BI', '4º BI', 'Média Final', 'Freq. Final']
+    for col in colunasNumericas:
+        if col in BD.columns:
+            BD[col] = pd.to_numeric(BD[col].astype(str).str.replace(',', '.'), errors='coerce').fillna(0.0)
+
+    if 'Observações' in BD.columns:
+        BD['Observações'] = BD['Observações'].astype(str).replace('nan', '')
     else:
-        linkSalaAtiva = DICIONARIO_SALAS[st.session_state.salaAtiva]
-        df_sheet = conn.read(spreadsheet=linkSalaAtiva, ttl="0")
-        dados_para_html = df_sheet.where(pd.notnull(df_sheet), None).to_dict(orient="records")
+        BD['Observações'] = ""
 
-    alunosMapeados = {}
-    for item in dados_para_html:
-        prontuario = str(item.get("Matrícula") or item.get("prontuario") or "BT300000").strip()
+    ordemChamada = BD.sort_values(by='Nº Chamada', ascending=True)
+    alunosLista = ordemChamada['Aluno'].unique().tolist()
 
-        if prontuario not in alunosMapeados:
-            alunosMapeados[prontuario] = {
-                "prontuario": prontuario,
-                "nome": item.get("Aluno", "Aluno Desconhecido"),
-                "curso": item.get("Série", "Técnico em Redes"),
-                "turma": st.session_state.salaAtiva,
-                "frequencia": float(item.get("Freq. Final") or 100),
-                "napne": (
-                    str(item.get("Necessidades Especiais", "")).strip().lower() == "sim"
-                    or str(item.get("Transtorno", "")).strip().lower() == "sim"
-                ),
-                "pneInfo": f"PNE: {item.get('Tipo de Necessidade Especial') or '-'} | Transtorno: {item.get('Tipo de Transtorno') or '-'}",
-                "acoesNapne": [],
-                "deliberacao": str(item.get("Observações", "")) if item.get("Observações") and str(item.get("Observações")).lower() != "nan" else "",
-                "disciplinas": []
-            }
+    if not alunosLista:
+        st.info("Nenhum relatório foi carregado ainda.")
+        st.write("Faça o upload dos PDFs na tela de Upload para visualizar o Dashboard.")
+        st.stop()
 
-        def tratar_nota(v):
-            if v is None: return None
-            try: return float(str(v).replace(',', '.'))
-            except ValueError: return None
+    if st.session_state.pagAluno >= len(alunosLista):
+        st.session_state.pagAluno = 0
 
-        alunosMapeados[prontuario]["disciplinas"].append({
-            "nome": item.get("Disciplina", "Disciplina"),
-            "b1": tratar_nota(item.get("1º BI")),
-            "b2": tratar_nota(item.get("2º BI")),
-            "b3": tratar_nota(item.get("3º BI")),
-            "b4": tratar_nota(item.get("4º BI")),
-            "faltas": 0
-        })
+    alunoNome = alunosLista[st.session_state.pagAluno]
+    BDAluno = BD[BD['Aluno'] == alunoNome].copy()
 
-    json_estruturado = json.dumps(list(alunosMapeados.values()), ensure_ascii=False)
+    # FOTO E IDENTIFICAÇÃO DO ESTUDANTE
+    t1, t2 = st.columns([1, 4])
+    with t1:
+        st.markdown("### Foto")
+        if alunoNome in st.session_state.fotoAluno:
+            st.image(st.session_state.fotoAluno[alunoNome], use_container_width=True)
+        else:
+            st.image("https://via.placeholder.com/150", use_container_width=True)
 
-    if os.path.exists("index.html"):
-        with open("index.html", "r", encoding="utf-8") as f:
-            html_content = f.read()
+    with t2:
+        st.subheader(f"Nome: {alunoNome}")
 
-        html_injetado = html_content.replace("__DADOS_JSON_INJETADOS__", json_estruturado)
+        c1, c2 = st.columns(2)
+        matriculaVal = BDAluno['Matrícula'].iloc[0] if 'Matrícula' in BDAluno.columns else "Não Informado"
+        serieVal = BDAluno['Série'].iloc[0] if 'Série' in BDAluno.columns else "Não Informado"
 
-        import base64
-        b64_html = base64.b64encode(html_injetado.encode('utf-8')).decode('utf-8')
+        c1.markdown(f"<div class='info-box'><b>Matrícula:</b> {matriculaVal}</div>", unsafe_allow_html=True)
+        c2.markdown(f"<div class='info-box'><b>Série:</b> {serieVal}</div>", unsafe_allow_html=True)
 
-        iframe_code = f"""
-        <iframe 
-            src="data:text/html;charset=utf-8;base64,{b64_html}"
-            style="width: 100%; height: 1100px; border: none; border-radius: 8px;"
-        ></iframe>
-        """
-        st.markdown(iframe_code, unsafe_allow_html=True)
-    else:
-        st.error("O arquivo 'index.html' não foi encontrado no repositório GitHub.")
+        st.markdown("#### Informações de Inclusão (NAPNE)")
+        napCol1, napCol2, napCol3 = st.columns(3)
+
+        valPne = BDAluno['Necessidades Especiais'].iloc[0] if 'Necessidades Especiais' in BDAluno.columns else "Não Informado"
+        valTipPne = BDAluno['Tipo de Necessidade Especial'].iloc[0] if 'Tipo de Necessidade Especial' in BDAluno.columns else "-"
+        valTrans = BDAluno['Transtorno'].iloc[0] if 'Transtorno' in BDAluno.columns else "Não Informado"
+        valTipTrans = BDAluno['Tipo de Transtorno'].iloc[0] if 'Tipo de Transtorno' in BDAluno.columns else "-"
+        valSuper = BDAluno['Superdotação'].iloc[0] if 'Superdotação' in BDAluno.columns else "Não Informado"
+        valTipSuper = BDAluno['Tipo de Superdotação'].iloc[0] if 'Tipo de Superdotação' in BDAluno.columns else "-"
+
+        with napCol1:
+            st.markdown(f"<div class='info-box'><b>Possui PNE:</b> {valPne}</div>", unsafe_allow_html=True)
+            if str(valPne).strip().lower() in ["sim", "s"]:
+                st.markdown(f"<div class='info-box' style='color: #e67e22;'><b>Tipo de PNE:</b> {valTipPne}</div>", unsafe_allow_html=True)
+
+        with napCol2:
+            st.markdown(f"<div class='info-box'><b>Possui Transtorno:</b> {valTrans}</div>", unsafe_allow_html=True)
+            if str(valTrans).strip().lower() in ["sim", "s"]:
+                st.markdown(f"<div class='info-box' style='color: #e67e22;'><b>Tipo Transtorno:</b> {valTipTrans}</div>", unsafe_allow_html=True)
+
+        with napCol3:
+            st.markdown(f"<div class='info-box'><b>Superdotação:</b> {valSuper}</div>", unsafe_allow_html=True)
+            if str(valSuper).strip().lower() in ["sim", "s"]:
+                st.markdown(f"<div class='info-box' style='color: #e67e22;'><b>Tipo Superdotação:</b> {valTipSuper}</div>", unsafe_allow_html=True)
+
+    st.divider()
+
+    ordenarPor = st.radio("Ordenar disciplinas por:", ["Nota", "Frequência"], horizontal=True)
+
+    if ordenarPor != st.session_state.ordenacao:
+        st.session_state.materiaSelecionada = None
+        st.session_state.ordenacao = ordenarPor
+
+    # PARTE CENTRAL DASH
+    m1, m2, m3, m4 = st.columns([2, 3, 2, 2])
+
+    with m1:
+        st.write("### Disciplinas")
+        colunaRef = 'Média Final' if 'Média Final' in BDAluno.columns else '1º BI'
+        if ordenarPor == "Frequência" and 'Freq. Final' in BDAluno.columns:
+            colunaRef = 'Freq. Final'
+
+        BDLista = BDAluno.sort_values(by=colunaRef, ascending=True)
+        disciplinasOrdenadas = BDLista['Disciplina'].unique().tolist()
+
+        if st.session_state.materiaSelecionada is None or st.session_state.materiaSelecionada not in disciplinasOrdenadas:
+            if disciplinasOrdenadas:
+                st.session_state.materiaSelecionada = disciplinasOrdenadas[0]
+
+        for disci in disciplinasOrdenadas:
+            if st.button(disci, key=f"btn_{disci}"):
+                st.session_state.materiaSelecionada = disci
+                st.session_state.resetObs += 1
+                st.rerun()
+
+    if st.session_state.materiaSelecionada:
+        BDMateria = BDAluno[BDAluno['Disciplina'] == st.session_state.materiaSelecionada].iloc[0]
+
+        with m2:
+            freqFinalVal = float(BDMateria['Freq. Final'])
+            porcentagemPresenca = freqFinalVal * 100 if freqFinalVal <= 1.0 else freqFinalVal
+            porcentagemFaltas = max(0.0, 100.0 - porcentagemPresenca)
+
+            st.write(f"**Visão Anual de Frequência: {st.session_state.materiaSelecionada}**")
+
+            BDFreqRosca = pd.DataFrame({
+                "Status": ["Presença", "Faltas"],
+                "Percentual": [porcentagemPresenca, porcentagemFaltas]
+            })
+
+            import plotly.express as px
+            graficoFreq = px.pie(
+                BDFreqRosca,
+                names="Status",
+                values="Percentual",
+                hole=0.6,
+                color="Status",
+                color_discrete_map={"Presença": "#2ecc71", "Faltas": "#e74c3c"}
+            )
+
+            graficoFreq.update_traces(textinfo="percent+label", hoverinfo="label+percent")
+            graficoFreq.update_layout(
+                showlegend=False,
+                margin=dict(t=10, b=10, l=10, r=10),
+                height=220
+            )
+            st.plotly_chart(graficoFreq, use_container_width=True)
+
+            st.divider()
+
+            valMediaFim = round(float(BDMateria['Média Final']), 2)
+            st.write(f"**Notas por Bimestre (Média Final: {valMediaFim})**")
+
+            n1 = float(BDMateria['1º BI'])
+            n2 = float(BDMateria['2º BI'])
+            n3 = float(BDMateria['3º BI'])
+            n4 = float(BDMateria['4º BI'])
+
+            graficoNota = px.bar(x=['1º BI', '2º BI', '3º BI', '4º BI'], y=[n1, n2, n3, n4])
+            graficoNota.update_yaxes(range=[0, 10.5], title="Notas")
+            st.plotly_chart(graficoNota, use_container_width=True)
+
+        with m3:
+            st.write("### Global")
+            mediaComum = BDAluno[BDAluno['Núcleo'] == 'Comum']['Média Final'].mean()
+            mediaTec = BDAluno[BDAluno['Núcleo'] == 'Técnico']['Média Final'].mean()
+            notaMat = BDAluno[BDAluno['Disciplina'].str.contains('Matemática', case=False)]
+            mediaMat = notaMat['Média Final'].values[0] if not notaMat.empty else 0.0
+
+            mediaComum = round(mediaComum, 2) if pd.notna(mediaComum) else 0.0
+            mediaTec = round(mediaTec, 2) if pd.notna(mediaTec) else 0.0
+            mediaMat = round(float(mediaMat), 2)
+
+            st.write(f"Média Núcleo Comum: **{mediaComum}**")
+            st.write(f"Média Núcleo Técnico: **{mediaTec}**")
+            st.write(f"Média Matemática: **{mediaMat}**")
+            st.divider()
+
+            mediaGlobal = BDAluno['Média Final'].mean()
+            mediaGlobal = round(mediaGlobal, 1) if pd.notna(mediaGlobal) else 0.0
+            st.metric("Média Global", f"{mediaGlobal}")
+
+        with m4:
+            st.write("### Observações")
+            chaveObs = f"{alunoNome}_{st.session_state.materiaSelecionada}_{st.session_state.resetObs}".replace(" ", "_")
+            obsSalva = ""
+            if 'Observações' in BDMateria.index and pd.notna(BDMateria['Observações']):
+                obsSalva = str(BDMateria['Observações'])
+            historico = [n.strip() for n in obsSalva.split(" | ") if n.strip() and n.lower() != "nan"]
+
+            with st.form(key=f"form_{chaveObs}"):
+                entradasAtuais = []
+                for i, texto in enumerate(historico):
+                    st.text_area(f"Nota {i+1}", value=texto, key=f"hist_{chaveObs}_{i}", disabled=True)
+                    entradasAtuais.append(texto)
+
+                novaNota = st.text_area("Nova anotação...", value="", key=f"nova_{chaveObs}")
+
+                if st.form_submit_button("SALVAR"):
+                    if novaNota.strip():
+                        entradasAtuais.append(novaNota.strip())
+                        textoFinal = " | ".join(entradasAtuais)
+                        pagina = BD[(BD['Aluno'] == alunoNome) & (BD['Disciplina'] == st.session_state.materiaSelecionada)].index
+                        if not pagina.empty:
+                            BD.at[pagina[0], 'Observações'] = str(textoFinal)
+
+                            conn.update(spreadsheet=linkSalaAtiva, data=BD)
+                            st.session_state.resetObs += 1
+                            st.success("Salvo com sucesso!")
+                            st.rerun()
+
+    # BARRA INFERIOR DE NAVEGAÇÃO DOS ALUNOS
+    st.divider()
+    b1, b2, b3 = st.columns([1, 1, 1])
+    with b1:
+        if st.button("⬅️ Anterior"):
+            st.session_state.pagAluno = (st.session_state.pagAluno - 1) % len(alunosLista)
+            st.session_state.materiaSelecionada = None
+            st.session_state.resetObs += 1
+            st.rerun()
+
+    with b2:
+        dicionarioChamada = {
+            BD[BD['Aluno'] == a]['Nº Chamada'].iloc[0]: i
+            for i, a in enumerate(alunosLista)
+        }
+        numAtual = BDAluno['Nº Chamada'].iloc[0] if not BDAluno.empty else 1
+        opcoesOrdenadas = sorted(list(dicionarioChamada.keys()))
+
+        paginaSelecao = opcoesOrdenadas.index(numAtual) if numAtual in opcoesOrdenadas else 0
+
+        escolhaNum = st.selectbox(
+            "Aluno Nº:",
+            options=opcoesOrdenadas,
+            index=paginaSelecao
+        )
+
+        if dicionarioChamada[escolhaNum] != st.session_state.pagAluno:
+            st.session_state.pagAluno = dicionarioChamada[escolhaNum]
+            st.session_state.materiaSelecionada = None
+            st.session_state.resetObs += 1
+            st.rerun()
+
+    with b3:
+        if st.button("Próximo ➡️"):
+            st.session_state.pagAluno = (st.session_state.pagAluno + 1) % len(alunosLista)
+            st.session_state.materiaSelecionada = None
+            st.session_state.resetObs += 1
+            st.rerun()
