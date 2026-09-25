@@ -453,7 +453,7 @@ if not st.session_state.dadosCarregados:
 else:
     st.sidebar.write(f"Turma Ativa: **{st.session_state.salaAtiva}**")
 
-    # Lê os dados do arquivo JSON gerado (ou carrega da planilha caso o JSON não exista ainda)
+    # 1. Lê os dados do arquivo JSON gerado ou carrega da planilha
     dados_para_html = []
     if os.path.exists("dados_alunos.json"):
         with open("dados_alunos.json", "r", encoding="utf-8") as f:
@@ -461,64 +461,55 @@ else:
     else:
         linkSalaAtiva = DICIONARIO_SALAS[st.session_state.salaAtiva]
         df_sheet = conn.read(spreadsheet=linkSalaAtiva, ttl="0")
-        dados_para_html = df_sheet.to_dict(orient="records")
+        # Substitui NaN por None para gerar JSON válido sem erros no JS
+        dados_para_html = df_sheet.where(pd.notnull(df_sheet), None).to_dict(orient="records")
 
-    # Mapeia e estrutura o JSON para o formato esperado pelo HTML/JS
+    # 2. Agrupa e estrutura por aluno para o JavaScript
     alunosMapeados = {}
     for item in dados_para_html:
-        prontuario = (
-            str(item.get("Matrícula", ""))
-            or str(item.get("prontuario", ""))
-            or "BT300000"
-        )
+        prontuario = str(item.get("Matrícula") or item.get("prontuario") or "BT300000").strip()
+        
         if prontuario not in alunosMapeados:
             alunosMapeados[prontuario] = {
                 "prontuario": prontuario,
                 "nome": item.get("Aluno", "Aluno Desconhecido"),
                 "curso": item.get("Série", "Técnico em Informática"),
                 "turma": st.session_state.salaAtiva,
-                "frequencia": float(item.get("Freq. Final", 100) or 100),
+                "frequencia": float(item.get("Freq. Final") or 100),
                 "napne": (
-                    str(item.get("Necessidades Especiais", "")).strip().lower()
-                    == "sim"
+                    str(item.get("Necessidades Especiais", "")).strip().lower() == "sim"
                     or str(item.get("Transtorno", "")).strip().lower() == "sim"
                 ),
-                "pneInfo": f"PNE: {item.get('Tipo de Necessidade Especial', '-')} | Transtorno: {item.get('Tipo de Transtorno', '-')}",
+                "pneInfo": f"PNE: {item.get('Tipo de Necessidade Especial') or '-'} | Transtorno: {item.get('Tipo de Transtorno') or '-'}",
                 "acoesNapne": [],
-                "deliberacao": str(item.get("Observações", ""))
-                if str(item.get("Observações", "")) != "nan"
-                else "",
-                "disciplinas": [],
+                "deliberacao": str(item.get("Observações", "")) if item.get("Observações") and str(item.get("Observações")).lower() != "nan" else "",
+                "disciplinas": []
             }
 
-        alunosMapeados[prontuario]["disciplinas"].push({
+        # Função auxiliar para tratar notas numéricas ou manter null
+        def tratar_nota(v):
+            if v is None: return None
+            try: return float(str(v).replace(',', '.'))
+            except ValueError: return None
+
+        alunosMapeados[prontuario]["disciplinas"].append({
             "nome": item.get("Disciplina", "Disciplina"),
-            "b1": item.get("1º BI") if pd.notna(item.get("1º BI")) else None,
-            "b2": item.get("2º BI") if pd.notna(item.get("2º BI")) else None,
-            "b3": item.get("3º BI") if pd.notna(item.get("3º BI")) else None,
-            "b4": item.get("4º BI") if pd.notna(item.get("4º BI")) else None,
-            "faltas": 0,
-        }) if hasattr(alunosMapeados[prontuario]["disciplinas"], "push") else alunosMapeados[prontuario]["disciplinas"].append({
-            "nome": item.get("Disciplina", "Disciplina"),
-            "b1": float(item.get("1º BI")) if pd.notna(item.get("1º BI")) and str(item.get("1º BI")).replace('.', '', 1).isdigit() else None,
-            "b2": float(item.get("2º BI")) if pd.notna(item.get("2º BI")) and str(item.get("2º BI")).replace('.', '', 1).isdigit() else None,
-            "b3": float(item.get("3º BI")) if pd.notna(item.get("3º BI")) and str(item.get("3º BI")).replace('.', '', 1).isdigit() else None,
-            "b4": float(item.get("4º BI")) if pd.notna(item.get("4º BI")) and str(item.get("4º BI")).replace('.', '', 1).isdigit() else None,
-            "faltas": 0,
+            "b1": tratar_nota(item.get("1º BI")),
+            "b2": tratar_nota(item.get("2º BI")),
+            "b3": tratar_nota(item.get("3º BI")),
+            "b4": tratar_nota(item.get("4º BI")),
+            "faltas": 0
         })
 
+    # Converte o dicionário Python final para uma string JSON que o JS lê perfeitamente
     json_estruturado = json.dumps(list(alunosMapeados.values()), ensure_ascii=False)
 
-    # Carrega a Ficha em HTML e injeta os dados do JSON
+    # 3. Renderiza o HTML injetando a variável bancoAlunos
     if os.path.exists("index.html"):
         with open("index.html", "r", encoding="utf-8") as f:
             html_content = f.read()
 
-        html_injetado = html_content.replace(
-            "__DADOS_JSON_INJETADOS__", json_estruturado
-        )
-        components.html(html_injetado, height=1000, scrolling=True)
+        html_injetado = html_content.replace("__DADOS_JSON_INJETADOS__", json_estruturado)
+        components.html(html_injetado, height=1050, scrolling=True)
     else:
-        st.error(
-            "O arquivo 'index.html' não foi encontrado na raiz do projeto. Por favor, adicione-o ao repositório no GitHub."
-        )
+        st.error("O arquivo 'index.html' não foi encontrado no repositório GitHub.")
