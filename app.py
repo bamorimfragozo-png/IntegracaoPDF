@@ -1,4 +1,3 @@
-```python
 import base64
 import io
 import json
@@ -780,4 +779,3 @@ else:
         st.error(
             "O arquivo 'index.html' não foi encontrado no repositório GitHub."
         )
-```
