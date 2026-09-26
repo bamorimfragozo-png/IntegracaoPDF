@@ -407,11 +407,15 @@
 
             if (aluno) {
                 aluno.deliberacao = textoObs;
-        
-                // Redireciona a janela pai com parâmetros de URL para acionar o salvamento direto na planilha pelo Python
-                const urlPai = window.parent.location.href.split('?')[0];
-                const novaUrl = `${urlPai}?action=salvar_obs&aluno=${encodeURIComponent(aluno.nome)}&obs=${encodeURIComponent(textoObs)}`;
-                window.parent.location.href = novaUrl;
+                
+                // Envia para o Python salvar no Google Sheets
+                window.parent.postMessage({
+                    type: 'SALVAR_OBSERVACAO',
+                    aluno: aluno.nome,
+                    obs: textoObs
+                }, '*');
+
+                alert("Deliberação salva localmente! Aguarde a gravação na planilha...");
             }
         }
 
