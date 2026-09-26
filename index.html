@@ -395,40 +395,7 @@
         }
 
         function salvarDeliberacaoConselho() {
-            const select = document.getElementById('selectAluno');
-            const index = select.value;
-            const aluno = bancoAlunos[index];
-            const textoObs = document.getElementById('txtDeliberacaoConselho').value;
-
-            if (aluno) {
-                aluno.deliberacao = textoObs;
-                // Envio por formulário direto para garantir no Streamlit
-                const form = document.createElement('form');
-                form.method = 'GET';
-                form.action = window.parent.location.href.split('?')[0];
-                form.target = '_top';
-
-                const inputAction = document.createElement('input');
-                inputAction.type = 'hidden';
-                inputAction.name = 'action';
-                inputAction.value = 'salvar_obs';
-                form.appendChild(inputAction);
-
-                const inputAluno = document.createElement('input');
-                inputAluno.type = 'hidden';
-                inputAluno.name = 'aluno';
-                inputAluno.value = aluno.nome;
-                form.appendChild(inputAluno);
-
-                const inputObs = document.createElement('input');
-                inputObs.type = 'hidden';
-                inputObs.name = 'obs';
-                inputObs.value = textoObs;
-                form.appendChild(inputObs);
-
-                document.body.appendChild(form);
-                form.submit();
-            }
+            alert("Observação salva temporariamente na sessão local.");
         }
 
         window.onload = inicializar;
