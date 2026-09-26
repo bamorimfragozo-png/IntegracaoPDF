@@ -111,6 +111,7 @@
                                     <th class="text-center">B3</th>
                                     <th class="text-center">B4</th>
                                     <th class="text-center">Média</th>
+                                    <th class="text-center">Freq. %</th>
                                     <th class="text-center">Falta(s)</th>
                                 </tr>
                             </thead>
@@ -121,7 +122,6 @@
                 </div>
             </div>
 
-            <!-- GRÁFICOS DA DISCIPLINA SELECIONADA -->
             <div class="col-md-5">
                 <div class="card card-custom p-3 h-100">
                     <h6 class="fw-bold text-secondary mb-2" id="txtTituloDisciplina">Selecione uma disciplina na tabela</h6>
@@ -140,7 +140,7 @@
                         </div>
                     </div>
                     <hr>
-                    <h6 class="fw-bold text-secondary mb-2">Evolução Média Geral (Turma/Bimestres)</h6>
+                    <h6 class="fw-bold text-secondary mb-2">Evolução Média Geral (Bimestres)</h6>
                     <div style="height: 140px;">
                         <canvas id="chartEvolucaoGeral"></canvas>
                     </div>
@@ -148,7 +148,6 @@
             </div>
         </div>
 
-        <!-- NAPNE E DELIBERAÇÕES -->
         <div class="card card-custom p-3 napne-box">
             <div class="d-flex justify-content-between align-items-center mb-2">
                 <h6 class="fw-bold text-dark mb-0">
@@ -184,7 +183,6 @@
         let chartRoscaInstance = null;
         let chartBarrasInstance = null;
         let chartEvolucaoGeralInstance = null;
-        let disciplinaSelecionadaIndex = 0;
 
         function inicializar() {
             const select = document.getElementById('selectAluno');
@@ -234,14 +232,13 @@
 
             const tipoOrd = document.getElementById('selectOrdenacao').value;
 
-            // Ordenação configurável das disciplinas
             const disciplinasProcessadas = aluno.disciplinas.map(d => {
                 const notasValidas = [d.b1, d.b2, d.b3, d.b4].filter(n => n !== null && n !== undefined && !isNaN(n));
                 const media = notasValidas.length > 0 ? (notasValidas.reduce((a, b) => a + b, 0) / notasValidas.length) : null;
                 return { ...d, media: media };
             }).sort((a, b) => {
                 if (tipoOrd === 'freq') {
-                    return (a.faltas || 0) - (b.faltas || 0);
+                    return (a.frequenciaMateria || 100) - (b.frequenciaMateria || 100);
                 } else {
                     if (a.media === null) return 1;
                     if (b.media === null) return -1;
@@ -275,12 +272,11 @@
             }
 
             document.getElementById('txtNotasNapne').innerText = aluno.pneInfo;
-            document.getElementById('txtDeliberacaoConselho').value = aluno.deliberacao;
+            document.getElementById('txtDeliberacaoConselho').value = aluno.deliberacao || '';
             
             renderTabelaDisciplinas(disciplinasProcessadas);
             renderGraficoEvolucaoGeral(disciplinasProcessadas);
             
-            // Exibe gráficos da primeira disciplina por padrão
             if (disciplinasProcessadas.length > 0) {
                 selecionarDisciplina(0, disciplinasProcessadas);
             }
@@ -292,6 +288,7 @@
 
             disciplinas.forEach((d, i) => {
                 const classeMedia = obterClasseNota(d.media);
+                const freqMat = d.frequenciaMateria !== undefined ? d.frequenciaMateria.toFixed(1) + '%' : '-';
                 tbody.innerHTML += `
                     <tr id="tr_disp_${i}" onclick='selecionarDisciplina(${i}, ${JSON.stringify(disciplinas).replace(/'/g, "&apos;")})'>
                         <td class="fw-semibold">${d.nome}</td>
@@ -300,6 +297,7 @@
                         <td class="text-center ${obterClasseNota(d.b3)}">${formatarNota(d.b3)}</td>
                         <td class="text-center ${obterClasseNota(d.b4)}">${formatarNota(d.b4)}</td>
                         <td class="text-center ${classeMedia}">${formatarNota(d.media)}</td>
+                        <td class="text-center fw-bold ${d.frequenciaMateria < 75 ? 'text-danger' : ''}">${freqMat}</td>
                         <td class="text-center">${d.faltas || 0}</td>
                     </tr>
                 `;
@@ -307,7 +305,6 @@
         }
 
         function selecionarDisciplina(idx, disciplinas) {
-            disciplinaSelecionadaIndex = idx;
             document.querySelectorAll('#tbodyDisciplinas tr').forEach(tr => tr.classList.remove('linha-selecionada'));
             const rowSelected = document.getElementById(`tr_disp_${idx}`);
             if (rowSelected) rowSelected.classList.add('linha-selecionada');
@@ -315,8 +312,7 @@
             const d = disciplinas[idx];
             document.getElementById('txtTituloDisciplina').innerText = `Matéria: ${d.nome}`;
 
-            // 1. Rosca de Frequência da Matéria
-            const freqGlobal = parseFloat(document.getElementById('kpiFrequencia').innerText) || 100;
+            const freqDisc = d.frequenciaMateria !== undefined ? d.frequenciaMateria : 100;
             const ctxRosca = document.getElementById('chartRoscaFreq').getContext('2d');
             if (chartRoscaInstance) chartRoscaInstance.destroy();
 
@@ -325,7 +321,7 @@
                 data: {
                     labels: ['Presença', 'Faltas'],
                     datasets: [{
-                        data: [freqGlobal, Math.max(0, 100 - freqGlobal)],
+                        data: [freqDisc, Math.max(0, 100 - freqDisc)],
                         backgroundColor: ['#198754', '#dc3545']
                     }]
                 },
@@ -336,7 +332,6 @@
                 }
             });
 
-            // 2. Barras de Notas da Matéria
             const ctxBarras = document.getElementById('chartBarrasNota').getContext('2d');
             if (chartBarrasInstance) chartBarrasInstance.destroy();
 
@@ -407,11 +402,32 @@
 
             if (aluno) {
                 aluno.deliberacao = textoObs;
-        
-                // Redireciona a janela pai com parâmetros de URL para acionar o salvamento direto na planilha pelo Python
-                const urlPai = window.parent.location.href.split('?')[0];
-                const novaUrl = `${urlPai}?action=salvar_obs&aluno=${encodeURIComponent(aluno.nome)}&obs=${encodeURIComponent(textoObs)}`;
-                window.parent.location.href = novaUrl;
+                // Envio por formulário direto para garantir no Streamlit
+                const form = document.createElement('form');
+                form.method = 'GET';
+                form.action = window.parent.location.href.split('?')[0];
+                form.target = '_top';
+
+                const inputAction = document.createElement('input');
+                inputAction.type = 'hidden';
+                inputAction.name = 'action';
+                inputAction.value = 'salvar_obs';
+                form.appendChild(inputAction);
+
+                const inputAluno = document.createElement('input');
+                inputAluno.type = 'hidden';
+                inputAluno.name = 'aluno';
+                inputAluno.value = aluno.nome;
+                form.appendChild(inputAluno);
+
+                const inputObs = document.createElement('input');
+                inputObs.type = 'hidden';
+                inputObs.name = 'obs';
+                inputObs.value = textoObs;
+                form.appendChild(inputObs);
+
+                document.body.appendChild(form);
+                form.submit();
             }
         }
 
