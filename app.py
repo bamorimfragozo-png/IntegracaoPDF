@@ -121,7 +121,7 @@ def extrairDados(arquivosPdf):
             if not nomeAluno or nomeAluno == "Não Identificado":
                 nomeAluno = arquivo.name.replace(".pdf", "").replace("Boletim", "").replace("_", " ").strip()
 
-            # Captura precisa do NAPNE
+            # Captura precisa do NAPNE (versão flexível com e sem dois-pontos)
             necEspeciais = "Não"
             tipoNecEspecial = "-"
             transtorno = "Não"
@@ -130,23 +130,23 @@ def extrairDados(arquivosPdf):
             tipoSuperdotacao = "-"
 
             # Necessidades Especiais
-            mPne = re.search(r"Portador\(a\)\s+de\s+Necessidades\s+Especiais\s*:\s*(Sim|Não)", blocoLimpo, re.IGNORECASE)
+            mPne = re.search(r"Portador\(a\)\s+de\s+Necessidades\s+Especiais\s*:?\s*(Sim|Não)", blocoLimpo, re.IGNORECASE)
             if mPne: necEspeciais = mPne.group(1).capitalize()
-            mTipPne = re.search(r"Tipo\s+de\s+Necessidade\s+Especial\s*:\s*([^:]+?)(?=Portador|\bTranstorno\b|\bSuperdotação\b|Disciplina|\Z)", blocoLimpo, re.IGNORECASE)
+            mTipPne = re.search(r"Tipo\s+de\s+Necessidade\s+Especial\s*:?\s*(.*?)(?=Portador|\bTranstorno\b|\bSuperdotação\b|Disciplina|\Z)", blocoLimpo, re.IGNORECASE)
             if mTipPne and mTipPne.group(1).strip() not in ["-", ""]:
                 tipoNecEspecial = mTipPne.group(1).strip()
 
             # Transtorno
-            mTrans = re.search(r"Portador\(a\)\s+de\s+Transtorno\s*:\s*(Sim|Não)", blocoLimpo, re.IGNORECASE)
+            mTrans = re.search(r"Portador\(a\)\s+de\s+Transtorno\s*:?\s*(Sim|Não)", blocoLimpo, re.IGNORECASE)
             if mTrans: transtorno = mTrans.group(1).capitalize()
-            mTipTrans = re.search(r"Tipo\s+de\s+Transtorno\s*:\s*([^:]+?)(?=Portador|\bSuperdotação\b|Disciplina|\Z)", blocoLimpo, re.IGNORECASE)
+            mTipTrans = re.search(r"Tipo\s+de\s+Transtorno\s*:?\s*(.*?)(?=Portador|\bSuperdotação\b|Disciplina|\Z)", blocoLimpo, re.IGNORECASE)
             if mTipTrans and mTipTrans.group(1).strip() not in ["-", ""]:
                 tipoTranstorno = mTipTrans.group(1).strip()
 
             # Superdotação
-            mSuper = re.search(r"Portador\(a\)\s+de\s+Superdotação\s*:\s*(Sim|Não)", blocoLimpo, re.IGNORECASE)
+            mSuper = re.search(r"Portador\(a\)\s+de\s+Superdotação\s*:?\s*(Sim|Não)", blocoLimpo, re.IGNORECASE)
             if mSuper: superdotacao = mSuper.group(1).capitalize()
-            mTipSuper = re.search(r"Tipo\s+de\s+Superdotação\s*:\s*([^:]+?)(?=Disciplina|\Z)", blocoLimpo, re.IGNORECASE)
+            mTipSuper = re.search(r"Tipo\s+de\s+Superdotação\s*:?\s*(.*?)(?=Disciplina|\Z)", blocoLimpo, re.IGNORECASE)
             if mTipSuper and mTipSuper.group(1).strip() not in ["-", ""]:
                 tipoSuperdotacao = mTipSuper.group(1).strip()
 
