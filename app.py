@@ -81,7 +81,7 @@ def extrairDados(arquivosPdf):
             textoCompleto += pagina.extract_text() + "\n"
 
         # Divisão estrita por boletim individual
-        blocosBoletins = re.split(r"(?=BOLETIM DE NOTAS INDIVIDUAL|Aluno\(a\):)", textoCompleto)
+        blocosBoletins = re.split(r"(?=BOLETIM DE NOTAS INDIVIDUAL|Alunoa:)", textoCompleto)
 
         for bloco in blocosBoletins:
             if "Disciplina" not in bloco and "TÉCNICO" not in bloco:
@@ -96,7 +96,7 @@ def extrairDados(arquivosPdf):
             freqGlobal = 100.0
 
             # Nome do Aluno
-            mNome = re.search(r"Aluno\(a\):\s*([^\n|]+)", bloco, re.IGNORECASE)
+            mNome = re.search(r"Alunoa:\s*([^\n|]+)", bloco, re.IGNORECASE)
             if mNome:
                 nomeAluno = mNome.group(1).strip()
                 nomeAluno = re.sub(r"Matrícula:.*", "", nomeAluno, flags=re.IGNORECASE).strip()
@@ -108,12 +108,10 @@ def extrairDados(arquivosPdf):
 
             # Matrícula e Turma
             mMat = re.search(r"BT\d{7}", bloco)
-            if mMat:
-                matriculaAluno = mMat.group(0).strip()
+            if mMat: matriculaAluno = mMat.group(0).strip()
 
             mTurma = re.search(r"202\d[12]\.\d\.[A-Z0-9\.]+", bloco)
-            if mTurma:
-                serieAluno = mTurma.group(0).strip()
+            if mTurma: serieAluno = mTurma.group(0).strip()
 
             # Frequência isolada do aluno atual
             mFreq = re.search(r"Frequência\s*:\s*\|?\s*(\d+[\.,]?\d*)\s*%", blocoLimpo, re.IGNORECASE)
@@ -132,32 +130,29 @@ def extrairDados(arquivosPdf):
             tipoSuperdotacao = "-"
 
             # Necessidades Especiais
-            mPne = re.search(r"Portador\(a\)\s+de\s+Necessidades\s+Especiais\s*:?\s*(Sim|Não)", blocoLimpo, re.IGNORECASE)
-            if mPne:
-                necEspeciais = mPne.group(1).capitalize()
+            mPne = re.search(r"Portadora\s+de\s+Necessidades\s+Especiais\s*:?\s*(Sim|Não)", blocoLimpo, re.IGNORECASE)
+            if mPne: necEspeciais = mPne.group(1).capitalize()
             mTipPne = re.search(r"Tipo\s+de\s+Necessidade\s+Especial\s*:?\s*(.*?)(?=Portador|\bTranstorno\b|\bSuperdotação\b|Disciplina|\Z)", blocoLimpo, re.IGNORECASE)
             if mTipPne and mTipPne.group(1).strip() not in ["-", ""]:
                 tipoNecEspecial = mTipPne.group(1).strip()
 
             # Transtorno
-            mTrans = re.search(r"Portador\(a\)\s+de\s+Transtorno\s*:?\s*(Sim|Não)", blocoLimpo, re.IGNORECASE)
-            if mTrans:
-                transtorno = mTrans.group(1).capitalize()
+            mTrans = re.search(r"Portadora\s+de\s+Transtorno\s*:?\s*(Sim|Não)", blocoLimpo, re.IGNORECASE)
+            if mTrans: transtorno = mTrans.group(1).capitalize()
             mTipTrans = re.search(r"Tipo\s+de\s+Transtorno\s*:?\s*(.*?)(?=Portador|\bSuperdotação\b|Disciplina|\Z)", blocoLimpo, re.IGNORECASE)
             if mTipTrans and mTipTrans.group(1).strip() not in ["-", ""]:
                 tipoTranstorno = mTipTrans.group(1).strip()
 
             # Superdotação
-            mSuper = re.search(r"Portador\(a\)\s+de\s+Superdotação\s*:?\s*(Sim|Não)", blocoLimpo, re.IGNORECASE)
-            if mSuper:
-                superdotacao = mSuper.group(1).capitalize()
+            mSuper = re.search(r"Portadora\s+de\s+Superdotação\s*:?\s*(Sim|Não)", blocoLimpo, re.IGNORECASE)
+            if mSuper: superdotacao = mSuper.group(1).capitalize()
             mTipSuper = re.search(r"Tipo\s+de\s+Superdotação\s*:?\s*(.*?)(?=Disciplina|\Z)", blocoLimpo, re.IGNORECASE)
             if mTipSuper and mTipSuper.group(1).strip() not in ["-", ""]:
                 tipoSuperdotacao = mTipSuper.group(1).strip()
 
             # Disciplinas
             padraoBloco = re.findall(
-                r"(INT\.\d{5}\s*\([A-Z0-9]+\)\s*-\s*[^0-9\n]+)([\s\S]*?)(?=(?:INT\.\d{5}|Total|Este documento|Boituva|\Z))",
+                r"(INT\.\d{5}\s*[A-Z0-9]+\s*-\s*[^0-9\n]+)([\s\S]*?)(?=(?:INT\.\d{5}|Total|Este documento|Boituva|\Z))",
                 bloco
             )
 
