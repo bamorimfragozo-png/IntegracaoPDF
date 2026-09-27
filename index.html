@@ -183,22 +183,13 @@
     let disciplinaSelecionadaIndex = 0;
     let disciplinasAtuais = [];
 
-    function slugSala(sala) {
-        return String(sala || '')
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, '_')
-            .replace(/^_+|_+$/g, '');
-    }
-
     function obterSala() {
-        const params = new URLSearchParams(window.location.search);
-        return params.get('sala') || 'Redes 1';
-    }
-
-    function obterUrlJson() {
-        return `/app/static/dados_alunos_${slugSala(obterSala())}.json?ts=${Date.now()}`;
+        try {
+            const params = new URLSearchParams(window.parent.location.search);
+            return params.get('sala') || 'Redes 1';
+        } catch (e) {
+            return 'Redes 1';
+        }
     }
 
     async function carregarJson(mostrarMensagem = false) {
@@ -206,20 +197,12 @@
         if (mostrarMensagem) status.innerText = 'Atualizando...';
 
         try {
-            // Se os dados foram injetados diretamente pelo Streamlit (Python)
             if (window.dadosAlunosInjetados && Array.isArray(window.dadosAlunosInjetados)) {
                 bancoAlunos = window.dadosAlunosInjetados;
                 inicializar();
                 if (mostrarMensagem) status.innerText = 'Dados atualizados.';
                 return;
             }
-
-            // Fallback caso tente buscar via HTTP fetch
-            const resposta = await fetch(obterUrlJson(), { cache: 'no-store' });
-            if (!resposta.ok) throw new Error(`HTTP ${resposta.status}`);
-            bancoAlunos = await resposta.json();
-            inicializar();
-            if (mostrarMensagem) status.innerText = 'Dados atualizados.';
         } catch (erro) {
             console.error(erro);
             status.innerText = 'Erro ao ler os dados.';
@@ -473,6 +456,7 @@
 
     function salvarDeliberacaoConselho() {
         const select = document.getElementById('selectAluno');
+        if (!select || select.value === '') return;
         const aluno = bancoAlunos[parseInt(select.value, 10)];
         const textoObs = document.getElementById('txtDeliberacaoConselho').value;
 
@@ -480,13 +464,19 @@
 
         aluno.deliberacao = textoObs;
 
-        const urlPai = window.parent.location.href.split('?')[0];
-        const params = new URLSearchParams();
-        params.set('action', 'salvar_obs');
-        params.set('matricula', aluno.prontuario);
-        params.set('sala', obterSala());
-        params.set('obs', textoObs);
-        window.parent.location.href = `${urlPai}?${params.toString()}`;
+        try {
+            const urlAtual = new URL(window.parent.location.href);
+            urlAtual.searchParams.set('action', 'salvar_obs');
+            urlAtual.searchParams.set('matricula', aluno.prontuario);
+            urlAtual.searchParams.set('sala', obterSala());
+            urlAtual.searchParams.set('obs', textoObs);
+            window.parent.location.href = urlAtual.toString();
+        } catch (e) {
+            window.open(
+                `?action=salvar_obs&matricula=${encodeURIComponent(aluno.prontuario)}&sala=${encodeURIComponent(obterSala())}&obs=${encodeURIComponent(textoObs)}`,
+                '_parent'
+            );
+        }
     }
 
     window.addEventListener('load', () => carregarJson(false));
