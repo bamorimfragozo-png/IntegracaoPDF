@@ -194,7 +194,7 @@
                 return;
             }
             bancoAlunos.forEach((aluno, index) => {
-                select.innerHTML += `<option value="${index}">${aluno.nome} (${aluno.prontuario})</option>`;
+                select.innerHTML += `<option value="index">{aluno.nome} (${aluno.prontuario})</option>`;
             });
             carregarDadosAluno();
         }
@@ -293,13 +293,13 @@
             disciplinas.forEach((d, i) => {
                 const classeMedia = obterClasseNota(d.media);
                 tbody.innerHTML += `
-                    <tr id="tr_disp_${i}" onclick='selecionarDisciplina(${i}, ${JSON.stringify(disciplinas).replace(/'/g, "&apos;")})'>
+                    <tr id="tr_disp_i"onclick='selecionarDisciplina({i}, ${JSON.stringify(disciplinas).replace(/'/g, "&apos;")})'>
                         <td class="fw-semibold">${d.nome}</td>
-                        <td class="text-center ${obterClasseNota(d.b1)}">${formatarNota(d.b1)}</td>
-                        <td class="text-center ${obterClasseNota(d.b2)}">${formatarNota(d.b2)}</td>
-                        <td class="text-center ${obterClasseNota(d.b3)}">${formatarNota(d.b3)}</td>
-                        <td class="text-center ${obterClasseNota(d.b4)}">${formatarNota(d.b4)}</td>
-                        <td class="text-center ${classeMedia}">${formatarNota(d.media)}</td>
+                        <td class="text-center obterClasseNota(d.b1)">{formatarNota(d.b1)}</td>
+                        <td class="text-center obterClasseNota(d.b2)">{formatarNota(d.b2)}</td>
+                        <td class="text-center obterClasseNota(d.b3)">{formatarNota(d.b3)}</td>
+                        <td class="text-center obterClasseNota(d.b4)">{formatarNota(d.b4)}</td>
+                        <td class="text-center classeMedia">{formatarNota(d.media)}</td>
                         <td class="text-center">${d.faltas || 0}</td>
                     </tr>
                 `;
@@ -410,7 +410,7 @@
         
                 // Redireciona a janela pai com parâmetros de URL para acionar o salvamento direto na planilha pelo Python
                 const urlPai = window.parent.location.href.split('?')[0];
-                const novaUrl = `${urlPai}?action=salvar_obs&aluno=${encodeURIComponent(aluno.nome)}&obs=${encodeURIComponent(textoObs)}`;
+                const novaUrl = `urlPai?action=salvarobs&aluno={encodeURIComponent(aluno.nome)}&obs=${encodeURIComponent(textoObs)}`;
                 window.parent.location.href = novaUrl;
             }
         }
