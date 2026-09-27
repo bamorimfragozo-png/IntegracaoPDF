@@ -817,21 +817,33 @@ else:
     if not HTML_PATH.exists():
         st.error("O arquivo 'index.html' não foi encontrado no repositório.")
     else:
-        # O Python atualiza o JSON a partir da fonte persistente (Google Sheets)
-        # sempre que o dashboard é aberto. O JavaScript é quem faz a leitura desse JSON.
         try:
+            # Lê os dados atualizados do Google Sheets
             df_dashboard = conn.read(
                 spreadsheet=DICIONARIO_SALAS[sala_ativa],
                 ttl=0,
             )
-            atualizar_json_da_planilha(sala_ativa, df_dashboard)
-        except Exception as erro:
-            st.error(f"Não foi possível atualizar o arquivo JSON a partir da planilha: {erro}")
+            dados_json = dataframe_para_json(df_dashboard)
+            
+            # Lê o conteúdo do HTML
+            html_content = HTML_PATH.read_text(encoding="utf-8")
+            
+            # Injeta os dados do Python diretamente no Script do HTML
+            script_injecao = f"""
+            <script>
+                window.dadosAlunosInjetados = {json.dumps(dados_json, ensure_ascii=False)};
+            </script>
+            """
+            
+            # Insere o script no início do <head> do HTML
+            html_final = html_content.replace("<head>", f"<head>{script_injecao}", 1)
+            
+            # Renderiza o HTML com os dados já carregados
+            st.components.v1.html(
+                html_final,
+                height=1150,
+                scrolling=True,
+            )
 
-        # O HTML é servido como iframe local; o JavaScript dentro dele faz fetch()
-        # do JSON em /app/static/....
-        st.iframe(
-            HTML_PATH,
-            height=1150,
-            width="stretch",
-        )
+        except Exception as erro:
+            st.error(f"Não foi possível carregar os dados da planilha: {erro}")
