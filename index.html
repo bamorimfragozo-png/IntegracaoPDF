@@ -12,13 +12,11 @@
         .card-custom { border: none; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); background: white; }
         .napne-box { background-color: #fff8e1; border-left: 4px solid #ffa000; }
         .table-sm td, .table-sm th { vertical-align: middle; padding: 0.5rem; cursor: pointer; }
-        .tabela-disciplinas { table-layout: fixed; width: 100%; }
-        .tabela-disciplinas th:first-child, .tabela-disciplinas td:first-child { width: 46%; white-space: normal; overflow-wrap: anywhere; word-break: normal; }
-        .tabela-disciplinas th:not(:first-child), .tabela-disciplinas td:not(:first-child) { width: 9%; }
-        .nome-disciplina { white-space: normal !important; overflow-wrap: anywhere; line-height: 1.25; }
+
         .nota-vermelha { color: #dc3545; font-weight: bold; }
         .nota-laranja { color: #fd7e14; font-weight: bold; }
         .nota-verde { color: #198754; font-weight: bold; }
+
         .nav-btn-side {
             position: fixed; top: 0; bottom: 0; width: 32px;
             background-color: rgba(33, 37, 41, 0.08); color: #495057; border: none;
@@ -30,8 +28,6 @@
         .nav-btn-right { right: 0; border-top-left-radius: 8px; border-bottom-left-radius: 8px; }
         .container-wrapper { margin-left: 28px; margin-right: 28px; }
         .linha-selecionada { background-color: #e7f1ff !important; }
-        .status-carregamento { min-height: 24px; }
-        .napne-item { margin-bottom: 4px; }
     </style>
 </head>
 <body class="p-3">
@@ -50,17 +46,14 @@
                     <label for="selectAluno" class="form-label fw-bold text-secondary mb-1">
                         <i class="bi bi-person-bounding-box me-1"></i> Selecionar Aluno (Conselho de Classe):
                     </label>
-                    <select id="selectAluno" class="form-select form-select-sm fw-bold" onchange="carregarDadosAluno()"></select>
+                    <select id="selectAluno" class="form-select form-select-sm fw-bold" onchange="carregarDadosAluno()">
+                    </select>
                 </div>
                 <div class="col-md-5">
                     <h5 class="fw-bold mb-0 text-dark" id="txtNomeAluno">---</h5>
                     <small class="text-muted">Prontuário: <span id="txtProntuario" class="fw-semibold">---</span> | Curso: <span id="txtCurso" class="fw-semibold">---</span> | Turma: <span id="txtTurma" class="fw-semibold">---</span></small>
                 </div>
                 <div class="col-md-3 text-end">
-                    <button class="btn btn-sm btn-outline-primary mb-2" onclick="carregarJson(true)">
-                        <i class="bi bi-arrow-clockwise me-1"></i> Atualizar dados
-                    </button>
-                    <div id="statusCarregamento" class="small text-muted status-carregamento"></div>
                     <span id="badgeStatusGeral" class="badge p-2 fs-6">---</span>
                 </div>
             </div>
@@ -76,7 +69,7 @@
             <div class="col-md-3">
                 <div class="card card-custom p-2 text-center border-start border-4 border-info">
                     <small class="text-muted fw-bold">FREQUÊNCIA GLOBAL</small>
-                    <h3 class="fw-bold mb-0" id="kpiFrequencia">-</h3>
+                    <h3 class="fw-bold mb-0" id="kpiFrequencia">0%</h3>
                 </div>
             </div>
             <div class="col-md-3">
@@ -104,12 +97,12 @@
                             <label class="small text-muted fw-semibold">Ordenar por:</label>
                             <select id="selectOrdenacao" class="form-select form-select-sm" style="width: auto;" onchange="carregarDadosAluno()">
                                 <option value="nota">Menor Nota Primeiro</option>
-                                <option value="freq">Maior quantidade de faltas primeiro</option>
+                                <option value="freq">Menor Frequência Primeiro</option>
                             </select>
                         </div>
                     </div>
                     <div class="table-responsive">
-                        <table class="table table-sm table-hover align-middle mb-0 tabela-disciplinas">
+                        <table class="table table-sm table-hover align-middle mb-0">
                             <thead class="table-light">
                                 <tr>
                                     <th>Disciplina (Clique para ver gráficos)</th>
@@ -121,33 +114,41 @@
                                     <th class="text-center">Falta(s)</th>
                                 </tr>
                             </thead>
-                            <tbody id="tbodyDisciplinas"></tbody>
+                            <tbody id="tbodyDisciplinas">
+                            </tbody>
                         </table>
                     </div>
                 </div>
             </div>
 
+            <!-- GRÁFICOS DA DISCIPLINA SELECIONADA -->
             <div class="col-md-5">
                 <div class="card card-custom p-3 h-100">
                     <h6 class="fw-bold text-secondary mb-2" id="txtTituloDisciplina">Selecione uma disciplina na tabela</h6>
-                    <div class="small text-muted mb-2" id="txtFreqDisciplina"></div>
                     <div class="row g-2">
                         <div class="col-md-6 text-center">
                             <small class="fw-bold text-muted">Frequência da Matéria</small>
-                            <div style="height: 160px;"><canvas id="chartRoscaFreq"></canvas></div>
+                            <div style="height: 160px;">
+                                <canvas id="chartRoscaFreq"></canvas>
+                            </div>
                         </div>
                         <div class="col-md-6 text-center">
                             <small class="fw-bold text-muted">Notas por Bimestre</small>
-                            <div style="height: 160px;"><canvas id="chartBarrasNota"></canvas></div>
+                            <div style="height: 160px;">
+                                <canvas id="chartBarrasNota"></canvas>
+                            </div>
                         </div>
                     </div>
                     <hr>
-                    <h6 class="fw-bold text-secondary mb-2">Evolução Média Geral (Bimestres)</h6>
-                    <div style="height: 140px;"><canvas id="chartEvolucaoGeral"></canvas></div>
+                    <h6 class="fw-bold text-secondary mb-2">Evolução Média Geral (Turma/Bimestres)</h6>
+                    <div style="height: 140px;">
+                        <canvas id="chartEvolucaoGeral"></canvas>
+                    </div>
                 </div>
             </div>
         </div>
 
+        <!-- NAPNE E DELIBERAÇÕES -->
         <div class="card card-custom p-3 napne-box">
             <div class="d-flex justify-content-between align-items-center mb-2">
                 <h6 class="fw-bold text-dark mb-0">
@@ -159,7 +160,9 @@
             <div class="row g-3">
                 <div class="col-md-6">
                     <label class="fw-bold text-muted small">Informações NAPNE (SUAP):</label>
-                    <div class="p-2 bg-white rounded border text-secondary mb-2" id="txtNotasNapne" style="min-height: 80px;">Nenhum registro de NAPNE encontrado.</div>
+                    <div class="p-2 bg-white rounded border text-secondary mb-2" id="txtNotasNapne" style="min-height: 80px;">
+                        Nenhum registro de PNE/Transtorno/Superdotação encontrado.
+                    </div>
                 </div>
 
                 <div class="col-md-6">
@@ -175,311 +178,247 @@
         </div>
     </div>
 
-<script>
-    let bancoAlunos = [];
-    let chartRoscaInstance = null;
-    let chartBarrasInstance = null;
-    let chartEvolucaoGeralInstance = null;
-    let disciplinaSelecionadaIndex = 0;
-    let disciplinasAtuais = [];
+    <script>
+        let bancoAlunos = __DADOS_JSON_INJETADOS__;
 
-    function obterSala() {
-        try {
-            const params = new URLSearchParams(window.parent.location.search);
-            return params.get('sala') || 'Redes 1';
-        } catch (e) {
-            return 'Redes 1';
-        }
-    }
+        let chartRoscaInstance = null;
+        let chartBarrasInstance = null;
+        let chartEvolucaoGeralInstance = null;
+        let disciplinaSelecionadaIndex = 0;
+        let disciplinasAtuais = [];
 
-    async function carregarJson(mostrarMensagem = false) {
-        const status = document.getElementById('statusCarregamento');
-        if (mostrarMensagem) status.innerText = 'Atualizando...';
-
-        try {
-            if (window.dadosAlunosInjetados && Array.isArray(window.dadosAlunosInjetados)) {
-                bancoAlunos = window.dadosAlunosInjetados;
-                inicializar();
-                if (mostrarMensagem) status.innerText = 'Dados atualizados.';
+        function inicializar() {
+            const select = document.getElementById('selectAluno');
+            select.innerHTML = '';
+            if (!bancoAlunos || bancoAlunos.length === 0) {
+                select.innerHTML = '<option value="">Nenhum aluno cadastrado</option>';
                 return;
             }
-        } catch (erro) {
-            console.error(erro);
-            status.innerText = 'Erro ao ler os dados.';
-            document.getElementById('selectAluno').innerHTML = '<option value="">Não foi possível carregar os dados</option>';
-        }
-    }
-
-    function inicializar() {
-        const select = document.getElementById('selectAluno');
-        const valorAnterior = select.value;
-        select.innerHTML = '';
-
-        if (!Array.isArray(bancoAlunos) || bancoAlunos.length === 0) {
-            select.innerHTML = '<option value="">Nenhum aluno cadastrado</option>';
-            limparPainel();
-            return;
+            bancoAlunos.forEach((aluno, index) => {
+                select.innerHTML += `<option value="${index}">${aluno.nome} (${aluno.prontuario})</option>`;
+            });
+            carregarDadosAluno();
         }
 
-        bancoAlunos.forEach((aluno, index) => {
-            const option = document.createElement('option');
-            option.value = index;
-            option.textContent = `${aluno.nome} (${aluno.prontuario})`;
-            select.appendChild(option);
-        });
-
-        if (valorAnterior !== '' && Number(valorAnterior) < bancoAlunos.length) {
-            select.value = valorAnterior;
-        } else {
-            select.value = '0';
+        function navegarAluno(direcao) {
+            const select = document.getElementById('selectAluno');
+            let total = select.options.length;
+            if (total <= 1 && !select.value) return;
+            let atual = parseInt(select.value);
+            let novoIndex = (atual + direcao + total) % total;
+            select.value = novoIndex;
+            carregarDadosAluno();
         }
 
-        carregarDadosAluno();
-    }
-
-    function limparPainel() {
-        document.getElementById('txtNomeAluno').innerText = '---';
-        document.getElementById('txtProntuario').innerText = '---';
-        document.getElementById('txtCurso').innerText = '---';
-        document.getElementById('txtTurma').innerText = '---';
-        document.getElementById('kpiFrequencia').innerText = '-';
-        document.getElementById('txtNotasNapne').innerText = 'Nenhum registro de NAPNE encontrado.';
-        document.getElementById('txtDeliberacaoConselho').value = '';
-        document.getElementById('tbodyDisciplinas').innerHTML = '';
-    }
-
-    function navegarAluno(direcao) {
-        const select = document.getElementById('selectAluno');
-        const total = select.options.length;
-        if (total <= 0 || !bancoAlunos.length) return;
-        let atual = parseInt(select.value, 10);
-        if (Number.isNaN(atual)) atual = 0;
-        const novoIndex = (atual + direcao + total) % total;
-        select.value = String(novoIndex);
-        carregarDadosAluno();
-    }
-
-    function obterClasseNota(valor) {
-        if (valor === null || valor === undefined || isNaN(valor)) return '';
-        if (valor < 4.0) return 'nota-vermelha';
-        if (valor < 6.0) return 'nota-laranja';
-        return 'nota-verde';
-    }
-
-    function formatarNota(valor) {
-        return (valor !== null && valor !== undefined && !isNaN(valor)) ? Number(valor).toFixed(1) : '-';
-    }
-
-    function formatarPercentual(valor) {
-        return (valor !== null && valor !== undefined && !isNaN(valor)) ? Number(valor).toFixed(2).replace('.', ',') + '%' : '-';
-    }
-
-    function calcularMediaFallback(disciplina) {
-        if (disciplina.mediaFinal !== null && disciplina.mediaFinal !== undefined && !isNaN(disciplina.mediaFinal)) {
-            return Number(disciplina.mediaFinal);
-        }
-        const notas = [disciplina.b1, disciplina.b2, disciplina.b3, disciplina.b4]
-            .filter(n => n !== null && n !== undefined && !isNaN(n))
-            .map(Number);
-        return notas.length ? notas.reduce((a, b) => a + b, 0) / notas.length : null;
-    }
-
-    function carregarDadosAluno() {
-        const select = document.getElementById('selectAluno');
-        if (!select.value && select.value !== '0') return;
-        const aluno = bancoAlunos[parseInt(select.value, 10)];
-        if (!aluno) return;
-
-        document.getElementById('txtNomeAluno').innerText = aluno.nome || '---';
-        document.getElementById('txtProntuario').innerText = aluno.prontuario || '---';
-        document.getElementById('txtCurso').innerText = aluno.curso || '---';
-        document.getElementById('txtTurma').innerText = aluno.turma || '---';
-
-        const tipoOrd = document.getElementById('selectOrdenacao').value;
-        disciplinasAtuais = (aluno.disciplinas || []).map(d => ({
-            ...d,
-            media: calcularMediaFallback(d)
-        }));
-
-        disciplinasAtuais.sort((a, b) => {
-            if (tipoOrd === 'freq') return Number(b.faltas || 0) - Number(a.faltas || 0);
-            const mediaA = a.media === null ? Infinity : a.media;
-            const mediaB = b.media === null ? Infinity : b.media;
-            return mediaA - mediaB;
-        });
-
-        const mediasValidas = disciplinasAtuais.map(d => d.media).filter(m => m !== null && !isNaN(m));
-        const mediaGeral = mediasValidas.length ? mediasValidas.reduce((a, b) => a + b, 0) / mediasValidas.length : 0;
-        const retencoes = disciplinasAtuais.filter(d => d.media !== null && d.media < 6.0).length;
-
-        document.getElementById('kpiMediaGeral').innerText = mediaGeral.toFixed(1);
-        document.getElementById('kpiMediaGeral').className = `fw-bold mb-0 ${obterClasseNota(mediaGeral)}`;
-
-        const frequencia = aluno.frequencia;
-        document.getElementById('kpiFrequencia').innerText = formatarPercentual(frequencia);
-        document.getElementById('kpiFrequencia').className = `fw-bold mb-0 ${frequencia !== null && frequencia < 75.0 ? 'text-danger' : 'text-info'}`;
-
-        document.getElementById('kpiRetencoes').innerText = retencoes;
-        document.getElementById('kpiNapneStatus').innerText = aluno.napne ? 'SIM' : 'NÃO';
-
-        const badgeStatus = document.getElementById('badgeStatusGeral');
-        if ((frequencia !== null && frequencia < 75.0) || retencoes > 3) {
-            badgeStatus.innerText = 'SITUAÇÃO CRÍTICA';
-            badgeStatus.className = 'badge bg-danger p-2 fs-6';
-        } else if (retencoes > 0) {
-            badgeStatus.innerText = 'EM ATENÇÃO';
-            badgeStatus.className = 'badge bg-warning text-dark p-2 fs-6';
-        } else {
-            badgeStatus.innerText = 'PROMOVIDO / SATISFATÓRIO';
-            badgeStatus.className = 'badge bg-success p-2 fs-6';
+        function obterClasseNota(valor) {
+            if (valor === null || valor === undefined || isNaN(valor)) return '';
+            if (valor < 4.0) return 'nota-vermelha';
+            if (valor < 6.0) return 'nota-laranja';
+            return 'nota-verde';
         }
 
-        document.getElementById('txtNotasNapne').innerText = aluno.pneInfo || 'Nenhum registro de NAPNE encontrado.';
-        document.getElementById('txtDeliberacaoConselho').value = aluno.deliberacao || '';
+        function formatarNota(valor) {
+            return (valor !== null && valor !== undefined && !isNaN(valor)) ? valor.toFixed(1) : '-';
+        }
 
-        renderTabelaDisciplinas(disciplinasAtuais);
-        renderGraficoEvolucaoGeral(disciplinasAtuais);
+        function carregarDadosAluno() {
+            const select = document.getElementById('selectAluno');
+            if (!select.value && select.value !== "0") return;
+            const index = select.value;
+            const aluno = bancoAlunos[index];
+            if (!aluno) return;
 
-        if (disciplinasAtuais.length > 0) selecionarDisciplina(0);
-        else document.getElementById('txtTituloDisciplina').innerText = 'Nenhuma disciplina encontrada';
-    }
+            document.getElementById('txtNomeAluno').innerText = aluno.nome;
+            document.getElementById('txtProntuario').innerText = aluno.prontuario;
+            document.getElementById('txtCurso').innerText = aluno.curso;
+            document.getElementById('txtTurma').innerText = aluno.turma;
 
-    function renderTabelaDisciplinas(disciplinas) {
-        const tbody = document.getElementById('tbodyDisciplinas');
-        tbody.innerHTML = '';
+            const tipoOrd = document.getElementById('selectOrdenacao').value;
 
-        disciplinas.forEach((d, i) => {
-            const classeMedia = obterClasseNota(d.media);
-            const tr = document.createElement('tr');
-            tr.id = `tr_disp_${i}`;
-            tr.onclick = () => selecionarDisciplina(i);
-
-            const nome = document.createElement('td');
-            nome.className = 'fw-semibold nome-disciplina';
-            nome.textContent = d.nome || 'Disciplina';
-            tr.appendChild(nome);
-
-            ['b1', 'b2', 'b3', 'b4'].forEach(campo => {
-                const td = document.createElement('td');
-                td.className = `text-center ${obterClasseNota(d[campo])}`;
-                td.textContent = formatarNota(d[campo]);
-                tr.appendChild(td);
+            // Ordenação configurável das disciplinas
+            disciplinasAtuais = aluno.disciplinas.map(d => {
+                const notasValidas = [d.b1, d.b2, d.b3, d.b4].filter(n => n !== null && n !== undefined && !isNaN(n));
+                const media = notasValidas.length > 0 ? (notasValidas.reduce((a, b) => a + b, 0) / notasValidas.length) : null;
+                return { ...d, media: media };
+            }).sort((a, b) => {
+                if (tipoOrd === 'freq') {
+                    return (a.faltas || 0) - (b.faltas || 0);
+                } else {
+                    if (a.media === null) return 1;
+                    if (b.media === null) return -1;
+                    return a.media - b.media;
+                }
             });
 
-            const media = document.createElement('td');
-            media.className = `text-center ${classeMedia}`;
-            media.textContent = formatarNota(d.media);
-            tr.appendChild(media);
+            const mediasValidas = disciplinasAtuais.map(d => d.media).filter(m => m !== null);
+            const mediaGeral = mediasValidas.length > 0 ? (mediasValidas.reduce((a, b) => a + b, 0) / mediasValidas.length) : 0;
+            const retencoes = disciplinasAtuais.filter(d => d.media !== null && d.media < 6.0).length;
 
-            const faltas = document.createElement('td');
-            faltas.className = 'text-center';
-            faltas.textContent = (d.faltas !== null && d.faltas !== undefined) ? d.faltas : '-';
-            tr.appendChild(faltas);
+            document.getElementById('kpiMediaGeral').innerText = mediaGeral.toFixed(1);
+            document.getElementById('kpiMediaGeral').className = `fw-bold mb-0 ${obterClasseNota(mediaGeral)}`;
+            
+            document.getElementById('kpiFrequencia').innerText = aluno.frequencia.toFixed(1) + '%';
+            document.getElementById('kpiFrequencia').className = `fw-bold mb-0 ${aluno.frequencia < 75.0 ? 'text-danger' : 'text-info'}`;
+            
+            document.getElementById('kpiRetencoes').innerText = retencoes;
+            document.getElementById('kpiNapneStatus').innerText = aluno.napne ? "SIM" : "NÃO";
 
-            tbody.appendChild(tr);
-        });
-    }
-
-    function selecionarDisciplina(idx) {
-        disciplinaSelecionadaIndex = idx;
-        document.querySelectorAll('#tbodyDisciplinas tr').forEach(tr => tr.classList.remove('linha-selecionada'));
-        const rowSelected = document.getElementById(`tr_disp_${idx}`);
-        if (rowSelected) rowSelected.classList.add('linha-selecionada');
-
-        const d = disciplinasAtuais[idx];
-        if (!d) return;
-
-        document.getElementById('txtTituloDisciplina').innerText = `Matéria: ${d.nome}`;
-        document.getElementById('txtFreqDisciplina').innerText = `Frequência: ${formatarPercentual(d.freq)} | Faltas: ${d.faltas ?? '-'}`;
-
-        const frequencia = (d.freq !== null && d.freq !== undefined && !isNaN(d.freq)) ? Number(d.freq) : 0;
-        const ctxRosca = document.getElementById('chartRoscaFreq').getContext('2d');
-        if (chartRoscaInstance) chartRoscaInstance.destroy();
-        chartRoscaInstance = new Chart(ctxRosca, {
-            type: 'doughnut',
-            data: {
-                labels: ['Presença', 'Ausência'],
-                datasets: [{ data: [frequencia, Math.max(0, 100 - frequencia)] }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } }
+            const badgeStatus = document.getElementById('badgeStatusGeral');
+            if (retencoes > 3 || aluno.frequencia < 75.0) {
+                badgeStatus.innerText = "SITUAÇÃO CRÍTICA";
+                badgeStatus.className = "badge bg-danger p-2 fs-6";
+            } else if (retencoes > 0) {
+                badgeStatus.innerText = "EM ATENÇÃO";
+                badgeStatus.className = "badge bg-warning text-dark p-2 fs-6";
+            } else {
+                badgeStatus.innerText = "PROMOVIDO / SATISFATÓRIO";
+                badgeStatus.className = "badge bg-success p-2 fs-6";
             }
-        });
 
-        const ctxBarras = document.getElementById('chartBarrasNota').getContext('2d');
-        if (chartBarrasInstance) chartBarrasInstance.destroy();
-        chartBarrasInstance = new Chart(ctxBarras, {
-            type: 'bar',
-            data: {
-                labels: ['B1', 'B2', 'B3', 'B4'],
-                datasets: [{
-                    label: 'Notas',
-                    data: [d.b1, d.b2, d.b3, d.b4]
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: { y: { min: 0, max: 10 } },
-                plugins: { legend: { display: false } }
+            document.getElementById('txtNotasNapne').innerText = aluno.pneInfo;
+            document.getElementById('txtDeliberacaoConselho').value = aluno.deliberacao;
+            
+            renderTabelaDisciplinas(disciplinasAtuais);
+            renderGraficoEvolucaoGeral(disciplinasAtuais);
+            
+            // Exibe gráficos da primeira disciplina por padrão
+            if (disciplinasAtuais.length > 0) {
+                selecionarDisciplina(0);
             }
-        });
-    }
-
-    function renderGraficoEvolucaoGeral(disciplinas) {
-        const bimestres = ['b1', 'b2', 'b3', 'b4'];
-        const mediasBimestrais = bimestres.map(b => {
-            const notasValidas = disciplinas.map(d => d[b]).filter(n => n !== null && n !== undefined && !isNaN(n)).map(Number);
-            return notasValidas.length ? notasValidas.reduce((a, b) => a + b, 0) / notasValidas.length : null;
-        });
-
-        const ctx = document.getElementById('chartEvolucaoGeral').getContext('2d');
-        if (chartEvolucaoGeralInstance) chartEvolucaoGeralInstance.destroy();
-        chartEvolucaoGeralInstance = new Chart(ctx, {
-            data: {
-                labels: ['1º Bim', '2º Bim', '3º Bim', '4º Bim'],
-                datasets: [
-                    { type: 'line', label: 'Evolução', data: mediasBimestrais, borderWidth: 2, fill: false, spanGaps: true },
-                    { type: 'bar', label: 'Média', data: mediasBimestrais }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: { y: { min: 0, max: 10 } },
-                plugins: { legend: { display: false } }
-            }
-        });
-    }
-
-    function salvarDeliberacaoConselho() {
-        const select = document.getElementById('selectAluno');
-        if (!select || select.value === '') return;
-        const aluno = bancoAlunos[parseInt(select.value, 10)];
-        const textoObs = document.getElementById('txtDeliberacaoConselho').value;
-
-        if (!aluno) return;
-
-        aluno.deliberacao = textoObs;
-
-        try {
-            const urlAtual = new URL(window.parent.location.href);
-            urlAtual.searchParams.set('action', 'salvar_obs');
-            urlAtual.searchParams.set('matricula', aluno.prontuario);
-            urlAtual.searchParams.set('sala', obterSala());
-            urlAtual.searchParams.set('obs', textoObs);
-            window.parent.location.href = urlAtual.toString();
-        } catch (e) {
-            window.open(
-                `?action=salvar_obs&matricula=${encodeURIComponent(aluno.prontuario)}&sala=${encodeURIComponent(obterSala())}&obs=${encodeURIComponent(textoObs)}`,
-                '_parent'
-            );
         }
-    }
 
-    window.addEventListener('load', () => carregarJson(false));
-</script>
+        function renderTabelaDisciplinas(disciplinas) {
+            const tbody = document.getElementById('tbodyDisciplinas');
+            tbody.innerHTML = '';
+
+            disciplinas.forEach((d, i) => {
+                const classeMedia = obterClasseNota(d.media);
+                tbody.innerHTML += `
+                    <tr id="tr_disp_${i}" onclick="selecionarDisciplina(${i})">
+                        <td class="fw-semibold">${d.nome}</td>
+                        <td class="text-center ${obterClasseNota(d.b1)}">${formatarNota(d.b1)}</td>
+                        <td class="text-center ${obterClasseNota(d.b2)}">${formatarNota(d.b2)}</td>
+                        <td class="text-center ${obterClasseNota(d.b3)}">${formatarNota(d.b3)}</td>
+                        <td class="text-center ${obterClasseNota(d.b4)}">${formatarNota(d.b4)}</td>
+                        <td class="text-center ${classeMedia}">${formatarNota(d.media)}</td>
+                        <td class="text-center">${d.faltas || 0}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        function selecionarDisciplina(idx) {
+            disciplinaSelecionadaIndex = idx;
+            document.querySelectorAll('#tbodyDisciplinas tr').forEach(tr => tr.classList.remove('linha-selecionada'));
+            const rowSelected = document.getElementById(`tr_disp_${idx}`);
+            if (rowSelected) rowSelected.classList.add('linha-selecionada');
+
+            const d = disciplinasAtuais[idx];
+            if (!d) return;
+
+            document.getElementById('txtTituloDisciplina').innerText = `Matéria: ${d.nome}`;
+
+            // 1. Rosca de Frequência da Matéria
+            const freqGlobal = parseFloat(document.getElementById('kpiFrequencia').innerText) || 100;
+            const ctxRosca = document.getElementById('chartRoscaFreq').getContext('2d');
+            if (chartRoscaInstance) chartRoscaInstance.destroy();
+
+            chartRoscaInstance = new Chart(ctxRosca, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Presença', 'Faltas'],
+                    datasets: [{
+                        data: [freqGlobal, Math.max(0, 100 - freqGlobal)],
+                        backgroundColor: ['#198754', '#dc3545']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } }
+                }
+            });
+
+            // 2. Barras de Notas da Matéria
+            const ctxBarras = document.getElementById('chartBarrasNota').getContext('2d');
+            if (chartBarrasInstance) chartBarrasInstance.destroy();
+
+            chartBarrasInstance = new Chart(ctxBarras, {
+                type: 'bar',
+                data: {
+                    labels: ['B1', 'B2', 'B3', 'B4'],
+                    datasets: [{
+                        label: 'Notas',
+                        data: [d.b1, d.b2, d.b3, d.b4],
+                        backgroundColor: '#0d6efd'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { y: { min: 0, max: 10 } },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        function renderGraficoEvolucaoGeral(disciplinas) {
+            const bimestres = ['b1', 'b2', 'b3', 'b4'];
+            const mediasBimestrais = bimestres.map(b => {
+                const notasValidas = disciplinas.map(d => d[b]).filter(n => n !== null && n !== undefined && !isNaN(n));
+                return notasValidas.length > 0 ? (notasValidas.reduce((a, b) => a + b, 0) / notasValidas.length) : null;
+            });
+
+            const ctx = document.getElementById('chartEvolucaoGeral').getContext('2d');
+            if (chartEvolucaoGeralInstance) chartEvolucaoGeralInstance.destroy();
+
+            chartEvolucaoGeralInstance = new Chart(ctx, {
+                data: {
+                    labels: ['1º Bim', '2º Bim', '3º Bim', '4º Bim'],
+                    datasets: [
+                        {
+                            type: 'line',
+                            label: 'Evolução',
+                            data: mediasBimestrais,
+                            borderColor: '#fd7e14',
+                            borderWidth: 2,
+                            fill: false,
+                            spanGaps: true
+                        },
+                        {
+                            type: 'bar',
+                            label: 'Média',
+                            data: mediasBimestrais,
+                            backgroundColor: '#ffe58f'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { y: { min: 0, max: 10 } },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        function salvarDeliberacaoConselho() {
+            const select = document.getElementById('selectAluno');
+            const index = select.value;
+            const aluno = bancoAlunos[index];
+            const textoObs = document.getElementById('txtDeliberacaoConselho').value;
+
+            if (aluno) {
+                aluno.deliberacao = textoObs;
+        
+                // Redireciona a janela pai com parâmetros de URL para acionar o salvamento direto na planilha pelo Python
+                const urlPai = window.parent.location.href.split('?')[0];
+                const novaUrl = `${urlPai}?action=salvar_obs&aluno=${encodeURIComponent(aluno.nome)}&obs=${encodeURIComponent(textoObs)}`;
+                window.parent.location.href = novaUrl;
+            }
+        }
+
+        window.onload = inicializar;
+    </script>
 </body>
 </html>
