@@ -1,11 +1,12 @@
+import base64
+import io
+import json
 import os
 import re
-from flask import Flask, render_template, request, send_file
-import pdfplumber
-
-app = Flask(__name__)
-app.config["UPLOAD_FOLDER"] = "uploads"
-os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+import pandas as pd
+import streamlit as st
+from pypdf import PdfReader
+from streamlit_gsheets import GSheetsConnection
 
 
 def limpar_tipo(texto):
@@ -16,15 +17,16 @@ def limpar_tipo(texto):
     return texto_limpo if texto_limpo not in ["", "-"] else "-"
 
 
-def extrair_dados_pdf(caminho_pdf):
+def extrair_dados_pdf(pdf_file):
     dados_extraidos = []
 
-    with pdfplumber.open(caminho_pdf) as pdf:
-        texto_completo = ""
-        for pagina in pdf.pages:
-            texto_pagina = pagina.extract_text()
-            if texto_pagina:
-                texto_completo += texto_pagina + "\n"
+    # Leitura do PDF usando PyPDF
+    reader = PdfReader(pdf_file)
+    texto_completo = ""
+    for page in reader.pages:
+        texto_pagina = page.extract_text()
+        if texto_pagina:
+            texto_completo += texto_pagina + "\n"
 
     # Divide o documento por blocos de alunos ou registros
     blocos = re.split(r"(?=Matrícula\s*:)", texto_completo, flags=re.IGNORECASE)
@@ -109,19 +111,21 @@ def extrair_dados_pdf(caminho_pdf):
     return dados_extraidos
 
 
-@app.route("/", methods=["GET", "POST"])
-def index():
-    dados = None
-    if request.method == "POST":
-        if "pdf_file" in request.files:
-            file = request.files["pdf_file"]
-            if file.filename != "":
-                filepath = os.path.join(app.config["UPLOAD_FOLDER"], file.filename)
-                file.save(filepath)
-                dados = extrair_dados_pdf(filepath)
+# Conexão com Google Sheets (se aplicável ao seu projeto)
+# conn = st.connection("gsheets", type=GSheetsConnection)
 
-    return render_template("index.html", dados=dados)
+st.title("Processador de Relatórios NAPNE")
 
+uploaded_file = st.file_uploader(
+    "Selecione o arquivo PDF:", type=["pdf"], accept_multiple_files=False
+)
 
-if __name__ == "__main__":
-    app.run(debug=True)
+if uploaded_file is not None:
+    with st.spinner("Processando o relatório..."):
+        dados = extrair_dados_pdf(uploaded_file)
+        if dados:
+            st.success("Dados extraídos com sucesso!")
+            df = pd.DataFrame(dados)
+            st.dataframe(df, use_container_width=True)
+        else:
+            st.warning("Nenhum registro encontrado no documento.")
