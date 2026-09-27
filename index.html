@@ -232,20 +232,20 @@
             document.getElementById('txtCurso').innerText = aluno.curso;
             document.getElementById('txtTurma').innerText = aluno.turma;
 
-            const tipoOrd = document.getElementById('selectOrdenacao').value;
+           const tipoOrd = document.getElementById('selectOrdenacao').value;
 
-            // Ordenação configurável das disciplinas
+            // Processamento de médias e ordenação por Nota ou Faltas
             const disciplinasProcessadas = aluno.disciplinas.map(d => {
                 const notasValidas = [d.b1, d.b2, d.b3, d.b4].filter(n => n !== null && n !== undefined && !isNaN(n));
                 const media = notasValidas.length > 0 ? (notasValidas.reduce((a, b) => a + b, 0) / notasValidas.length) : null;
                 return { ...d, media: media };
             }).sort((a, b) => {
                 if (tipoOrd === 'freq') {
-                    return (a.faltas || 0) - (b.faltas || 0);
+                    return (b.faltas || 0) - (a.faltas || 0); // Ordena pelas faltas da disciplina
                 } else {
                     if (a.media === null) return 1;
                     if (b.media === null) return -1;
-                    return a.media - b.media;
+                    return a.media - b.media; // Ordena por menor nota
                 }
             });
 
@@ -300,7 +300,7 @@
                         <td class="text-center ${obterClasseNota(d.b3)}">${formatarNota(d.b3)}</td>
                         <td class="text-center ${obterClasseNota(d.b4)}">${formatarNota(d.b4)}</td>
                         <td class="text-center ${classeMedia}">${formatarNota(d.media)}</td>
-                        <td class="text-center">${d.faltas || 0}</td>
+                        <td class="text-center fw-bold ${d.faltas > 10 ? 'text-danger' : ''}">${d.faltas || 0}</td>
                     </tr>
                 `;
             });
