@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 from pypdf import PdfReader
 import pdfplumber
 from streamlit_gsheets import GSheetsConnection
@@ -138,13 +139,12 @@ def texto_para_sim_nao(valor):
     texto = normalizar_espacos(valor).lower()
     if texto == "sim":
         return "Sim"
-    if texto == "não" or texto == "nao":
+    if texto in {"não", "nao"}:
         return "Não"
     return "Não"
 
 
 def extrair_sim_nao(texto, rotulo):
-    # Permite espaços diferentes e/ou dois-pontos depois do rótulo.
     padrao_rotulo = re.escape(rotulo).replace(r"\ ", r"\s+")
     padrao = re.compile(rf"{padrao_rotulo}\s*:?\s*(Sim|Não|Nao)\b", re.IGNORECASE)
     encontrado = padrao.search(texto)
@@ -154,7 +154,6 @@ def extrair_sim_nao(texto, rotulo):
 
 
 def extrair_campo_texto(texto, rotulo, proximos_rotulos):
-    """Extrai o texto que aparece depois de um rótulo até o próximo campo conhecido."""
     padrao_rotulo = re.escape(rotulo).replace(r"\ ", r"\s+")
     paradas = []
     for item in proximos_rotulos:
@@ -174,7 +173,6 @@ def extrair_campo_texto(texto, rotulo, proximos_rotulos):
 
 
 def extrair_tipo_superdotacao(texto):
-    """Pega o valor do campo 'Superdotação', e não o Sim/Não de 'Portador(a) de Superdotação'."""
     ocorrencias = list(re.finditer(r"Superdotação\s*:?", texto, re.IGNORECASE))
     for ocorrencia in ocorrencias:
         inicio_valor = ocorrencia.end()
@@ -195,8 +193,13 @@ def extrair_napne(bloco):
     texto = normalizar_espacos(bloco)
 
     aluno_especial = extrair_sim_nao(texto, "Aluno Especial?")
+    if aluno_especial == "Não":
+        aluno_especial = extrair_sim_nao(texto, "Aluno Especial")
 
     necessidades = extrair_sim_nao(texto, "Portador(a) de Necessidades Especiais")
+    if necessidades == "Não":
+        necessidades = extrair_sim_nao(texto, "Necessidades Especiais")
+
     tipo_necessidade = extrair_campo_texto(
         texto,
         "Tipo de Necessidade Especial",
@@ -205,12 +208,16 @@ def extrair_napne(bloco):
             "Tipo de Transtorno",
             "Portador(a) de Superdotação",
             "Superdotação",
+            "Transtorno",
             "Disciplina",
             "Total",
         ],
     )
 
     transtorno = extrair_sim_nao(texto, "Portador(a) de Transtorno")
+    if transtorno == "Não":
+        transtorno = extrair_sim_nao(texto, "Transtorno")
+
     tipo_transtorno = extrair_campo_texto(
         texto,
         "Tipo de Transtorno",
@@ -223,24 +230,24 @@ def extrair_napne(bloco):
     )
 
     superdotacao = extrair_sim_nao(texto, "Portador(a) de Superdotação")
+    if superdotacao == "Não":
+        superdotacao = extrair_sim_nao(texto, "Superdotação")
+
     tipo_superdotacao = extrair_tipo_superdotacao(texto)
 
-    # Só usamos os tipos quando o respectivo campo está marcado como Sim.
-    if necessidades != "Sim":
-        tipo_necessidade = "-"
-    if transtorno != "Sim":
-        tipo_transtorno = "-"
-    if superdotacao != "Sim":
-        tipo_superdotacao = "-"
+    if "Necessidades Especiais" in texto and tipo_necessidade != "-":
+        necessidades = "Sim"
+    if "Transtorno" in texto and tipo_transtorno != "-":
+        transtorno = "Sim"
 
     return {
         "Aluno Especial?": aluno_especial,
         "Necessidades Especiais": necessidades,
-        "Tipo de Necessidade Especial": tipo_necessidade,
+        "Tipo de Necessidade Especial": tipo_necessidade if necessidades == "Sim" else "-",
         "Transtorno": transtorno,
-        "Tipo de Transtorno": tipo_transtorno,
+        "Tipo de Transtorno": tipo_transtorno if transtorno == "Sim" else "-",
         "Superdotação": superdotacao,
-        "Tipo de Superdotação": tipo_superdotacao,
+        "Tipo de Superdotação": tipo_superdotacao if superdotacao == "Sim" else "-",
     }
 
 
@@ -298,12 +305,6 @@ def extrair_identificacao(bloco, nome_arquivo):
 
 
 def extrair_nomes_disciplinas_pdf(arquivo_bytes):
-    """Extrai nomes completos das disciplinas usando as posições das palavras no PDF.
-
-    O SUAP pode separar o nome da disciplina em duas linhas e o pypdf, em alguns
-    PDFs, cola palavras que visualmente estão separadas. O pdfplumber é usado
-    apenas para recuperar esses nomes com as posições do documento.
-    """
     nomes = {}
     try:
         with pdfplumber.open(io.BytesIO(arquivo_bytes)) as pdf:
@@ -347,8 +348,6 @@ def extrair_nomes_disciplinas_pdf(arquivo_bytes):
                             break
                         for palavra in sorted(linhas[j]["palavras"], key=lambda w: w["x0"]):
                             token = palavra["text"]
-                            # A coluna da disciplina fica à esquerda da coluna C.H. Horas.
-                            # Ignoramos o número do diário e valores numéricos dessa linha.
                             if 50 <= palavra["x0"] < 280 and not re.fullmatch(r"\d+(?:[.,]\d+)?", token):
                                 if token not in {"Cursando", "Aprovado", "Reprovado", "Matriculado", "Dispensado", "Cancelado", "Concluído"}:
                                     palavras_nome.append(token)
@@ -357,13 +356,11 @@ def extrair_nomes_disciplinas_pdf(arquivo_bytes):
                     if nome:
                         nomes[codigo] = nome
     except Exception:
-        # Se o pdfplumber não conseguir processar um arquivo, o parser pypdf continua funcionando.
         return nomes
     return nomes
 
 
 def extrair_disciplinas(bloco, nomes_por_codigo=None):
-    """Lê qualquer quantidade de disciplinas a partir do código INT.xxxxx."""
     texto = normalizar_espacos(bloco)
     padrao_inicio = re.compile(r"INT\.\d+\s*\([^)]*\)\s*-\s*", re.IGNORECASE)
     inicios = list(padrao_inicio.finditer(texto))
@@ -375,11 +372,9 @@ def extrair_disciplinas(bloco, nomes_por_codigo=None):
         fim_dados = inicios[indice + 1].start() if indice + 1 < len(inicios) else len(texto)
         trecho = texto[inicio_dados:fim_dados]
 
-        # Evita capturar alguma ocorrência de INT em rodapé/fora da tabela.
         if "Total" in trecho:
             trecho = trecho.split("Total", 1)[0]
 
-        # O nome termina quando começam os campos C.H. Horas / C.H. Aulas / T. de Aulas / T. Faltas / % Freq.
         m_meta = re.search(
             r"(?P<nome>.*?)\s+"
             r"(?P<ch_horas>\d+(?:[.,]\d+)?)\s+"
@@ -406,7 +401,6 @@ def extrair_disciplinas(bloco, nomes_por_codigo=None):
         freq_disciplina = para_float(m_meta.group("freq"))
         resto = m_meta.group("rest")
 
-        # Depois da situação vem a MFD e, em seguida, pares N/F.
         m_pos_situacao = re.search(
             r"(?:Cursando|Aprovado|Reprovado|Matriculado|Dispensado|Cancelado|Conclu[ií]do|Aguarda Carga Hor[aá]ria).*?"
             r"(?P<mfd>\d{1,2}(?:[.,]\d{1,2})?)\s+"
@@ -415,7 +409,6 @@ def extrair_disciplinas(bloco, nomes_por_codigo=None):
             re.IGNORECASE,
         )
         if not m_pos_situacao:
-            # Fallback genérico: primeiro número que aparece depois do texto da situação.
             m_pos_situacao = re.search(
                 r"(?P<mfd>\d{1,2}(?:[.,]\d{1,2})?)\s+(?P<pairs>.*)$",
                 resto,
@@ -430,7 +423,6 @@ def extrair_disciplinas(bloco, nomes_por_codigo=None):
             mfd = para_float(m_pos_situacao.group("mfd"))
             tokens = m_pos_situacao.group("pairs").split()
 
-            # Cada etapa é N/F. O quinto par não é necessário para os quatro bimestres.
             for etapa in range(4):
                 pos_nota = etapa * 2
                 pos_falta = pos_nota + 1
@@ -440,7 +432,6 @@ def extrair_disciplinas(bloco, nomes_por_codigo=None):
                     faltas_bimestres[etapa] = para_int(tokens[pos_falta])
 
         if mfd is None:
-            # Último recurso: procura um número <= 10 na parte final do registro.
             candidatos = re.findall(r"(?<!\d)(\d{1,2}(?:[.,]\d{1,2})?)(?!\d)", resto)
             for candidato in candidatos:
                 numero = para_float(candidato)
@@ -494,9 +485,6 @@ def extrair_dados(arquivos_pdf):
                 paginas.append("")
         texto_completo = "\n".join(paginas)
 
-        # Um PDF pode conter vários boletins. O rodapé do SUAP também pode repetir
-        # a expressão "BOLETIM DE NOTAS INDIVIDUAL", por isso exigimos que o marcador
-        # seja seguido pelo campo "Aluno(a):" para iniciar um novo bloco.
         marcadores = list(
             re.finditer(
                 r"BOLETIM DE NOTAS INDIVIDUAL\s+Aluno\(a\)\s*:",
@@ -512,7 +500,6 @@ def extrair_dados(arquivos_pdf):
                 if len(bloco) > 200:
                     blocos.append(bloco)
         else:
-            # Fallback para PDFs que tenham apenas "Aluno(a):" como marcador.
             marcadores_aluno = list(re.finditer(r"Aluno\(a\)\s*:", texto_completo, re.IGNORECASE))
             if marcadores_aluno:
                 blocos = []
@@ -567,11 +554,10 @@ def chave_linha(linha):
 
 
 def mesclar_dados(df_atual, df_novo):
-    """Atualiza dados lidos do PDF sem apagar Observações já salvas."""
+    """Atualiza dados lidos do PDF sem apagar Observações nem dados do NAPNE já salvos."""
     atual = preparar_dataframe(df_atual)
     novo = preparar_dataframe(df_novo)
 
-    # Limpa apenas linhas completamente inválidas, sem apagar alunos existentes.
     atual = atual[atual["Matrícula"].notna() | atual["Aluno"].notna()].copy()
 
     mapa = {}
@@ -584,15 +570,8 @@ def mesclar_dados(df_atual, df_novo):
             continue
         if chave not in mapa:
             ordem.append(chave)
-        # Se houver duplicatas antigas, preserva a observação não vazia.
-        if chave in mapa:
-            observacao_antiga = mapa[chave].get("Observações")
-            observacao_nova = registro.get("Observações")
-            if not observacao_nova and observacao_antiga:
-                registro["Observações"] = observacao_antiga
         mapa[chave] = registro
 
-    # Próximo número de chamada disponível.
     chamadas = pd.to_numeric(atual["Nº Chamada"], errors="coerce") if not atual.empty else pd.Series(dtype=float)
     proxima_chamada = int(chamadas.max()) + 1 if not chamadas.dropna().empty else 1
 
@@ -603,10 +582,10 @@ def mesclar_dados(df_atual, df_novo):
             continue
 
         if chave in mapa:
-            observacao_antiga = mapa[chave].get("Observações")
-            if observacao_antiga not in (None, "", "nan", "NaN"):
-                registro["Observações"] = observacao_antiga
-            # Mantém o número de chamada já existente.
+            obs_antiga = mapa[chave].get("Observações")
+            if obs_antiga not in (None, "", "nan", "NaN") and not registro.get("Observações"):
+                registro["Observações"] = obs_antiga
+
             registro["Nº Chamada"] = mapa[chave].get("Nº Chamada")
         else:
             registro["Nº Chamada"] = registro.get("Nº Chamada") or proxima_chamada
@@ -618,10 +597,8 @@ def mesclar_dados(df_atual, df_novo):
     resultado = pd.DataFrame([mapa[chave] for chave in ordem if chave in mapa])
     resultado = preparar_dataframe(resultado)
 
-    # Ordem estável das colunas.
     extras = [c for c in resultado.columns if c not in COLUNAS_BASE]
-    resultado = resultado[COLUNAS_BASE + extras]
-    return resultado
+    return resultado[COLUNAS_BASE + extras]
 
 
 def dataframe_para_json(df):
@@ -692,23 +669,8 @@ def dataframe_para_json(df):
     return resultado
 
 
-def salvar_json_estatico(sala, dados):
-    caminho = STATIC_DIR / f"dados_alunos_{slug_sala(sala)}.json"
-    with caminho.open("w", encoding="utf-8") as arquivo:
-        json.dump(dados, arquivo, ensure_ascii=False, indent=2, allow_nan=False)
-    return caminho
-
-
-def atualizar_json_da_planilha(sala, df=None):
-    if df is None:
-        df = conn.read(spreadsheet=DICIONARIO_SALAS[sala], ttl=0)
-    dados = dataframe_para_json(df)
-    caminho = salvar_json_estatico(sala, dados)
-    return caminho, dados
-
-
 # ============================================================
-# SALVAR DELIBERAÇÃO VINDO DO HTML
+# SALVAR DELIBERAÇÃO VINDO DO HTML (Query Params)
 # ============================================================
 
 query_params = st.query_params
@@ -717,22 +679,17 @@ if query_params.get("action") == "salvar_obs":
     nova_obs = query_params.get("obs", "")
     sala_alvo = query_params.get("sala", st.session_state.salaAtiva)
 
-    if sala_alvo not in DICIONARIO_SALAS:
-        sala_alvo = st.session_state.salaAtiva
+    if sala_alvo in DICIONARIO_SALAS:
+        link_sala = DICIONARIO_SALAS[sala_alvo]
+        df_sheet = conn.read(spreadsheet=link_sala, ttl=0)
+        df_sheet = preparar_dataframe(df_sheet)
 
-    link_sala = DICIONARIO_SALAS[sala_alvo]
-    df_sheet = conn.read(spreadsheet=link_sala, ttl=0)
-    df_sheet = preparar_dataframe(df_sheet)
-
-    if "Matrícula" in df_sheet.columns:
-        mascara = df_sheet["Matrícula"].astype(str).str.strip().str.upper() == matricula_alvo.upper()
-        if mascara.any():
-            df_sheet.loc[mascara, "Observações"] = nova_obs
-            conn.update(spreadsheet=link_sala, data=df_sheet)
-            atualizar_json_da_planilha(sala_alvo, df_sheet)
-            st.toast("Deliberação salva no Google Sheets com sucesso!", icon="✅")
-        else:
-            st.error("Não foi possível localizar a matrícula do aluno na planilha.")
+        if "Matrícula" in df_sheet.columns:
+            mascara = df_sheet["Matrícula"].astype(str).str.strip().str.upper() == matricula_alvo.upper()
+            if mascara.any():
+                df_sheet.loc[mascara, "Observações"] = nova_obs
+                conn.update(spreadsheet=link_sala, data=df_sheet)
+                st.toast("Deliberação salva no Google Sheets com sucesso!", icon="✅")
 
     st.query_params.clear()
     st.session_state.salaAtiva = sala_alvo
@@ -793,16 +750,10 @@ if not st.session_state.dadosCarregados:
                     df_final = mesclar_dados(df_atual, df_novo)
 
                     conn.update(spreadsheet=link_sala, data=df_final)
-                    caminho_json = salvar_json_estatico(
-                        sala_selecionada,
-                        dataframe_para_json(df_final),
-                    )
 
                     st.session_state.salaAtiva = sala_selecionada
                     st.session_state.dadosCarregados = True
-                    st.success(
-                        f"Dados processados. JSON atualizado em {caminho_json.name}."
-                    )
+                    st.success("Dados processados e salvos com sucesso na planilha!")
                     st.rerun()
 
 
@@ -818,28 +769,23 @@ else:
         st.error("O arquivo 'index.html' não foi encontrado no repositório.")
     else:
         try:
-            # Lê os dados atualizados do Google Sheets
             df_dashboard = conn.read(
                 spreadsheet=DICIONARIO_SALAS[sala_ativa],
                 ttl=0,
             )
             dados_json = dataframe_para_json(df_dashboard)
-            
-            # Lê o conteúdo do HTML
+
             html_content = HTML_PATH.read_text(encoding="utf-8")
-            
-            # Injeta os dados do Python diretamente no Script do HTML
+
             script_injecao = f"""
             <script>
                 window.dadosAlunosInjetados = {json.dumps(dados_json, ensure_ascii=False)};
             </script>
             """
-            
-            # Insere o script no início do <head> do HTML
+
             html_final = html_content.replace("<head>", f"<head>{script_injecao}", 1)
-            
-            # Renderiza o HTML com os dados já carregados
-            st.components.v1.html(
+
+            components.html(
                 html_final,
                 height=1150,
                 scrolling=True,
