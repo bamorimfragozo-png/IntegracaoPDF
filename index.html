@@ -185,7 +185,6 @@
         let chartBarrasInstance = null;
         let chartEvolucaoGeralInstance = null;
         let disciplinaSelecionadaIndex = 0;
-        let disciplinasAtuais = [];
 
         function inicializar() {
             const select = document.getElementById('selectAluno');
@@ -236,7 +235,7 @@
             const tipoOrd = document.getElementById('selectOrdenacao').value;
 
             // Ordenação configurável das disciplinas
-            disciplinasAtuais = aluno.disciplinas.map(d => {
+            const disciplinasProcessadas = aluno.disciplinas.map(d => {
                 const notasValidas = [d.b1, d.b2, d.b3, d.b4].filter(n => n !== null && n !== undefined && !isNaN(n));
                 const media = notasValidas.length > 0 ? (notasValidas.reduce((a, b) => a + b, 0) / notasValidas.length) : null;
                 return { ...d, media: media };
@@ -250,9 +249,9 @@
                 }
             });
 
-            const mediasValidas = disciplinasAtuais.map(d => d.media).filter(m => m !== null);
+            const mediasValidas = disciplinasProcessadas.map(d => d.media).filter(m => m !== null);
             const mediaGeral = mediasValidas.length > 0 ? (mediasValidas.reduce((a, b) => a + b, 0) / mediasValidas.length) : 0;
-            const retencoes = disciplinasAtuais.filter(d => d.media !== null && d.media < 6.0).length;
+            const retencoes = disciplinasProcessadas.filter(d => d.media !== null && d.media < 6.0).length;
 
             document.getElementById('kpiMediaGeral').innerText = mediaGeral.toFixed(1);
             document.getElementById('kpiMediaGeral').className = `fw-bold mb-0 ${obterClasseNota(mediaGeral)}`;
@@ -278,12 +277,12 @@
             document.getElementById('txtNotasNapne').innerText = aluno.pneInfo;
             document.getElementById('txtDeliberacaoConselho').value = aluno.deliberacao;
             
-            renderTabelaDisciplinas(disciplinasAtuais);
-            renderGraficoEvolucaoGeral(disciplinasAtuais);
+            renderTabelaDisciplinas(disciplinasProcessadas);
+            renderGraficoEvolucaoGeral(disciplinasProcessadas);
             
             // Exibe gráficos da primeira disciplina por padrão
-            if (disciplinasAtuais.length > 0) {
-                selecionarDisciplina(0);
+            if (disciplinasProcessadas.length > 0) {
+                selecionarDisciplina(0, disciplinasProcessadas);
             }
         }
 
@@ -294,7 +293,7 @@
             disciplinas.forEach((d, i) => {
                 const classeMedia = obterClasseNota(d.media);
                 tbody.innerHTML += `
-                    <tr id="tr_disp_${i}" onclick="selecionarDisciplina(${i})">
+                    <tr id="tr_disp_${i}" onclick='selecionarDisciplina(${i}, ${JSON.stringify(disciplinas).replace(/'/g, "&apos;")})'>
                         <td class="fw-semibold">${d.nome}</td>
                         <td class="text-center ${obterClasseNota(d.b1)}">${formatarNota(d.b1)}</td>
                         <td class="text-center ${obterClasseNota(d.b2)}">${formatarNota(d.b2)}</td>
@@ -307,15 +306,13 @@
             });
         }
 
-        function selecionarDisciplina(idx) {
+        function selecionarDisciplina(idx, disciplinas) {
             disciplinaSelecionadaIndex = idx;
             document.querySelectorAll('#tbodyDisciplinas tr').forEach(tr => tr.classList.remove('linha-selecionada'));
             const rowSelected = document.getElementById(`tr_disp_${idx}`);
             if (rowSelected) rowSelected.classList.add('linha-selecionada');
 
-            const d = disciplinasAtuais[idx];
-            if (!d) return;
-
+            const d = disciplinas[idx];
             document.getElementById('txtTituloDisciplina').innerText = `Matéria: ${d.nome}`;
 
             // 1. Rosca de Frequência da Matéria
@@ -413,7 +410,7 @@
         
                 // Redireciona a janela pai com parâmetros de URL para acionar o salvamento direto na planilha pelo Python
                 const urlPai = window.parent.location.href.split('?')[0];
-                const novaUrl = `${urlPai}?action=salvar_obs&aluno=${encodeURIComponent(aluno.nome)}&obs=${encodeURIComponent(textoObs)}`;
+                const novaUrl = `${urlPai}?action=salvarobs&aluno=${encodeURIComponent(aluno.nome)}&obs=${encodeURIComponent(textoObs)}`;
                 window.parent.location.href = novaUrl;
             }
         }
