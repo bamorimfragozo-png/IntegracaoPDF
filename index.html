@@ -206,6 +206,15 @@
         if (mostrarMensagem) status.innerText = 'Atualizando...';
 
         try {
+            // Se os dados foram injetados diretamente pelo Streamlit (Python)
+            if (window.dadosAlunosInjetados && Array.isArray(window.dadosAlunosInjetados)) {
+                bancoAlunos = window.dadosAlunosInjetados;
+                inicializar();
+                if (mostrarMensagem) status.innerText = 'Dados atualizados.';
+                return;
+            }
+
+            // Fallback caso tente buscar via HTTP fetch
             const resposta = await fetch(obterUrlJson(), { cache: 'no-store' });
             if (!resposta.ok) throw new Error(`HTTP ${resposta.status}`);
             bancoAlunos = await resposta.json();
@@ -213,7 +222,7 @@
             if (mostrarMensagem) status.innerText = 'Dados atualizados.';
         } catch (erro) {
             console.error(erro);
-            status.innerText = 'Erro ao ler o JSON.';
+            status.innerText = 'Erro ao ler os dados.';
             document.getElementById('selectAluno').innerHTML = '<option value="">Não foi possível carregar os dados</option>';
         }
     }
