@@ -312,7 +312,7 @@ else:
             "b2": tratar_nota(item.get("2º BI")),
             "b3": tratar_nota(item.get("3º BI")),
             "b4": tratar_nota(item.get("4º BI")),
-            "faltas": 0
+            "faltas": int(item.get("Faltas", 0)) if pd.notnull(item.get("Faltas")) else 0
         })
 
     json_estruturado = json.dumps(list(alunosMapeados.values()), ensure_ascii=False)
