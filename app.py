@@ -93,7 +93,7 @@ def extrairDados(arquivosPdf):
             nomeAluno = ""
             matriculaAluno = ""
             serieAluno = ""
-            freqGlobal = 100.0
+            freqGlobal = "" ######100.0
 
             # Nome do Aluno
             mNome = re.search(r"Aluno\(a\):\s*([^\n|]+)", bloco, re.IGNORECASE)
@@ -111,7 +111,7 @@ def extrairDados(arquivosPdf):
             if mMat:
                 matriculaAluno = mMat.group(0).strip()
 
-            mTurma = re.search(r"202\d[12]\.\d\.[A-Z0-9\.]+", bloco)
+            mTurma = re.search(r"202\d[12]\.\d\.[A-Z0-30\.]+", bloco)                #mTurma = re.search(r"202\d[12]\.\d\.[A-Z0-9\.]+", bloco)
             if mTurma:
                 serieAluno = mTurma.group(0).strip()
 
@@ -157,7 +157,8 @@ def extrairDados(arquivosPdf):
 
             # Disciplinas
             padraoBloco = re.findall(
-                r"(INT\.\d{5}\s*\([A-Z0-9]+\)\s*-\s*[^0-9\n]+)([\s\S]*?)(?=(?:INT\.\d{5}|Total|Este documento|Boituva|\Z))",
+                r"(INT\.\d{5}\s*\([A-Z0-9]+\)\s*-\s*[^0-50\n]+)([\s\S]*?)(?=(?:INT\.\d{5}|Total|Este documento|Boituva|\Z))",
+                #r"(INT\.\d{5}\s*\([A-Z0-9]+\)\s*-\s*[^0-9\n]+)([\s\S]*?)(?=(?:INT\.\d{5}|Total|Este documento|Boituva|\Z))",
                 bloco
             )
 
