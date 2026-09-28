@@ -318,24 +318,37 @@
 
             document.getElementById('txtTituloDisciplina').innerText = `Matéria: ${d.nome}`;
 
-            // 1. Rosca de Frequência da Matéria
-            const freqGlobal = parseFloat(document.getElementById('kpiFrequencia').innerText) || 100;
+            // Cálculo da frequência específica da disciplina (considerando p. ex. carga horária base ou cálculo de presença)
+            // Se d.faltas for informado, calculamos a percentagem aproximada de presença (ex: considerando 80h/aulas padrão ou exibindo Presença x Faltas):
+            const totalFaltas = d.faltas || 0;
+            // Exemplo calculando % de presença com base na frequência global ou faltas diretas:
+            const freqMateria = d.freq_materia !== undefined ? d.freq_materia : Math.max(0, 100 - (totalFaltas * 2)); 
+
             const ctxRosca = document.getElementById('chartRoscaFreq').getContext('2d');
             if (chartRoscaInstance) chartRoscaInstance.destroy();
 
             chartRoscaInstance = new Chart(ctxRosca, {
                 type: 'doughnut',
                 data: {
-                    labels: ['Presença', 'Faltas'],
+                    labels: ['Presença (%)', 'Faltas (Aulas)'],
                     datasets: [{
-                        data: [freqGlobal, Math.max(0, 100 - freqGlobal)],
+                        data: [freqMateria, totalFaltas],
                         backgroundColor: ['#198754', '#dc3545']
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: { legend: { display: false } }
+                    plugins: { 
+                        legend: { display: true, position: 'bottom' },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return ` ${context.label}: ${context.raw}`;
+                                }
+                            }
+                        }
+                    }
                 }
             });
 
