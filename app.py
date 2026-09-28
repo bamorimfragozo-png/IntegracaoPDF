@@ -14,7 +14,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-TECNICAS = [
+tecnicas = [
     "ILPR", "MAIN", "ININ", "LDPR", "RDCO", "LPWE", "SOPE", "INSO", "IPRE",
     "BDDA", "PSCO", "PRIN", "CNVI", "SDRE", "ASRE", "RSFI", "GCLI", "ELET",
     "DCAD", "CAUT", "PROG", "PCOE", "EDIG", "PRI1", "ELIN", "CISUT", "INTI",
@@ -37,7 +37,7 @@ if "dadosCarregados" not in st.session_state:
 if "salaAtiva" not in st.session_state:
     st.session_state.salaAtiva = "Redes 1"
 
-# Captura salvar deliberação
+# Captura de salvamento via query params (comunicação iframe -> streamlit)
 query_params = st.query_params
 if "action" in query_params and query_params["action"] == "salvar_obs":
     aluno_alvo = query_params.get("aluno", "")
@@ -45,257 +45,291 @@ if "action" in query_params and query_params["action"] == "salvar_obs":
     sala_alvo = st.session_state.salaAtiva
     linkSala = DICIONARIO_SALAS[sala_alvo]
     
-    try:
-        df_sheet = conn.read(spreadsheet=linkSala, ttl=0)
-        if "Aluno" in df_sheet.columns and "Observações" in df_sheet.columns:
-            mascara = df_sheet["Aluno"].astype(str).str.strip().str.upper() == aluno_alvo.strip().upper()
-            df_sheet.loc[mascara, "Observações"] = nova_obs
-            conn.update(spreadsheet=linkSala, data=df_sheet)
-            st.toast(f"Deliberação de {aluno_alvo} salva no Google Sheets!", icon="✅")
-    except Exception as e:
-        st.error(f"Erro ao salvar deliberação: {e}")
+    df_sheet = conn.read(spreadsheet=linkSala)
+    if "Aluno" in df_sheet.columns and "Observações" in df_sheet.columns:
+        df_sheet.loc[df_sheet["Aluno"].astype(str).str.strip().str.upper() == aluno_alvo.strip().upper(), "Observações"] = nova_obs
+        conn.update(spreadsheet=linkSala, data=df_sheet)
+        st.toast(f"Deliberação de {aluno_alvo} salva com sucesso no Google Sheets!", icon="✅")
     st.query_params.clear()
 
 st.sidebar.title("Conselho de Classe")
 st.sidebar.markdown("---")
 
-if st.sidebar.button("📁 Upload de PDFs", use_container_width=True):
+if st.sidebar.button("📁 Tela de Upload / Processamento", use_container_width=True):
     st.session_state.dadosCarregados = False
     st.rerun()
 
-if st.sidebar.button("📊 Ficha do Conselho", use_container_width=True):
+if st.sidebar.button("📊 Ficha do Conselho (Dashboard)", use_container_width=True):
     st.session_state.dadosCarregados = True
     st.rerun()
 
 
-def extrair_dados_pdf(arquivos_pdf, sala_selecionada):
-    dados_finais = []
-    dados_napne = {}
+def extrairDados(arquivosPdf):
+    dadosFinais = []
+    numeroChamada = 1
 
-    # 1. Leitura do NAPNE
-    for arquivo in arquivos_pdf:
-        pdf_bytes = io.BytesIO(arquivo.getvalue())
+    for arquivo in arquivosPdf:
+        memoriaPdf = io.BytesIO(arquivo.getvalue())
         try:
-            reader = PdfReader(pdf_bytes)
-            texto = "\n".join([p.extract_text() or "" for p in reader.pages])
-        except Exception:
+            leitorPdf = PdfReader(memoriaPdf)
+        except Exception as e:
+            st.error(f"Erro ao ler o arquivo {arquivo.name}: {e}")
             continue
 
-        if "Necessidades Especiais" in texto or "Transtorno" in texto or "Superdotação" in texto:
-            mat_match = re.search(r"BT\d{7}", texto, re.IGNORECASE)
-            if mat_match:
-                prontuario = mat_match.group(0).upper()
-                
-                # Procura se é SIM em algum caso
-                tem_pne = bool(re.search(r"Necessidade\s*Especial:\s*Sim", texto, re.I) or "Portador(a) de Necessidades Especiais Sim" in texto)
-                tem_trans = bool(re.search(r"Transtorno:\s*Sim", texto, re.I) or "Portador(a) de Transtorno Sim" in texto)
-                tem_super = bool(re.search(r"Superdotação:\s*Sim", texto, re.I) or "Portador(a) de Superdotação Sim" in texto)
+        textoCompleto = ""
+        for pagina in leitorPdf.pages:
+            textoCompleto += pagina.extract_text() + "\n"
 
-                napne_ativo = tem_pne or tem_trans or tem_super
+        # Divisão estrita por boletim individual
+        blocosBoletins = re.split(r"(?=BOLETIM DE NOTAS INDIVIDUAL|Aluno\(a\):)", textoCompleto)
 
-                desc = []
-                for linha in texto.split("\n"):
-                    if any(k in linha for k in ["Tipo", "Descrição", "Laudo", "Observação"]) and ":" in linha:
-                        desc.append(linha.strip())
-                
-                info_pne_str = " | ".join(desc) if desc else ("Aluno com acompanhamento NAPNE cadastrado." if napne_ativo else "Nenhum registro de PNE/Transtorno/Superdotação.")
-                
-                dados_napne[prontuario] = {
-                    "napne_ativo": napne_ativo,
-                    "info": info_pne_str
-                }
-
-    # 2. Leitura dos Boletins
-    for arquivo in arquivos_pdf:
-        pdf_bytes = io.BytesIO(arquivo.getvalue())
-        try:
-            reader = PdfReader(pdf_bytes)
-            texto_completo = "\n".join([p.extract_text() or "" for p in reader.pages])
-        except Exception:
-            continue
-
-        if "BOLETIM" not in texto_completo.upper() and "DIÁRIO" not in texto_completo.upper():
-            continue
-
-        blocos = re.split(r"(?=Aluno\(a\):|BOLETIM DE NOTAS INDIVIDUAL)", texto_completo)
-
-        for bloco in blocos:
-            if not bloco.strip():
+        for bloco in blocosBoletins:
+            if "Disciplina" not in bloco and "TÉCNICO" not in bloco:
                 continue
 
-            # Prontuário
-            m_mat = re.search(r"BT\d{7}", bloco, re.IGNORECASE)
-            if not m_mat:
-                continue
-            prontuario = m_mat.group(0).upper()
+            # Limpeza do bloco para regex do NAPNE
+            blocoLimpo = re.sub(r'\s+', ' ', bloco)
+
+            nomeAluno = ""
+            matriculaAluno = ""
+            serieAluno = ""
+            freqGlobal = 100.0
 
             # Nome do Aluno
-            nome = "Não Identificado"
-            m_nome = re.search(r"Aluno\(a\):\s*([^\n|]+)", bloco, re.IGNORECASE)
-            if m_nome:
-                nome = m_nome.group(1).strip()
-                nome = re.sub(r"\s+BT\d{7}.*", "", nome, flags=re.IGNORECASE).strip()
+            mNome = re.search(r"Aluno\(a\):\s*([^\n|]+)", bloco, re.IGNORECASE)
+            if mNome:
+                nomeAluno = mNome.group(1).strip()
+                nomeAluno = re.sub(r"Matrícula:.*", "", nomeAluno, flags=re.IGNORECASE).strip()
 
-            # Frequência Global Real
-            freq_global = 100.0
-            m_freq = re.search(r"Frequência\s*Global:\s*(\d+[\.,]?\d*)\s*%", bloco, re.IGNORECASE)
-            if not m_freq:
-                m_freq = re.search(r"(\d+[\.,]?\d*)\s*%\s*de\s*frequência", bloco, re.IGNORECASE)
-            if m_freq:
-                freq_global = float(m_freq.group(1).replace(",", "."))
+            if not nomeAluno:
+                mNome2 = re.search(r"BOLETIM DE NOTAS INDIVIDUAL\s*([^\n]+)", bloco, re.IGNORECASE)
+                if mNome2:
+                    nomeAluno = mNome2.group(1).strip()
 
-            # Separação por linhas das disciplinas
-            linhas = bloco.split("\n")
-            for idx, linha in enumerate(linhas):
-                # Filtra apenas o código + nome limpo da matéria
-                match_disp = re.search(r"^(\d+\s+[A-Z0-9\.]+\s+\([^\)]+\)\s+-\s+[^-]+)", linha.strip())
-                if match_disp:
-                    nome_materia_limpo = match_disp.group(1).strip()
+            # Matrícula e Turma
+            mMat = re.search(r"BT\d{7}", bloco)
+            if mMat:
+                matriculaAluno = mMat.group(0).strip()
 
-                    # Procura apenas os números de notas que aparecem nas colunas de Bimestres (valores de 0.0 a 10.0)
-                    resto_linha_e_proximas = " ".join(linhas[idx:idx+3])
-                    # Remove do texto Carga Horária, Faltas e % de frequência para não confundir com notas
-                    texto_notas = re.sub(r"\b\d{2,3}\b\s+\d{1,2}\s+0\s+\d{1,3}%", "", resto_linha_e_proximas)
-                    
-                    candidatos = re.findall(r"\b(\d{1,2}[\.,]\d{1,2}|\d{1,2})\b", texto_notas)
-                    
-                    notas_aluno = []
-                    for c in candidatos:
-                        try:
-                            v = float(c.replace(",", "."))
-                            if 0 <= v <= 10.0 and len(notas_aluno) < 4:
-                                notas_aluno.append(v)
-                        except ValueError:
-                            pass
+            mTurma = re.search(r"202\d[12]\.\d\.[A-Z0-9\.]+", bloco)
+            if mTurma:
+                serieAluno = mTurma.group(0).strip()
 
-                    b1 = notas_aluno[0] if len(notas_aluno) > 0 else None
-                    b2 = notas_aluno[1] if len(notas_aluno) > 1 else None
-                    b3 = notas_aluno[2] if len(notas_aluno) > 2 else None
-                    b4 = notas_aluno[3] if len(notas_aluno) > 3 else None
+            # Frequência isolada do aluno atual
+            mFreq = re.search(r"Frequência\s*:\s*\|?\s*(\d+[\.,]?\d*)\s*%", blocoLimpo, re.IGNORECASE)
+            if mFreq:
+                freqGlobal = float(mFreq.group(1).replace(",", "."))
 
-                    validas = [n for n in [b1, b2, b3, b4] if n is not None]
-                    media_final = round(sum(validas) / len(validas), 2) if validas else 0.0
+            if not nomeAluno or nomeAluno == "Não Identificado":
+                nomeAluno = arquivo.name.replace(".pdf", "").replace("Boletim", "").replace("_", " ").strip()
 
-                    nap = dados_napne.get(prontuario, {
-                        "napne_ativo": False,
-                        "info": "Nenhum registro de PNE/Transtorno/Superdotação."
-                    })
+            # Captura precisa do NAPNE (versão flexível com e sem dois-pontos)
+            necEspeciais = "Não"
+            tipoNecEspecial = "-"
+            transtorno = "Não"
+            tipoTranstorno = "-"
+            superdotacao = "Não"
+            tipoSuperdotacao = "-"
 
-                    dados_finais.append({
-                        "Aluno": nome,
-                        "Matrícula": prontuario,
-                        "Série": sala_selecionada,
-                        "Disciplina": nome_materia_limpo,
-                        "1º BI": b1,
-                        "2º BI": b2,
-                        "3º BI": b3,
-                        "4º BI": b4,
-                        "Média Final": media_final,
-                        "Freq. Final": freq_global,
-                        "Núcleo": "Técnico" if any(t in nome_materia_limpo.upper() for t in TECNICAS) else "Comum",
-                        "Observações": "",
-                        "Necessidades Especiais": "Sim" if nap["napne_ativo"] else "Não",
-                        "Tipo de Necessidade Especial": nap["info"],
-                        "Transtorno": "Não",
-                        "Tipo de Transtorno": nap["info"],
-                        "Superdotação": "Não",
-                        "Tipo de Superdotação": nap["info"]
-                    })
+            # Necessidades Especiais
+            mPne = re.search(r"Portador\(a\)\s+de\s+Necessidades\s+Especiais\s*:?\s*(Sim|Não)", blocoLimpo, re.IGNORECASE)
+            if mPne:
+                necEspeciais = mPne.group(1).capitalize()
+            mTipPne = re.search(r"Tipo\s+de\s+Necessidade\s+Especial\s*:?\s*(.*?)(?=Portador|\bTranstorno\b|\bSuperdotação\b|Disciplina|\Z)", blocoLimpo, re.IGNORECASE)
+            if mTipPne and mTipPne.group(1).strip() not in ["-", ""]:
+                tipoNecEspecial = mTipPne.group(1).strip()
 
-    return pd.DataFrame(dados_finais)
+            # Transtorno
+            mTrans = re.search(r"Portador\(a\)\s+de\s+Transtorno\s*:?\s*(Sim|Não)", blocoLimpo, re.IGNORECASE)
+            if mTrans:
+                transtorno = mTrans.group(1).capitalize()
+            mTipTrans = re.search(r"Tipo\s+de\s+Transtorno\s*:?\s*(.*?)(?=Portador|\bSuperdotação\b|Disciplina|\Z)", blocoLimpo, re.IGNORECASE)
+            if mTipTrans and mTipTrans.group(1).strip() not in ["-", ""]:
+                tipoTranstorno = mTipTrans.group(1).strip()
+
+            # Superdotação
+            mSuper = re.search(r"Portador\(a\)\s+de\s+Superdotação\s*:?\s*(Sim|Não)", blocoLimpo, re.IGNORECASE)
+            if mSuper:
+                superdotacao = mSuper.group(1).capitalize()
+            mTipSuper = re.search(r"Tipo\s+de\s+Superdotação\s*:?\s*(.*?)(?=Disciplina|\Z)", blocoLimpo, re.IGNORECASE)
+            if mTipSuper and mTipSuper.group(1).strip() not in ["-", ""]:
+                tipoSuperdotacao = mTipSuper.group(1).strip()
+
+            # Disciplinas
+            padraoBloco = re.findall(
+                r"(INT\.\d{5}\s*\([A-Z0-9]+\)\s*-\s*[^0-9\n]+)([\s\S]*?)(?=(?:INT\.\d{5}|Total|Este documento|Boituva|\Z))",
+                bloco
+            )
+
+            for match in padraoBloco:
+                nomeMateria = match[0].strip()
+                blocoTexto = match[1]
+
+                if "Turma:" in nomeMateria or "Sit." in nomeMateria or "Série" in nomeMateria:
+                    continue
+
+                candidatosNotas = re.findall(r"\b(\d{1,2}[\.,]\d{1,2})\b", blocoTexto)
+                notasEncontradas = []
+
+                for val in candidatosNotas:
+                    try:
+                        num = float(val.replace(",", "."))
+                        if num <= 10.0:
+                            notasEncontradas.append(num)
+                    except ValueError:
+                        pass
+
+                b1 = notasEncontradas[0] if len(notasEncontradas) > 0 else None
+                b2 = notasEncontradas[1] if len(notasEncontradas) > 1 else None
+                b3 = notasEncontradas[2] if len(notasEncontradas) > 2 else None
+                b4 = notasEncontradas[3] if len(notasEncontradas) > 3 else None
+
+                notasValidas = [n for n in [b1, b2, b3, b4] if n is not None]
+                mediaFinal = round(sum(notasValidas) / len(notasValidas), 2) if notasValidas else 0.0
+
+                tecnico = any(kw in nomeMateria.upper() for kw in tecnicas)
+                nucleo = "Técnico" if tecnico else "Comum"
+
+                dadosFinais.append({
+                    'Nº Chamada': int(numeroChamada),
+                    'Aluno': nomeAluno,
+                    'Matrícula': matriculaAluno,
+                    'Série': serieAluno,
+                    'Disciplina': nomeMateria,
+                    '1º BI': b1,
+                    '2º BI': b2,
+                    '3º BI': b3,
+                    '4º BI': b4,
+                    'Média Final': mediaFinal,
+                    'Freq. Final': freqGlobal,
+                    'Núcleo': nucleo,
+                    'Observações': '',
+                    'Necessidades Especiais': necEspeciais,
+                    'Tipo de Necessidade Especial': tipoNecEspecial,
+                    'Transtorno': transtorno,
+                    'Tipo de Transtorno': tipoTranstorno,
+                    'Superdotação': superdotacao,
+                    'Tipo de Superdotação': tipoSuperdotacao
+                })
+
+            numeroChamada += 1
+
+    return pd.DataFrame(dadosFinais)
 
 
-# --- INTERFACE ---
-
+# TELA 1: UPLOAD
 if not st.session_state.dadosCarregados:
-    st.title("Upload de PDFs - Conselho de Classe")
+    st.title("Upload de PDFs")
+    st.subheader("Selecione a sala e faça o upload dos relatórios em PDF.")
+
     salaSelecionada = st.selectbox("Selecione a Sala:", list(DICIONARIO_SALAS.keys()))
     st.session_state.salaAtiva = salaSelecionada
-    
-    arquivosEnviados = st.file_uploader("Envie os PDFs dos boletins e fichas NAPNE:", type=["pdf"], accept_multiple_files=True)
+    arquivosEnviados = st.file_uploader("Envie os PDFs dos boletins:", type=["pdf"], accept_multiple_files=True, key=f"uploader_{salaSelecionada}")
 
-    if st.button("PROCESSAR E ATUALIZAR DASHBOARD", type="primary"):
+    if st.button("PROCESSAR E ATUALIZAR DASHBOARD"):
         if arquivosEnviados:
-            with st.spinner("Processando e limpando dados..."):
-                df_novo = extrair_dados_pdf(arquivosEnviados, salaSelecionada)
+            with st.spinner("Processando arquivos, atualizando planilha e gerando JSON..."):
+                BDNovo = extrairDados(arquivosEnviados)
 
-                if not df_novo.empty:
-                    link_sheet = DICIONARIO_SALAS[salaSelecionada]
-                    try:
-                        df_antigo = conn.read(spreadsheet=link_sheet, ttl=0)
-                    except Exception:
-                        df_antigo = pd.DataFrame()
+                linkSalaAtiva = DICIONARIO_SALAS[salaSelecionada]
+                df_atual = conn.read(spreadsheet=linkSalaAtiva)
 
-                    if not df_antigo.empty and "Matrícula" in df_antigo.columns and "Observações" in df_antigo.columns:
-                        obs_dict = df_antigo.set_index(["Matrícula", "Disciplina"])["Observações"].to_dict()
-                        for i, row in df_novo.iterrows():
-                            chave = (row["Matrícula"], row["Disciplina"])
-                            if chave in obs_dict and pd.notna(obs_dict[chave]):
-                                df_novo.at[i, "Observações"] = obs_dict[chave]
+                if "Aluno" in df_atual.columns:
+                    df_atual = df_atual[~df_atual["Aluno"].astype(str).str.contains("BT30", na=False)]
+                    df_atual = df_atual[df_atual["Aluno"] != "Não Identificado"]
 
-                    conn.update(spreadsheet=link_sheet, data=df_novo)
+                df_final = pd.concat([df_atual, BDNovo], ignore_index=True)
+                df_final = df_final.drop_duplicates(subset=["Aluno", "Disciplina"], keep="last")
 
-                    json_str = df_novo.to_json(orient="records", date_format="iso")
-                    dados_limpos = json.loads(json_str)
+                if not BDNovo.empty:
+                    conn.update(spreadsheet=linkSalaAtiva, data=df_final)
 
+                    # Exportação direta para o JSON local
+                    dicionario_dados = df_final.to_dict(orient="records")
                     with open("dados_alunos.json", "w", encoding="utf-8") as f:
-                        json.dump(dados_limpos, f, ensure_ascii=False, indent=4)
+                        json.dump(dicionario_dados, f, ensure_ascii=False, indent=4)
 
+                    st.session_state.salaAtiva = salaSelecionada
                     st.session_state.dadosCarregados = True
-                    st.success("Dados limpos e importados com sucesso!")
                     st.rerun()
                 else:
-                    st.error("Não foi possível ler as disciplinas do PDF.")
+                    st.error("Não foi possível extrair dados válidos do PDF.")
         else:
-            st.error("Anexe os arquivos PDF.")
+            st.error("Por favor, selecione os arquivos PDF.")
 
+# TELA 2: DASHBOARD HTML
 else:
-    dados_json = []
+    st.sidebar.write(f"Visualizando: **{st.session_state.salaAtiva}**")
+
+    dados_para_html = []
     if os.path.exists("dados_alunos.json"):
         with open("dados_alunos.json", "r", encoding="utf-8") as f:
-            dados_json = json.load(f)
+            dados_para_html = json.load(f)
+    else:
+        linkSalaAtiva = DICIONARIO_SALAS[st.session_state.salaAtiva]
+        df_sheet = conn.read(spreadsheet=linkSalaAtiva, ttl="0")
+        dados_para_html = df_sheet.where(pd.notnull(df_sheet), None).to_dict(orient="records")
 
-    alunos = {}
-    for r in dados_json:
-        p = str(r.get("Matrícula", "")).strip().upper()
-        if not p:
+    alunosMapeados = {}
+    for item in dados_para_html:
+        prontuario = str(item.get("Matrícula") or item.get("prontuario") or "BT300000").strip()
+        nome = str(item.get("Aluno", "")).strip()
+
+        if nome == "Não Identificado" or not nome or nome.startswith("BT30"):
             continue
 
-        if p not in alunos:
-            is_napne = str(r.get("Necessidades Especiais")).upper() == "SIM"
-            alunos[p] = {
-                "prontuario": p,
-                "nome": r.get("Aluno", "Sem Nome"),
-                "curso": r.get("Série", "Técnico Integrado"),
+        if prontuario not in alunosMapeados:
+            pneTexto = []
+            if str(item.get("Necessidades Especiais")).strip().lower() == "sim": 
+                pneTexto.append(f"PNE: {item.get('Tipo de Necessidade Especial') or '-'}")
+            if str(item.get("Transtorno")).strip().lower() == "sim": 
+                pneTexto.append(f"Transtorno: {item.get('Tipo de Transtorno') or '-'}")
+            if str(item.get("Superdotação")).strip().lower() == "sim": 
+                pneTexto.append(f"Superdotação: {item.get('Tipo de Superdotação') or '-'}")
+
+            infoNapne = " | ".join(pneTexto) if pneTexto else "Nenhum registro de PNE/Transtorno/Superdotação."
+
+            alunosMapeados[prontuario] = {
+                "prontuario": prontuario,
+                "nome": nome,
+                "curso": item.get("Série", "Técnico em Redes de Computadores"),
                 "turma": st.session_state.salaAtiva,
-                "frequencia": float(r.get("Freq. Final") or 100.0),
-                "napne": is_napne,
-                "pneInfo": r.get("Tipo de Necessidade Especial") or "Sem registros no NAPNE.",
-                "deliberacao": r.get("Observações") or "",
+                "frequencia": float(item.get("Freq. Final") or 100),
+                "napne": len(pneTexto) > 0,
+                "pneInfo": infoNapne,
+                "deliberacao": str(item.get("Observações", "")) if item.get("Observações") and str(item.get("Observações")).lower() != "nan" else "",
                 "disciplinas": []
             }
 
-        alunos[p]["disciplinas"].append({
-            "nome": r.get("Disciplina", "Disciplina"),
-            "b1": r.get("1º BI"),
-            "b2": r.get("2º BI"),
-            "b3": r.get("3º BI"),
-            "b4": r.get("4º BI"),
+        def tratar_nota(v):
+            if v is None or pd.isna(v): return None
+            try: return float(str(v).replace(',', '.'))
+            except ValueError: return None
+
+        alunosMapeados[prontuario]["disciplinas"].append({
+            "nome": item.get("Disciplina", "Disciplina"),
+            "b1": tratar_nota(item.get("1º BI")),
+            "b2": tratar_nota(item.get("2º BI")),
+            "b3": tratar_nota(item.get("3º BI")),
+            "b4": tratar_nota(item.get("4º BI")),
             "faltas": 0
         })
 
-    payload_json = json.dumps(list(alunos.values()), ensure_ascii=False)
+    json_estruturado = json.dumps(list(alunosMapeados.values()), ensure_ascii=False)
 
     if os.path.exists("index.html"):
         with open("index.html", "r", encoding="utf-8") as f:
-            html_template = f.read()
+            html_content = f.read()
 
-        html_final = html_template.replace("__DADOS_JSON_INJETADOS__", payload_json)
-        b64 = base64.b64encode(html_final.encode("utf-8")).decode("utf-8")
+        html_injetado = html_content.replace("__DADOS_JSON_INJETADOS__", json_estruturado)
 
-        st.markdown(
-            f'<iframe src="data:text/html;charset=utf-8;base64,{b64}" style="width: 100%; height: 1100px; border: none;"></iframe>',
-            unsafe_allow_html=True
-        )
+        b64_html = base64.b64encode(html_injetado.encode('utf-8')).decode('utf-8')
+        iframe_code = f"""
+        <iframe 
+            src="data:text/html;charset=utf-8;base64,{b64_html}"
+            style="width: 100%; height: 1150px; border: none; border-radius: 8px;"
+        ></iframe>
+        """
+        st.markdown(iframe_code, unsafe_allow_html=True)
     else:
-        st.error("Arquivo 'index.html' não foi localizado.")
+        st.error("O arquivo 'index.html' não foi encontrado no repositório GitHub.")
