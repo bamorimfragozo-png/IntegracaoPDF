@@ -44,7 +44,7 @@
             <div class="row align-items-center g-3">
                 <div class="col-md-4">
                     <label for="selectAluno" class="form-label fw-bold text-secondary mb-1">
-                        <i class="bi bi-person-bounding-box me-1"></i> Selecionar Aluno (Conselho de Classe):
+                        <i class="bi bi-person-bounding-box me-1"></i> Selecionar Aluno:
                     </label>
                     <select id="selectAluno" class="form-select form-select-sm fw-bold" onchange="carregarDadosAluno()">
                     </select>
@@ -53,7 +53,10 @@
                     <h5 class="fw-bold mb-0 text-dark" id="txtNomeAluno">---</h5>
                     <small class="text-muted">Prontuário: <span id="txtProntuario" class="fw-semibold">---</span> | Curso: <span id="txtCurso" class="fw-semibold">---</span> | Turma: <span id="txtTurma" class="fw-semibold">---</span></small>
                 </div>
-                <div class="col-md-3 text-end">
+                <div class="col-md-3 text-end d-flex align-items-center justify-content-end gap-2">
+                    <button class="btn btn-sm btn-outline-primary fw-bold" onclick="atualizarPainelViaJson()" title="Ler JSON e Atualizar Painel">
+                        <i class="bi bi-arrow-clockwise"></i> Atualizar Painel
+                    </button>
                     <span id="badgeStatusGeral" class="badge p-2 fs-6">---</span>
                 </div>
             </div>
@@ -200,6 +203,12 @@
             carregarDadosAluno();
         }
 
+        // ATIVIDADE 2: Botão JS que lê o JSON e atualiza o painel
+        function atualizarPainelViaJson() {
+            inicializar();
+            alert("Painel atualizado com os dados do arquivo JSON!");
+        }
+
         function navegarAluno(direcao) {
             const select = document.getElementById('selectAluno');
             let total = select.options.length;
@@ -235,7 +244,6 @@
 
             const tipoOrd = document.getElementById('selectOrdenacao').value;
 
-            // Ordenação configurável das disciplinas
             disciplinasAtuais = aluno.disciplinas.map(d => {
                 const notasValidas = [d.b1, d.b2, d.b3, d.b4].filter(n => n !== null && n !== undefined && !isNaN(n));
                 const media = notasValidas.length > 0 ? (notasValidas.reduce((a, b) => a + b, 0) / notasValidas.length) : null;
@@ -281,7 +289,6 @@
             renderTabelaDisciplinas(disciplinasAtuais);
             renderGraficoEvolucaoGeral(disciplinasAtuais);
             
-            // Exibe gráficos da primeira disciplina por padrão
             if (disciplinasAtuais.length > 0) {
                 selecionarDisciplina(0);
             }
@@ -318,7 +325,6 @@
 
             document.getElementById('txtTituloDisciplina').innerText = `Matéria: ${d.nome}`;
 
-            // 1. Rosca de Frequência da Matéria
             const freqGlobal = parseFloat(document.getElementById('kpiFrequencia').innerText) || 100;
             const ctxRosca = document.getElementById('chartRoscaFreq').getContext('2d');
             if (chartRoscaInstance) chartRoscaInstance.destroy();
@@ -339,7 +345,6 @@
                 }
             });
 
-            // 2. Barras de Notas da Matéria
             const ctxBarras = document.getElementById('chartBarrasNota').getContext('2d');
             if (chartBarrasInstance) chartBarrasInstance.destroy();
 
@@ -410,8 +415,6 @@
 
             if (aluno) {
                 aluno.deliberacao = textoObs;
-        
-                // Redireciona a janela pai com parâmetros de URL para acionar o salvamento direto na planilha pelo Python
                 const urlPai = window.parent.location.href.split('?')[0];
                 const novaUrl = `${urlPai}?action=salvar_obs&aluno=${encodeURIComponent(aluno.nome)}&obs=${encodeURIComponent(textoObs)}`;
                 window.parent.location.href = novaUrl;
