@@ -3,418 +3,410 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Conselho de Classe IFSP - Ficha Individual</title>
+    <title>Conselho de Classe - Dashboard</title>
+    <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <!-- FontAwesome Icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
     <style>
-        body { background-color: #f4f6f9; font-family: 'Segoe UI', system-ui, sans-serif; font-size: 0.88rem; }
-        .card-custom { border: none; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); background: white; }
-        .napne-box { background-color: #fff8e1; border-left: 4px solid #ffa000; }
-        .table-sm td, .table-sm th { vertical-align: middle; padding: 0.5rem; cursor: pointer; }
-
-        .nota-vermelha { color: #dc3545; font-weight: bold; }
-        .nota-laranja { color: #fd7e14; font-weight: bold; }
-        .nota-verde { color: #198754; font-weight: bold; }
-
-        .nav-btn-side {
-            position: fixed; top: 0; bottom: 0; width: 32px;
-            background-color: rgba(33, 37, 41, 0.08); color: #495057; border: none;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 1.4rem; cursor: pointer; transition: all 0.2s; z-index: 1000;
+        :root {
+            --bs-body-bg: #f4f6f9;
+            --primary-color: #1b5e20;
+            --primary-light: #e8f5e9;
         }
-        .nav-btn-side:hover { background-color: rgba(13, 110, 253, 0.85); color: white; width: 38px; }
-        .nav-btn-left { left: 0; border-top-right-radius: 8px; border-bottom-right-radius: 8px; }
-        .nav-btn-right { right: 0; border-top-left-radius: 8px; border-bottom-left-radius: 8px; }
-        .container-wrapper { margin-left: 28px; margin-right: 28px; }
-        .linha-selecionada { background-color: #e7f1ff !important; }
+
+        body {
+            background-color: var(--bs-body-bg);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #333;
+        }
+
+        .header-box {
+            background: linear-gradient(135deg, #1b5e20, #2e7d32);
+            color: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .student-card {
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border-left: 4px solid #6c757d;
+            background: #fff;
+            margin-bottom: 8px;
+            border-radius: 6px;
+        }
+
+        .student-card:hover {
+            transform: translateX(4px);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .student-card.active {
+            border-left-color: #198754;
+            background-color: var(--primary-light);
+        }
+
+        .badge-status {
+            font-size: 0.75rem;
+            padding: 0.35em 0.65em;
+        }
+
+        .table-grades {
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+        }
+
+        .table-grades th {
+            background-color: #2e7d32;
+            color: white;
+            font-weight: 500;
+            text-align: center;
+        }
+
+        .table-grades td {
+            vertical-align: middle;
+            text-align: center;
+        }
+
+        .nota-baixa {
+            color: #dc3545;
+            font-weight: bold;
+        }
+
+        .nota-boa {
+            color: #198754;
+        }
+
+        .card-info {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+            margin-bottom: 15px;
+        }
+
+        .list-container {
+            max-height: 800px;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
     </style>
 </head>
-<body class="p-3">
+<body>
 
-    <button class="nav-btn-side nav-btn-left" onclick="navegarAluno(-1)" title="Aluno Anterior">
-        <i class="bi bi-chevron-left"></i>
-    </button>
-    <button class="nav-btn-side nav-btn-right" onclick="navegarAluno(1)" title="Próximo Aluno">
-        <i class="bi bi-chevron-right"></i>
-    </button>
-
-    <div class="container-wrapper">
-        <div class="card card-custom p-3 mb-3">
-            <div class="row align-items-center g-3">
-                <div class="col-md-4">
-                    <label for="selectAluno" class="form-label fw-bold text-secondary mb-1">
-                        <i class="bi bi-person-bounding-box me-1"></i> Selecionar Aluno (Conselho de Classe):
-                    </label>
-                    <select id="selectAluno" class="form-select form-select-sm fw-bold" onchange="carregarDadosAluno()">
-                    </select>
-                </div>
-                <div class="col-md-5">
-                    <h5 class="fw-bold mb-0 text-dark" id="txtNomeAluno">---</h5>
-                    <small class="text-muted">Prontuário: <span id="txtProntuario" class="fw-semibold">---</span> | Curso: <span id="txtCurso" class="fw-semibold">---</span> | Turma: <span id="txtTurma" class="fw-semibold">---</span></small>
-                </div>
-                <div class="col-md-3 text-end">
-                    <span id="badgeStatusGeral" class="badge p-2 fs-6">---</span>
-                </div>
-            </div>
+<div class="container-fluid p-4">
+    <!-- CABEÇALHO -->
+    <div class="header-box d-flex justify-content-between align-items-center">
+        <div>
+            <h3 class="m-0"><i class="fa-solid fa-graduation-cap me-2"></i>Conselho de Classe</h3>
+            <small class="opacity-75" id="turmaNome">Selecione um aluno para visualizar</small>
         </div>
-
-        <div class="row g-3 mb-3">
-            <div class="col-md-3">
-                <div class="card card-custom p-2 text-center border-start border-4 border-primary">
-                    <small class="text-muted fw-bold">MÉDIA GERAL</small>
-                    <h3 class="fw-bold mb-0" id="kpiMediaGeral">0.0</h3>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card card-custom p-2 text-center border-start border-4 border-info">
-                    <small class="text-muted fw-bold">FREQUÊNCIA GLOBAL</small>
-                    <h3 class="fw-bold mb-0" id="kpiFrequencia">0%</h3>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card card-custom p-2 text-center border-start border-4 border-danger">
-                    <small class="text-muted fw-bold">DISCIPLINAS RETIDAS (&lt; 6.0)</small>
-                    <h3 class="fw-bold mb-0 text-danger" id="kpiRetencoes">0</h3>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card card-custom p-2 text-center border-start border-4 border-warning">
-                    <small class="text-muted fw-bold">ACOMPANHAMENTO NAPNE</small>
-                    <h3 class="fw-bold mb-0 text-warning" id="kpiNapneStatus">NÃO</h3>
-                </div>
-            </div>
-        </div>
-
-        <div class="row g-3 mb-3">
-            <div class="col-md-7">
-                <div class="card card-custom p-3 h-100">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <h6 class="fw-bold text-secondary mb-0">
-                            <i class="bi bi-sort-numeric-down me-1"></i> Desempenho por Disciplina
-                        </h6>
-                        <div class="d-flex align-items-center gap-2">
-                            <label class="small text-muted fw-semibold">Ordenar por:</label>
-                            <select id="selectOrdenacao" class="form-select form-select-sm" style="width: auto;" onchange="carregarDadosAluno()">
-                                <option value="nota">Menor Nota Primeiro</option>
-                                <option value="freq">Mais Faltas Primeiro</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="table-responsive">
-                        <table class="table table-sm table-hover align-middle mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Disciplina (Clique para ver gráficos)</th>
-                                    <th class="text-center">B1</th>
-                                    <th class="text-center">B2</th>
-                                    <th class="text-center">B3</th>
-                                    <th class="text-center">B4</th>
-                                    <th class="text-center">Média</th>
-                                    <th class="text-center">Falta(s)</th>
-                                </tr>
-                            </thead>
-                            <tbody id="tbodyDisciplinas">
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <!-- GRÁFICOS DA DISCIPLINA SELECIONADA -->
-            <div class="col-md-5">
-                <div class="card card-custom p-3 h-100">
-                    <h6 class="fw-bold text-secondary mb-2" id="txtTituloDisciplina">Selecione uma disciplina na tabela</h6>
-                    <div class="row g-2">
-                        <div class="col-md-6 text-center">
-                            <small class="fw-bold text-muted">Frequência da Matéria</small>
-                            <div style="height: 160px;">
-                                <canvas id="chartRoscaFreq"></canvas>
-                            </div>
-                        </div>
-                        <div class="col-md-6 text-center">
-                            <small class="fw-bold text-muted">Notas por Bimestre</small>
-                            <div style="height: 160px;">
-                                <canvas id="chartBarrasNota"></canvas>
-                            </div>
-                        </div>
-                    </div>
-                    <hr>
-                    <h6 class="fw-bold text-secondary mb-2">Evolução Média Geral (Turma/Bimestres)</h6>
-                    <div style="height: 140px;">
-                        <canvas id="chartEvolucaoGeral"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- NAPNE E DELIBERAÇÕES -->
-        <div class="card card-custom p-3 napne-box">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <h6 class="fw-bold text-dark mb-0">
-                    <i class="bi bi-journal-medical me-1 text-warning"></i> Parecer do NAPNE &amp; Observações Pedagógicas
-                </h6>
-                <span class="badge bg-warning text-dark" id="badgePNE">Atendimento Especializado</span>
-            </div>
-
-            <div class="row g-3">
-                <div class="col-md-6">
-                    <label class="fw-bold text-muted small">Informações NAPNE (SUAP):</label>
-                    <div class="p-2 bg-white rounded border text-secondary mb-2" id="txtNotasNapne" style="min-height: 80px;">
-                        Nenhum registro de PNE/Transtorno/Superdotação encontrado.
-                    </div>
-                </div>
-
-                <div class="col-md-6">
-                    <label class="fw-bold text-muted small">Encaminhamento / Deliberação do Conselho de Classe:</label>
-                    <textarea class="form-control form-control-sm mb-2" id="txtDeliberacaoConselho" rows="4" placeholder="Digite as deliberações do conselho..."></textarea>
-                    <div class="text-end">
-                        <button class="btn btn-sm btn-primary fw-bold" onclick="salvarDeliberacaoConselho()">
-                            <i class="bi bi-save me-1"></i> Salvar Deliberação na Planilha
-                        </button>
-                    </div>
-                </div>
-            </div>
+        <div>
+            <span class="badge bg-light text-dark fs-6" id="totalAlunosBadge">0 Alunos</span>
         </div>
     </div>
 
-    <script>
-        let bancoAlunos = __DADOS_JSON_INJETADOS__;
+    <div class="row">
+        <!-- PAINEL ESQUERDO: LISTA DE ALUNOS -->
+        <div class="col-md-4 col-lg-3">
+            <div class="card-info">
+                <div class="input-group mb-3">
+                    <span class="input-group-text"><i class="fa-solid fa-magnifying-glass"></i></span>
+                    <input type="text" id="inputBusca" class="form-control" placeholder="Buscar aluno..." onkeyup="filtrarAlunos()">
+                </div>
+                <div class="list-container" id="listaAlunosContainer">
+                    <!-- Alunos serão injetados via JavaScript -->
+                </div>
+            </div>
+        </div>
 
-        let chartRoscaInstance = null;
-        let chartBarrasInstance = null;
-        let chartEvolucaoGeralInstance = null;
-        let disciplinaSelecionadaIndex = 0;
-        let disciplinasAtuais = [];
-
-        function inicializar() {
-            const select = document.getElementById('selectAluno');
-            select.innerHTML = '';
-            if (!bancoAlunos || bancoAlunos.length === 0) {
-                select.innerHTML = '<option value="">Nenhum aluno cadastrado</option>';
-                return;
-            }
-            bancoAlunos.forEach((aluno, index) => {
-                select.innerHTML += `<option value="${index}">${aluno.nome} (${aluno.prontuario})</option>`;
-            });
-            carregarDadosAluno();
-        }
-
-        function navegarAluno(direcao) {
-            const select = document.getElementById('selectAluno');
-            let total = select.options.length;
-            if (total <= 1 && !select.value) return;
-            let atual = parseInt(select.value);
-            let novoIndex = (atual + direcao + total) % total;
-            select.value = novoIndex;
-            carregarDadosAluno();
-        }
-
-        function obterClasseNota(valor) {
-            if (valor === null || valor === undefined || isNaN(valor)) return '';
-            if (valor < 4.0) return 'nota-vermelha';
-            if (valor < 6.0) return 'nota-laranja';
-            return 'nota-verde';
-        }
-
-        function formatarNota(valor) {
-            return (valor !== null && valor !== undefined && !isNaN(valor)) ? valor.toFixed(1) : '-';
-        }
-
-        function carregarDadosAluno() {
-            const select = document.getElementById('selectAluno');
-            if (!select.value && select.value !== "0") return;
-            const index = select.value;
-            const aluno = bancoAlunos[index];
-            if (!aluno) return;
-
-            document.getElementById('txtNomeAluno').innerText = aluno.nome;
-            document.getElementById('txtProntuario').innerText = aluno.prontuario;
-            document.getElementById('txtCurso').innerText = aluno.curso;
-            document.getElementById('txtTurma').innerText = aluno.turma;
-
-            const tipoOrd = document.getElementById('selectOrdenacao').value;
-
-            // Usa rigorosamente as médias já lidas do PDF
-            disciplinasAtuais = aluno.disciplinas.map(d => {
-                return { ...d, media: d.media };
-            }).sort((a, b) => {
-                if (tipoOrd === 'freq') {
-                    return (b.faltas || 0) - (a.faltas || 0);
-                } else {
-                    if (a.media === null) return 1;
-                    if (b.media === null) return -1;
-                    return a.media - b.media;
-                }
-            });
-
-            const mediasValidas = disciplinasAtuais.map(d => d.media).filter(m => m !== null);
-            const mediaGeral = mediasValidas.length > 0 ? (mediasValidas.reduce((a, b) => a + b, 0) / mediasValidas.length) : 0;
-            const retencoes = disciplinasAtuais.filter(d => d.media !== null && d.media < 6.0).length;
-
-            document.getElementById('kpiMediaGeral').innerText = mediaGeral.toFixed(1);
-            document.getElementById('kpiMediaGeral').className = `fw-bold mb-0 ${obterClasseNota(mediaGeral)}`;
+        <!-- PAINEL DIREITO: FICHA DETALHADA DO ALUNO -->
+        <div class="col-md-8 col-lg-9" id="painelDetalhes" style="display: none;">
             
-            document.getElementById('kpiFrequencia').innerText = aluno.frequencia.toFixed(1) + '%';
-            document.getElementById('kpiFrequencia').className = `fw-bold mb-0 ${aluno.frequencia < 75.0 ? 'text-danger' : 'text-info'}`;
-            
-            document.getElementById('kpiRetencoes').innerText = retencoes;
-            document.getElementById('kpiNapneStatus').innerText = aluno.napne ? "SIM" : "NÃO";
+            <!-- INFORMACÕES DO ALUNO -->
+            <div class="card-info">
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <h4 id="alunoNome" class="text-success mb-1">Nome do Aluno</h4>
+                        <p class="text-muted mb-0">
+                            Prontuário: <strong id="alunoProntuario">-</strong> | 
+                            Frequência Global: <strong id="alunoFreq">-</strong>
+                        </p>
+                    </div>
+                    <div class="col-md-4 text-md-end mt-2 mt-md-0">
+                        <span id="badgeNapne" class="badge bg-warning text-dark me-1" style="display: none;">
+                            <i class="fa-solid fa-accessibility"></i> PNE / NAPNE
+                        </span>
+                        <span id="badgeStatusGeral" class="badge bg-secondary">Avaliando</span>
+                    </div>
+                </div>
 
-            const badgeStatus = document.getElementById('badgeStatusGeral');
-            if (retencoes > 3 || aluno.frequencia < 75.0) {
-                badgeStatus.innerText = "SITUAÇÃO CRÍTICA";
-                badgeStatus.className = "badge bg-danger p-2 fs-6";
-            } else if (retencoes > 0) {
-                badgeStatus.innerText = "EM ATENÇÃO";
-                badgeStatus.className = "badge bg-warning text-dark p-2 fs-6";
-            } else {
-                badgeStatus.innerText = "PROMOVIDO / SATISFATÓRIO";
-                badgeStatus.className = "badge bg-success p-2 fs-6";
-            }
+                <!-- ALERTA NAPNE / PNE -->
+                <div id="boxNapneInfo" class="alert alert-warning mt-3 mb-0" style="display: none;">
+                    <strong><i class="fa-solid fa-circle-info me-1"></i> Informações do NAPNE:</strong>
+                    <span id="textoNapne"></span>
+                </div>
+            </div>
 
-            document.getElementById('txtNotasNapne').innerText = aluno.pneInfo;
-            document.getElementById('txtDeliberacaoConselho').value = aluno.deliberacao;
-            
-            renderTabelaDisciplinas(disciplinasAtuais);
-            renderGraficoEvolucaoGeral(disciplinasAtuais);
-            
-            if (disciplinasAtuais.length > 0) {
-                selecionarDisciplina(0);
-            }
+            <!-- GRÁFICO E DESEMPENHO -->
+            <div class="row">
+                <div class="col-lg-12 mb-3">
+                    <div class="card-info">
+                        <h5>Desempenho por Bimestre</h5>
+                        <div style="height: 220px;">
+                            <canvas id="graficoNotas"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TABELA DE NOTAS POR DISCIPLINA -->
+            <div class="card-info p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover table-grades m-0">
+                        <thead>
+                            <tr>
+                                <th class="text-start ps-3">Disciplina</th>
+                                <th>1º Bim</th>
+                                <th>2º Bim</th>
+                                <th>3º Bim</th>
+                                <th>4º Bim</th>
+                                <th>Média</th>
+                                <th>Situação</th>
+                            </tr>
+                        </thead>
+                        <tbody id="corpoTabelaNotas">
+                            <!-- Injetado via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- DELIBERAÇÃO / OBSERVAÇÕES DO CONSELHO -->
+            <div class="card-info mt-3">
+                <h5><i class="fa-solid fa-pen-to-square me-2"></i>Observações e Deliberação do Conselho</h5>
+                <div class="mb-3">
+                    <textarea id="txtDeliberacao" class="form-control" rows="3" placeholder="Digite aqui as recomendações, decisões do conselho ou observações do aluno..."></textarea>
+                </div>
+                <div class="text-end">
+                    <button class="btn btn-success" onclick="salvarDeliberacao()">
+                        <i class="fa-solid fa-floppy-disk me-1"></i> Salvar Deliberação
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- MENSAGEM QUANDO NENHUM ALUNO ESTÁ SELECIONADO -->
+        <div class="col-md-8 col-lg-9" id="painelVazio">
+            <div class="card-info text-center py-5">
+                <i class="fa-solid fa-id-card fa-4x text-muted mb-3"></i>
+                <h4 class="text-muted">Nenhum aluno selecionado</h4>
+                <p class="text-muted">Clique em um aluno na lista à esquerda para carregar a ficha e o histórico de notas.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // INJEÇÃO DOS DADOS DO PYTHON
+    const dadosAlunos = __DADOS_JSON_INJETADOS__;
+
+    let alunoAtual = null;
+    let chartInstance = null;
+
+    // INICIALIZAÇÃO
+    document.addEventListener("DOMContentLoaded", function() {
+        if (dadosAlunos && dadosAlunos.length > 0) {
+            document.getElementById("totalAlunosBadge").innerText = dadosAlunos.length + " Alunos";
+            document.getElementById("turmaNome").innerText = "Turma: " + (dadosAlunos[0].turma || "Não especificada");
+            renderizarListaAlunos(dadosAlunos);
+        } else {
+            document.getElementById("listaAlunosContainer").innerHTML = "<div class='text-center text-muted p-3'>Nenhum dado encontrado.</div>";
         }
+    });
 
-        function renderTabelaDisciplinas(disciplinas) {
-            const tbody = document.getElementById('tbodyDisciplinas');
-            tbody.innerHTML = '';
+    // RENDERIZAR LISTA LATERAL
+    function renderizarListaAlunos(lista) {
+        const container = document.getElementById("listaAlunosContainer");
+        container.innerHTML = "";
 
-            disciplinas.forEach((d, i) => {
-                const classeMedia = obterClasseNota(d.media);
-                tbody.innerHTML += `
-                    <tr id="tr_disp_${i}" onclick="selecionarDisciplina(${i})">
-                        <td class="fw-semibold">${d.nome}</td>
-                        <td class="text-center ${obterClasseNota(d.b1)}">${formatarNota(d.b1)}</td>
-                        <td class="text-center ${obterClasseNota(d.b2)}">${formatarNota(d.b2)}</td>
-                        <td class="text-center ${obterClasseNota(d.b3)}">${formatarNota(d.b3)}</td>
-                        <td class="text-center ${obterClasseNota(d.b4)}">${formatarNota(d.b4)}</td>
-                        <td class="text-center ${classeMedia}">${formatarNota(d.media)}</td>
-                        <td class="text-center fw-bold text-danger">${d.faltas || 0}</td>
-                    </tr>
-                `;
+        lista.forEach((aluno, index) => {
+            const div = document.createElement("div");
+            div.className = "student-card p-2 d-flex justify-content-between align-items-center";
+            div.id = "card-aluno-" + index;
+            div.onclick = () => selecionarAluno(aluno, index);
+
+            // Verifica se tem notas baixas (< 6.0)
+            const temRetencao = aluno.disciplinas.some(d => {
+                const media = calcularMedia(d);
+                return media !== null && media < 6.0;
             });
+
+            const statusClass = temRetencao ? "bg-danger" : "bg-success";
+            const statusTexto = temRetencao ? "Atenção" : "OK";
+
+            div.innerHTML = `
+                <div>
+                    <strong class="d-block text-truncate" style="max-width: 180px;">${aluno.nome}</strong>
+                    <small class="text-muted">${aluno.prontuario}</small>
+                </div>
+                <div>
+                    <span class="badge ${statusClass} badge-status">${statusTexto}</span>
+                </div>
+            `;
+            container.appendChild(div);
+        });
+    }
+
+    // SELECIONAR ALUNO
+    function selecionarAluno(aluno, index) {
+        alunoAtual = aluno;
+
+        // Destaque visual no card selecionado
+        document.querySelectorAll('.student-card').forEach(c => c.classList.remove('active'));
+        const cardSel = document.getElementById("card-aluno-" + index);
+        if (cardSel) cardSel.classList.add('active');
+
+        // Exibe painel
+        document.getElementById("painelVazio").style.display = "none";
+        document.getElementById("painelDetalhes").style.display = "block";
+
+        // Preenche dados básicos
+        document.getElementById("alunoNome").innerText = aluno.nome;
+        document.getElementById("alunoProntuario").innerText = aluno.prontuario;
+        document.getElementById("alunoFreq").innerText = (aluno.frequencia || 100) + "%";
+        document.getElementById("txtDeliberacao").value = aluno.deliberacao || "";
+
+        // PNE / NAPNE
+        const boxNapne = document.getElementById("boxNapneInfo");
+        const badgeNapne = document.getElementById("badgeNapne");
+        if (aluno.napne) {
+            badgeNapne.style.display = "inline-block";
+            boxNapne.style.display = "block";
+            document.getElementById("textoNapne").innerText = aluno.pneInfo;
+        } else {
+            badgeNapne.style.display = "none";
+            boxNapne.style.display = "none";
         }
 
-        function selecionarDisciplina(idx) {
-            disciplinaSelecionadaIndex = idx;
-            document.querySelectorAll('#tbodyDisciplinas tr').forEach(tr => tr.classList.remove('linha-selecionada'));
-            const rowSelected = document.getElementById(`tr_disp_${idx}`);
-            if (rowSelected) rowSelected.classList.add('linha-selecionada');
+        // Tabela de Notas
+        const corpoTabela = document.getElementById("corpoTabelaNotas");
+        corpoTabela.innerHTML = "";
 
-            const d = disciplinasAtuais[idx];
-            if (!d) return;
+        let bimestresSoma = [0, 0, 0, 0];
+        let bimestresQtd = [0, 0, 0, 0];
 
-            document.getElementById('txtTituloDisciplina').innerText = `Matéria: ${d.nome}`;
+        aluno.disciplinas.forEach(d => {
+            const tr = document.createElement("tr");
 
-            // Exibição da Frequência lida do PDF na rosca
-            const freqNum = parseFloat(d.freq_materia) || 100;
-            const ctxRosca = document.getElementById('chartRoscaFreq').getContext('2d');
-            if (chartRoscaInstance) chartRoscaInstance.destroy();
+            const b1 = formatarNota(d.b1);
+            const b2 = formatarNota(d.b2);
+            const b3 = formatarNota(d.b3);
+            const b4 = formatarNota(d.b4);
 
-            chartRoscaInstance = new Chart(ctxRosca, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Presença (%)', 'Faltas / Ausência (%)'],
-                    datasets: [{
-                        data: [freqNum, Math.max(0, 100 - freqNum)],
-                        backgroundColor: ['#198754', '#dc3545']
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } }
+            if (d.b1 !== null) { bimestresSoma[0] += d.b1; bimestresQtd[0]++; }
+            if (d.b2 !== null) { bimestresSoma[1] += d.b2; bimestresQtd[1]++; }
+            if (d.b3 !== null) { bimestresSoma[2] += d.b3; bimestresQtd[2]++; }
+            if (d.b4 !== null) { bimestresSoma[3] += d.b4; bimestresQtd[3]++; }
+
+            const mediaVal = calcularMedia(d);
+            const mediaStr = mediaVal !== null ? mediaVal.toFixed(1) : "-";
+            const celulaClass = (mediaVal !== null && mediaVal < 6.0) ? "nota-baixa" : "nota-boa";
+
+            tr.innerHTML = `
+                <td class="text-start ps-3 font-weight-bold">${d.nome}</td>
+                <td>${b1}</td>
+                <td>${b2}</td>
+                <td>${b3}</td>
+                <td>${b4}</td>
+                <td class="${celulaClass}">${mediaStr}</td>
+                <td><span class="badge ${mediaVal < 6.0 ? 'bg-danger' : 'bg-success'}">${mediaVal < 6.0 ? 'Abaixo' : 'Adequado'}</span></td>
+            `;
+            corpoTabela.appendChild(tr);
+        });
+
+        // Atualizar Gráfico
+        const mediasBimestrais = bimestresSoma.map((soma, i) => bimestresQtd[i] > 0 ? (soma / bimestresQtd[i]).toFixed(2) : 0);
+        gerarGrafico(mediasBimestrais);
+    }
+
+    // CÁLCULO DE MÉDIA
+    function calcularMedia(d) {
+        const notas = [d.b1, d.b2, d.b3, d.b4].filter(n => n !== null && !isNaN(n));
+        if (notas.length === 0) return null;
+        return notas.reduce((a, b) => a + b, 0) / notas.length;
+    }
+
+    function formatarNota(v) {
+        if (v === null || v === undefined) return "-";
+        return parseFloat(v).toFixed(1);
+    }
+
+    // FILTRO DE BUSCA
+    function filtrarAlunos() {
+        const termo = document.getElementById("inputBusca").value.toLowerCase();
+        const filtrados = dadosAlunos.filter(a => a.nome.toLowerCase().includes(termo) || a.prontuario.toLowerCase().includes(termo));
+        renderizarListaAlunos(filtrados);
+    }
+
+    // GRÁFICO CHART.JS
+    function gerarGrafico(mediasBimestrais) {
+        const ctx = document.getElementById('graficoNotas').getContext('2d');
+        if (chartInstance) chartInstance.destroy();
+
+        chartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: ['1º Bimestre', '2º Bimestre', '3º Bimestre', '4º Bimestre'],
+                datasets: [{
+                    label: 'Média Geral das Disciplinas',
+                    data: mediasBimestrais,
+                    borderColor: '#1b5e20',
+                    backgroundColor: 'rgba(27, 94, 32, 0.1)',
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 5
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { min: 0, max: 10 }
                 }
-            });
-
-            // Barras de Notas da Matéria
-            const ctxBarras = document.getElementById('chartBarrasNota').getContext('2d');
-            if (chartBarrasInstance) chartBarrasInstance.destroy();
-
-            chartBarrasInstance = new Chart(ctxBarras, {
-                type: 'bar',
-                data: {
-                    labels: ['B1', 'B2', 'B3', 'B4'],
-                    datasets: [{
-                        label: 'Notas',
-                        data: [d.b1, d.b2, d.b3, d.b4],
-                        backgroundColor: '#0d6efd'
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: { y: { min: 0, max: 10 } },
-                    plugins: { legend: { display: false } }
-                }
-            });
-        }
-
-        function renderGraficoEvolucaoGeral(disciplinas) {
-            const bimestres = ['b1', 'b2', 'b3', 'b4'];
-            const mediasBimestrais = bimestres.map(b => {
-                const notasValidas = disciplinas.map(d => d[b]).filter(n => n !== null && n !== undefined && !isNaN(n));
-                return notasValidas.length > 0 ? (notasValidas.reduce((a, b) => a + b, 0) / notasValidas.length) : null;
-            });
-
-            const ctx = document.getElementById('chartEvolucaoGeral').getContext('2d');
-            if (chartEvolucaoGeralInstance) chartEvolucaoGeralInstance.destroy();
-
-            chartEvolucaoGeralInstance = new Chart(ctx, {
-                data: {
-                    labels: ['1º Bim', '2º Bim', '3º Bim', '4º Bim'],
-                    datasets: [
-                        {
-                            type: 'line',
-                            label: 'Evolução',
-                            data: mediasBimestrais,
-                            borderColor: '#fd7e14',
-                            borderWidth: 2,
-                            fill: false,
-                            spanGaps: true
-                        },
-                        {
-                            type: 'bar',
-                            label: 'Média',
-                            data: mediasBimestrais,
-                            backgroundColor: '#ffe58f'
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: { y: { min: 0, max: 10 } },
-                    plugins: { legend: { display: false } }
-                }
-            });
-        }
-
-        function salvarDeliberacaoConselho() {
-            const select = document.getElementById('selectAluno');
-            const index = select.value;
-            const aluno = bancoAlunos[index];
-            const textoObs = document.getElementById('txtDeliberacaoConselho').value;
-
-            if (aluno) {
-                aluno.deliberacao = textoObs;
-        
-                const urlPai = window.parent.location.href.split('?')[0];
-                const novaUrl = `${urlPai}?action=salvar_obs&aluno=${encodeURIComponent(aluno.nome)}&obs=${encodeURIComponent(textoObs)}`;
-                window.parent.location.href = novaUrl;
             }
-        }
+        });
+    }
 
-        window.onload = inicializar;
-    </script>
+    // COMUNICAÇÃO COM O STREAMLIT VIA QUERY PARAMS
+    function salvarDeliberacao() {
+        if (!alunoAtual) return;
+        const novaObs = document.getElementById("txtDeliberacao").value;
+        alunoAtual.deliberacao = novaObs;
+
+        // Redireciona a janela pai (Streamlit) para disparar a atualização na planilha
+        const urlParams = new URLSearchParams({
+            action: 'salvar_obs',
+            aluno: alunoAtual.nome,
+            obs: novaObs
+        });
+
+        if (window.top) {
+            window.top.location.href = window.top.location.pathname + "?" + urlParams.toString();
+        } else {
+            alert("Observação registrada localmente. Recarregue para persistir.");
+        }
+    }
+</script>
+
 </body>
 </html>
