@@ -4,11 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Conselho de Classe - Dashboard</title>
-    <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- FontAwesome Icons -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
@@ -103,7 +100,6 @@
 <body>
 
 <div class="container-fluid p-4">
-    <!-- CABEÇALHO -->
     <div class="header-box d-flex justify-content-between align-items-center">
         <div>
             <h3 class="m-0"><i class="fa-solid fa-graduation-cap me-2"></i>Conselho de Classe</h3>
@@ -115,23 +111,17 @@
     </div>
 
     <div class="row">
-        <!-- PAINEL ESQUERDO: LISTA DE ALUNOS -->
         <div class="col-md-4 col-lg-3">
             <div class="card-info">
                 <div class="input-group mb-3">
                     <span class="input-group-text"><i class="fa-solid fa-magnifying-glass"></i></span>
                     <input type="text" id="inputBusca" class="form-control" placeholder="Buscar aluno..." onkeyup="filtrarAlunos()">
                 </div>
-                <div class="list-container" id="listaAlunosContainer">
-                    <!-- Alunos serão injetados via JavaScript -->
-                </div>
+                <div class="list-container" id="listaAlunosContainer"></div>
             </div>
         </div>
 
-        <!-- PAINEL DIREITO: FICHA DETALHADA DO ALUNO -->
         <div class="col-md-8 col-lg-9" id="painelDetalhes" style="display: none;">
-            
-            <!-- INFORMACÕES DO ALUNO -->
             <div class="card-info">
                 <div class="row align-items-center">
                     <div class="col-md-8">
@@ -149,14 +139,12 @@
                     </div>
                 </div>
 
-                <!-- ALERTA NAPNE / PNE -->
                 <div id="boxNapneInfo" class="alert alert-warning mt-3 mb-0" style="display: none;">
                     <strong><i class="fa-solid fa-circle-info me-1"></i> Informações do NAPNE:</strong>
                     <span id="textoNapne"></span>
                 </div>
             </div>
 
-            <!-- GRÁFICO E DESEMPENHO -->
             <div class="row">
                 <div class="col-lg-12 mb-3">
                     <div class="card-info">
@@ -168,7 +156,6 @@
                 </div>
             </div>
 
-            <!-- TABELA DE NOTAS POR DISCIPLINA -->
             <div class="card-info p-0">
                 <div class="table-responsive">
                     <table class="table table-hover table-grades m-0">
@@ -183,18 +170,15 @@
                                 <th>Situação</th>
                             </tr>
                         </thead>
-                        <tbody id="corpoTabelaNotas">
-                            <!-- Injetado via JS -->
-                        </tbody>
+                        <tbody id="corpoTabelaNotas"></tbody>
                     </table>
                 </div>
             </div>
 
-            <!-- DELIBERAÇÃO / OBSERVAÇÕES DO CONSELHO -->
             <div class="card-info mt-3">
                 <h5><i class="fa-solid fa-pen-to-square me-2"></i>Observações e Deliberação do Conselho</h5>
                 <div class="mb-3">
-                    <textarea id="txtDeliberacao" class="form-control" rows="3" placeholder="Digite aqui as recomendações, decisões do conselho ou observações do aluno..."></textarea>
+                    <textarea id="txtDeliberacao" class="form-control" rows="3" placeholder="Digite as observações do aluno..."></textarea>
                 </div>
                 <div class="text-end">
                     <button class="btn btn-success" onclick="salvarDeliberacao()">
@@ -202,28 +186,23 @@
                     </button>
                 </div>
             </div>
-
         </div>
 
-        <!-- MENSAGEM QUANDO NENHUM ALUNO ESTÁ SELECIONADO -->
         <div class="col-md-8 col-lg-9" id="painelVazio">
             <div class="card-info text-center py-5">
                 <i class="fa-solid fa-id-card fa-4x text-muted mb-3"></i>
                 <h4 class="text-muted">Nenhum aluno selecionado</h4>
-                <p class="text-muted">Clique em um aluno na lista à esquerda para carregar a ficha e o histórico de notas.</p>
+                <p class="text-muted">Clique em um aluno na lista à esquerda para carregar as notas.</p>
             </div>
         </div>
     </div>
 </div>
 
 <script>
-    // INJEÇÃO DOS DADOS DO PYTHON
     const dadosAlunos = __DADOS_JSON_INJETADOS__;
-
     let alunoAtual = null;
     let chartInstance = null;
 
-    // INICIALIZAÇÃO
     document.addEventListener("DOMContentLoaded", function() {
         if (dadosAlunos && dadosAlunos.length > 0) {
             document.getElementById("totalAlunosBadge").innerText = dadosAlunos.length + " Alunos";
@@ -234,7 +213,6 @@
         }
     });
 
-    // RENDERIZAR LISTA LATERAL
     function renderizarListaAlunos(lista) {
         const container = document.getElementById("listaAlunosContainer");
         container.innerHTML = "";
@@ -245,7 +223,6 @@
             div.id = "card-aluno-" + index;
             div.onclick = () => selecionarAluno(aluno, index);
 
-            // Verifica se tem notas baixas (< 6.0)
             const temRetencao = aluno.disciplinas.some(d => {
                 const media = calcularMedia(d);
                 return media !== null && media < 6.0;
@@ -267,26 +244,21 @@
         });
     }
 
-    // SELECIONAR ALUNO
     function selecionarAluno(aluno, index) {
         alunoAtual = aluno;
 
-        // Destaque visual no card selecionado
         document.querySelectorAll('.student-card').forEach(c => c.classList.remove('active'));
         const cardSel = document.getElementById("card-aluno-" + index);
         if (cardSel) cardSel.classList.add('active');
 
-        // Exibe painel
         document.getElementById("painelVazio").style.display = "none";
         document.getElementById("painelDetalhes").style.display = "block";
 
-        // Preenche dados básicos
         document.getElementById("alunoNome").innerText = aluno.nome;
         document.getElementById("alunoProntuario").innerText = aluno.prontuario;
         document.getElementById("alunoFreq").innerText = (aluno.frequencia || 100) + "%";
         document.getElementById("txtDeliberacao").value = aluno.deliberacao || "";
 
-        // PNE / NAPNE
         const boxNapne = document.getElementById("boxNapneInfo");
         const badgeNapne = document.getElementById("badgeNapne");
         if (aluno.napne) {
@@ -298,7 +270,6 @@
             boxNapne.style.display = "none";
         }
 
-        // Tabela de Notas
         const corpoTabela = document.getElementById("corpoTabelaNotas");
         corpoTabela.innerHTML = "";
 
@@ -334,12 +305,10 @@
             corpoTabela.appendChild(tr);
         });
 
-        // Atualizar Gráfico
         const mediasBimestrais = bimestresSoma.map((soma, i) => bimestresQtd[i] > 0 ? (soma / bimestresQtd[i]).toFixed(2) : 0);
         gerarGrafico(mediasBimestrais);
     }
 
-    // CÁLCULO DE MÉDIA
     function calcularMedia(d) {
         const notas = [d.b1, d.b2, d.b3, d.b4].filter(n => n !== null && !isNaN(n));
         if (notas.length === 0) return null;
@@ -351,14 +320,12 @@
         return parseFloat(v).toFixed(1);
     }
 
-    // FILTRO DE BUSCA
     function filtrarAlunos() {
         const termo = document.getElementById("inputBusca").value.toLowerCase();
         const filtrados = dadosAlunos.filter(a => a.nome.toLowerCase().includes(termo) || a.prontuario.toLowerCase().includes(termo));
         renderizarListaAlunos(filtrados);
     }
 
-    // GRÁFICO CHART.JS
     function gerarGrafico(mediasBimestrais) {
         const ctx = document.getElementById('graficoNotas').getContext('2d');
         if (chartInstance) chartInstance.destroy();
@@ -387,13 +354,11 @@
         });
     }
 
-    // COMUNICAÇÃO COM O STREAMLIT VIA QUERY PARAMS
     function salvarDeliberacao() {
         if (!alunoAtual) return;
         const novaObs = document.getElementById("txtDeliberacao").value;
         alunoAtual.deliberacao = novaObs;
 
-        // Redireciona a janela pai (Streamlit) para disparar a atualização na planilha
         const urlParams = new URLSearchParams({
             action: 'salvar_obs',
             aluno: alunoAtual.nome,
@@ -403,7 +368,7 @@
         if (window.top) {
             window.top.location.href = window.top.location.pathname + "?" + urlParams.toString();
         } else {
-            alert("Observação registrada localmente. Recarregue para persistir.");
+            alert("Observação gravada.");
         }
     }
 </script>
