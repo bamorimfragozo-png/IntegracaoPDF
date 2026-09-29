@@ -87,7 +87,6 @@ def extrairDados(arquivosPdf):
             if "Disciplina" not in bloco and "TÉCNICO" not in bloco:
                 continue
 
-            # Limpeza do bloco para regex do NAPNE
             blocoLimpo = re.sub(r'\s+', ' ', bloco)
 
             nomeAluno = ""
@@ -123,7 +122,7 @@ def extrairDados(arquivosPdf):
             if not nomeAluno or nomeAluno == "Não Identificado":
                 nomeAluno = arquivo.name.replace(".pdf", "").replace("Boletim", "").replace("_", " ").strip()
 
-            # Captura precisa do NAPNE (versão flexível com e sem dois-pontos)
+            # Captura de PNE / NAPNE
             necEspeciais = "Não"
             tipoNecEspecial = "-"
             transtorno = "Não"
@@ -131,7 +130,6 @@ def extrairDados(arquivosPdf):
             superdotacao = "Não"
             tipoSuperdotacao = "-"
 
-            # Necessidades Especiais
             mPne = re.search(r"Portador\(a\)\s+de\s+Necessidades\s+Especiais\s*:?\s*(Sim|Não)", blocoLimpo, re.IGNORECASE)
             if mPne:
                 necEspeciais = mPne.group(1).capitalize()
@@ -139,7 +137,6 @@ def extrairDados(arquivosPdf):
             if mTipPne and mTipPne.group(1).strip() not in ["-", ""]:
                 tipoNecEspecial = mTipPne.group(1).strip()
 
-            # Transtorno
             mTrans = re.search(r"Portador\(a\)\s+de\s+Transtorno\s*:?\s*(Sim|Não)", blocoLimpo, re.IGNORECASE)
             if mTrans:
                 transtorno = mTrans.group(1).capitalize()
@@ -147,7 +144,6 @@ def extrairDados(arquivosPdf):
             if mTipTrans and mTipTrans.group(1).strip() not in ["-", ""]:
                 tipoTranstorno = mTipTrans.group(1).strip()
 
-            # Superdotação
             mSuper = re.search(r"Portador\(a\)\s+de\s+Superdotação\s*:?\s*(Sim|Não)", blocoLimpo, re.IGNORECASE)
             if mSuper:
                 superdotacao = mSuper.group(1).capitalize()
@@ -155,62 +151,118 @@ def extrairDados(arquivosPdf):
             if mTipSuper and mTipSuper.group(1).strip() not in ["-", ""]:
                 tipoSuperdotacao = mTipSuper.group(1).strip()
 
-            # Disciplinas
+            # --- LEITURA DIRETA DO PADRÃO SUAP (NOTAS, MÉDIA LIDA, FALTAS E % FREQ) ---
             padraoBloco = re.findall(
-                r"(INT\.\d{5}\s*\([A-Z0-9]+\)\s*-\s*[^0-9\n]+)([\s\S]*?)(?=(?:INT\.\d{5}|Total|Este documento|Boituva|\Z))",
-                bloco
+                r"(\d*\s*INT\.\d{5}\s*\([^)]+\)\s*-\s*[^0-9\n]+?)\s+(\d+[\.,]\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+[\.,]?\d*\%)(.*?)(?=(?:\d*\s*INT\.\d{5}|Total|Este documento|Boituva|\Z))",
+                bloco,
+                re.DOTALL
             )
 
-            for match in padraoBloco:
-                nomeMateria = match[0].strip()
-                blocoTexto = match[1]
+            if padraoBloco:
+                for match in padraoBloco:
+                    nomeMateria = match[0].strip()
+                    faltasDisciplina = int(match[4].strip())      # Faltas lidas diretamente
+                    freqMateriaStr = match[5].strip()             # % de Frequência lida diretamente
+                    blocoNotas = match[6]
 
-                if "Turma:" in nomeMateria or "Sit." in nomeMateria or "Série" in nomeMateria:
-                    continue
+                    # Procura notas na sequência: B1, B2, B3, B4, Média
+                    candidatos = re.findall(r"\b(\d{1,2}[\.,]\d{1,2}|-)\b", blocoNotas)
+                    
+                    valNotas = []
+                    for val in candidatos:
+                        if val == "-":
+                            valNotas.append(None)
+                        else:
+                            try:
+                                num = float(val.replace(",", "."))
+                                if num <= 10.0:
+                                    valNotas.append(num)
+                            except ValueError:
+                                pass
 
-                candidatosNotas = re.findall(r"\b(\d{1,2}[\.,]\d{1,2})\b", blocoTexto)
-                notasEncontradas = []
+                    b1 = valNotas[0] if len(valNotas) > 0 else None
+                    b2 = valNotas[1] if len(valNotas) > 1 else None
+                    b3 = valNotas[2] if len(valNotas) > 2 else None
+                    b4 = valNotas[3] if len(valNotas) > 3 else None
+                    mediaLida = valNotas[4] if len(valNotas) > 4 else None  # Média exatamente como vem do PDF
 
-                for val in candidatosNotas:
-                    try:
-                        num = float(val.replace(",", "."))
-                        if num <= 10.0:
-                            notasEncontradas.append(num)
-                    except ValueError:
-                        pass
+                    tecnico = any(kw in nomeMateria.upper() for kw in tecnicas)
+                    nucleo = "Técnico" if tecnico else "Comum"
 
-                b1 = notasEncontradas[0] if len(notasEncontradas) > 0 else None
-                b2 = notasEncontradas[1] if len(notasEncontradas) > 1 else None
-                b3 = notasEncontradas[2] if len(notasEncontradas) > 2 else None
-                b4 = notasEncontradas[3] if len(notasEncontradas) > 3 else None
+                    dadosFinais.append({
+                        'Nº Chamada': int(numeroChamada),
+                        'Aluno': nomeAluno,
+                        'Matrícula': matriculaAluno,
+                        'Série': serieAluno,
+                        'Disciplina': nomeMateria,
+                        '1º BI': b1,
+                        '2º BI': b2,
+                        '3º BI': b3,
+                        '4º BI': b4,
+                        'Média Final': mediaLida,
+                        'Faltas': faltasDisciplina,
+                        'Freq. Disciplina': freqMateriaStr,
+                        'Freq. Final': freqGlobal,
+                        'Núcleo': nucleo,
+                        'Observações': '',
+                        'Necessidades Especiais': necEspeciais,
+                        'Tipo de Necessidade Especial': tipoNecEspecial,
+                        'Transtorno': transtorno,
+                        'Tipo de Transtorno': tipoTranstorno,
+                        'Superdotação': superdotacao,
+                        'Tipo de Superdotação': tipoSuperdotacao
+                    })
+            else:
+                # Modificação/Fallback padrão para blocos que não casem perfeitamente com a regex completa do SUAP
+                padraoBlocoSimples = re.findall(
+                    r"(INT\.\d{5}\s*\([A-Z0-9]+\)\s*-\s*[^0-9\n]+)([\s\S]*?)(?=(?:INT\.\d{5}|Total|Este documento|Boituva|\Z))",
+                    bloco
+                )
+                for match in padraoBlocoSimples:
+                    nomeMateria = match[0].strip()
+                    blocoTexto = match[1]
 
-                notasValidas = [n for n in [b1, b2, b3, b4] if n is not None]
-                mediaFinal = round(sum(notasValidas) / len(notasValidas), 2) if notasValidas else 0.0
+                    if "Turma:" in nomeMateria or "Sit." in nomeMateria or "Série" in nomeMateria:
+                        continue
 
-                tecnico = any(kw in nomeMateria.upper() for kw in tecnicas)
-                nucleo = "Técnico" if tecnico else "Comum"
+                    mFaltas = re.search(r"\b(\d+)\s+(?:\d+[\.,]?\d*\%)", blocoTexto)
+                    faltasDisciplina = int(mFaltas.group(1)) if mFaltas else 0
 
-                dadosFinais.append({
-                    'Nº Chamada': int(numeroChamada),
-                    'Aluno': nomeAluno,
-                    'Matrícula': matriculaAluno,
-                    'Série': serieAluno,
-                    'Disciplina': nomeMateria,
-                    '1º BI': b1,
-                    '2º BI': b2,
-                    '3º BI': b3,
-                    '4º BI': b4,
-                    'Média Final': mediaFinal,
-                    'Freq. Final': freqGlobal,
-                    'Núcleo': nucleo,
-                    'Observações': '',
-                    'Necessidades Especiais': necEspeciais,
-                    'Tipo de Necessidade Especial': tipoNecEspecial,
-                    'Transtorno': transtorno,
-                    'Tipo de Transtorno': tipoTranstorno,
-                    'Superdotação': superdotacao,
-                    'Tipo de Superdotação': tipoSuperdotacao
-                })
+                    candidatosNotas = re.findall(r"\b(\d{1,2}[\.,]\d{1,2})\b", blocoTexto)
+                    notasEncontradas = [float(v.replace(",", ".")) for v in candidatosNotas if float(v.replace(",", ".")) <= 10.0]
+
+                    b1 = notasEncontradas[0] if len(notasEncontradas) > 0 else None
+                    b2 = notasEncontradas[1] if len(notasEncontradas) > 1 else None
+                    b3 = notasEncontradas[2] if len(notasEncontradas) > 2 else None
+                    b4 = notasEncontradas[3] if len(notasEncontradas) > 3 else None
+                    mediaLida = notasEncontradas[4] if len(notasEncontradas) > 4 else None
+
+                    tecnico = any(kw in nomeMateria.upper() for kw in tecnicas)
+                    nucleo = "Técnico" if tecnico else "Comum"
+
+                    dadosFinais.append({
+                        'Nº Chamada': int(numeroChamada),
+                        'Aluno': nomeAluno,
+                        'Matrícula': matriculaAluno,
+                        'Série': serieAluno,
+                        'Disciplina': nomeMateria,
+                        '1º BI': b1,
+                        '2º BI': b2,
+                        '3º BI': b3,
+                        '4º BI': b4,
+                        'Média Final': mediaLida,
+                        'Faltas': faltasDisciplina,
+                        'Freq. Disciplina': '100%',
+                        'Freq. Final': freqGlobal,
+                        'Núcleo': nucleo,
+                        'Observações': '',
+                        'Necessidades Especiais': necEspeciais,
+                        'Tipo de Necessidade Especial': tipoNecEspecial,
+                        'Transtorno': transtorno,
+                        'Tipo de Transtorno': tipoTranstorno,
+                        'Superdotação': superdotacao,
+                        'Tipo de Superdotação': tipoSuperdotacao
+                    })
 
             numeroChamada += 1
 
@@ -244,7 +296,7 @@ if not st.session_state.dadosCarregados:
                 if not BDNovo.empty:
                     conn.update(spreadsheet=linkSalaAtiva, data=df_final)
 
-                    # Exportação direta para o JSON local
+                    # Exportação para o JSON local
                     dicionario_dados = df_final.to_dict(orient="records")
                     with open("dados_alunos.json", "w", encoding="utf-8") as f:
                         json.dump(dicionario_dados, f, ensure_ascii=False, indent=4)
@@ -306,13 +358,16 @@ else:
             try: return float(str(v).replace(',', '.'))
             except ValueError: return None
 
+        # Repassa exatamente os valores extraídos do PDF
         alunosMapeados[prontuario]["disciplinas"].append({
             "nome": item.get("Disciplina", "Disciplina"),
             "b1": tratar_nota(item.get("1º BI")),
             "b2": tratar_nota(item.get("2º BI")),
             "b3": tratar_nota(item.get("3º BI")),
             "b4": tratar_nota(item.get("4º BI")),
-            "faltas": int(item.get("Faltas", 0)) if pd.notnull(item.get("Faltas")) else 0
+            "media": tratar_nota(item.get("Média Final")),
+            "faltas": int(item.get("Faltas", 0)) if pd.notnull(item.get("Faltas")) else 0,
+            "freq_materia": str(item.get("Freq. Disciplina", "100%"))
         })
 
     json_estruturado = json.dumps(list(alunosMapeados.values()), ensure_ascii=False)
@@ -332,4 +387,4 @@ else:
         """
         st.markdown(iframe_code, unsafe_allow_html=True)
     else:
-        st.error("O arquivo 'index.html' não foi encontrado no repositório GitHub.")
+        st.error("O arquivo 'index.html' não foi encontrado no repositório.")
