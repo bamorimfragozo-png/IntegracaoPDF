@@ -97,7 +97,7 @@
                             <label class="small text-muted fw-semibold">Ordenar por:</label>
                             <select id="selectOrdenacao" class="form-select form-select-sm" style="width: auto;" onchange="carregarDadosAluno()">
                                 <option value="nota">Menor Nota Primeiro</option>
-                                <option value="freq">Menor Frequência Primeiro</option>
+                                <option value="freq">Mais Faltas Primeiro</option>
                             </select>
                         </div>
                     </div>
@@ -235,14 +235,12 @@
 
             const tipoOrd = document.getElementById('selectOrdenacao').value;
 
-            // Ordenação configurável das disciplinas
+            // Usa rigorosamente as médias já lidas do PDF
             disciplinasAtuais = aluno.disciplinas.map(d => {
-                const notasValidas = [d.b1, d.b2, d.b3, d.b4].filter(n => n !== null && n !== undefined && !isNaN(n));
-                const media = notasValidas.length > 0 ? (notasValidas.reduce((a, b) => a + b, 0) / notasValidas.length) : null;
-                return { ...d, media: media };
+                return { ...d, media: d.media };
             }).sort((a, b) => {
                 if (tipoOrd === 'freq') {
-                    return (a.faltas || 0) - (b.faltas || 0);
+                    return (b.faltas || 0) - (a.faltas || 0);
                 } else {
                     if (a.media === null) return 1;
                     if (b.media === null) return -1;
@@ -281,7 +279,6 @@
             renderTabelaDisciplinas(disciplinasAtuais);
             renderGraficoEvolucaoGeral(disciplinasAtuais);
             
-            // Exibe gráficos da primeira disciplina por padrão
             if (disciplinasAtuais.length > 0) {
                 selecionarDisciplina(0);
             }
@@ -301,7 +298,7 @@
                         <td class="text-center ${obterClasseNota(d.b3)}">${formatarNota(d.b3)}</td>
                         <td class="text-center ${obterClasseNota(d.b4)}">${formatarNota(d.b4)}</td>
                         <td class="text-center ${classeMedia}">${formatarNota(d.media)}</td>
-                        <td class="text-center">${d.faltas || 0}</td>
+                        <td class="text-center fw-bold text-danger">${d.faltas || 0}</td>
                     </tr>
                 `;
             });
@@ -318,41 +315,28 @@
 
             document.getElementById('txtTituloDisciplina').innerText = `Matéria: ${d.nome}`;
 
-            // Cálculo da frequência específica da disciplina (considerando p. ex. carga horária base ou cálculo de presença)
-            // Se d.faltas for informado, calculamos a percentagem aproximada de presença (ex: considerando 80h/aulas padrão ou exibindo Presença x Faltas):
-            const totalFaltas = d.faltas || 0;
-            // Exemplo calculando % de presença com base na frequência global ou faltas diretas:
-            const freqMateria = d.freq_materia !== undefined ? d.freq_materia : Math.max(0, 100 - (totalFaltas * 2)); 
-
+            // Exibição da Frequência lida do PDF na rosca
+            const freqNum = parseFloat(d.freq_materia) || 100;
             const ctxRosca = document.getElementById('chartRoscaFreq').getContext('2d');
             if (chartRoscaInstance) chartRoscaInstance.destroy();
 
             chartRoscaInstance = new Chart(ctxRosca, {
                 type: 'doughnut',
                 data: {
-                    labels: ['Presença (%)', 'Faltas (Aulas)'],
+                    labels: ['Presença (%)', 'Faltas / Ausência (%)'],
                     datasets: [{
-                        data: [freqMateria, totalFaltas],
+                        data: [freqNum, Math.max(0, 100 - freqNum)],
                         backgroundColor: ['#198754', '#dc3545']
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: { 
-                        legend: { display: true, position: 'bottom' },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    return ` ${context.label}: ${context.raw}`;
-                                }
-                            }
-                        }
-                    }
+                    plugins: { legend: { display: false } }
                 }
             });
 
-            // 2. Barras de Notas da Matéria
+            // Barras de Notas da Matéria
             const ctxBarras = document.getElementById('chartBarrasNota').getContext('2d');
             if (chartBarrasInstance) chartBarrasInstance.destroy();
 
@@ -424,7 +408,6 @@
             if (aluno) {
                 aluno.deliberacao = textoObs;
         
-                // Redireciona a janela pai com parâmetros de URL para acionar o salvamento direto na planilha pelo Python
                 const urlPai = window.parent.location.href.split('?')[0];
                 const novaUrl = `${urlPai}?action=salvar_obs&aluno=${encodeURIComponent(aluno.nome)}&obs=${encodeURIComponent(textoObs)}`;
                 window.parent.location.href = novaUrl;
