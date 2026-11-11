@@ -100,15 +100,28 @@ def extrairDados(arquivosPdf):
         for pagina in leitorPdf.pages:
             textoCompleto += pagina.extract_text() + "\n"
 
-        # Divisão estrita por boletim individual
-        blocosBoletins = re.split(r"(?=BOLETIM DE NOTAS INDIVIDUAL|Aluno\(a\):)", textoCompleto)
+        ####################################
+        blocosBoletins = re.split(r"(?=BOLETIM DE NOTAS INDIVIDUAL|Aluno\(a\):|Dados Gerais)", textoCompleto)
 
         for bloco in blocosBoletins:
-            if "Disciplina" not in bloco and "TÉCNICO" not in bloco:
-                continue
+        # Se for um bloco exclusivo de dados pessoais (NAPNE), extraímos os dados sem procurar disciplinas falsas como EAD
+          is_dados_pessoais = "Portador(a)" in bloco or "Dados Gerais" in bloco or "Naturalidade" in bloco
 
-            # Limpeza do bloco para regex do NAPNE
-            blocoLimpo = re.sub(r'\s+', ' ', bloco)
+          if not is_dados_pessoais and "Disciplina" not in bloco and "TÉCNICO" not in bloco and "Técnico" not in bloco:
+              continue
+
+          blocoLimpo = re.sub(r'\s+', ' ', bloco)
+        ################################
+
+        # # Divisão estrita por boletim individual
+        # blocosBoletins = re.split(r"(?=BOLETIM DE NOTAS INDIVIDUAL|Aluno\(a\):)", textoCompleto)
+
+        # for bloco in blocosBoletins:
+        #     if "Disciplina" not in bloco and "TÉCNICO" not in bloco:
+        #         continue
+
+        #     # Limpeza do bloco para regex do NAPNE
+        #     blocoLimpo = re.sub(r'\s+', ' ', bloco)
 
             nomeAluno = ""
             matriculaAluno = ""
@@ -191,9 +204,10 @@ def extrairDados(arquivosPdf):
 #
 #                candidatosNotas = re.findall(r"\b(\d{1,2}[\.,]\d{1,2})\b", blocoTexto)
             ####################ACRESCIMO##################
+            # Regex altamente tolerante para Redes e Automação (captura códigos numéricos ou alfanuméricos de diários)
             padraoBloco = re.findall(
-              r"([A-Z0-9]{2,}\.\d{4,5}\s*\([A-Z0-9]+\)\s*-\s*[^0-9\n]+|[A-Z0-9\.\(\)]+\s*-\s*[^0-9\n]+)([\s\S]*?)(?=(?:[A-Z0-9]{2,}\.\d{4,5}|Total|Este documento|Boituva|\Z))",
-              bloco
+                r"(\d{5,6}\s*-\s*[^0-9\n]+|[A-Z0-9\.\(\)]+\s*-\s*[^0-9\n]+)([\s\S]*?)(?=(?:\d{5,6}\s*-|[A-Z0-9]{2,}\.\d{4,5}|Total|Este documento|Boituva|\Z))",
+                bloco
             )
             for match in padraoBloco:
                 nomeMateria = match[0].strip()
@@ -202,14 +216,27 @@ def extrairDados(arquivosPdf):
                 if "Turma:" in nomeMateria or "Sit." in nomeMateria or "Série" in nomeMateria or "Diário" in nomeMateria:
                     continue
 
-                # Extração correta de Faltas por Matéria
+                ############################
+                # Extração precisa de Faltas (procurando o valor logo após as colunas de aulas ou por posição segura)
                 candidatosInteiros = re.findall(r"\b(\d{1,3})\b", blocoTexto)
                 totalFaltasMatéria = 0
-                if len(candidatosInteiros) >= 4:
+                # No SUAP, a sequência costuma ser: C.H. Horas, C.H. Aulas, T. de Aulas, T. Faltas. 
+                # O quinto número ou o índice correspondente às faltas costuma ser o valor real de faltas (geralmente menor que o total de aulas).
+                if len(candidatosInteiros) >= 5:
                     try:
-                        totalFaltasMatéria = int(candidatosInteiros[3])
+                        # O 4º ou 5º número na linha do diário representa as faltas efetivas
+                        totalFaltasMatéria = int(candidatosInteiros[4]) if int(candidatosInteiros[4]) < int(candidatosInteiros[3]) else int(candidatosInteiros[3])
                     except ValueError:
-                        pass
+                        totalFaltasMatéria = 0
+                ###################################3
+                # # Extração correta de Faltas por Matéria
+                # candidatosInteiros = re.findall(r"\b(\d{1,3})\b", blocoTexto)
+                # totalFaltasMatéria = 0
+                # if len(candidatosInteiros) >= 4:
+                #     try:
+                #         totalFaltasMatéria = int(candidatosInteiros[3])
+                #     except ValueError:
+                #         pass
 
                 candidatosNotas = re.findall(r"\b(\d{1,2}[\.,]\d{1,2})\b", blocoTexto)
                   ##########################FIMACRESCIMO############################
