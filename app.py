@@ -37,20 +37,40 @@ if "dadosCarregados" not in st.session_state:
 if "salaAtiva" not in st.session_state:
     st.session_state.salaAtiva = "Redes 1"
 
+# # Captura de salvamento via query params (comunicação iframe -> streamlit)
+# query_params = st.query_params
+# if "action" in query_params and query_params["action"] == "salvar_obs":
+#     aluno_alvo = query_params.get("aluno", "")
+#     nova_obs = query_params.get("obs", "")
+#     sala_alvo = st.session_state.salaAtiva
+#     linkSala = DICIONARIO_SALAS[sala_alvo]
+    
+#     df_sheet = conn.read(spreadsheet=linkSala)
+#     if "Aluno" in df_sheet.columns and "Observações" in df_sheet.columns:
+#         df_sheet.loc[df_sheet["Aluno"].astype(str).str.strip().str.upper() == aluno_alvo.strip().upper(), "Observações"] = nova_obs
+#         conn.update(spreadsheet=linkSala, data=df_sheet)
+#         st.toast(f"Deliberação de {aluno_alvo} salva com sucesso no Google Sheets!", icon="✅")
+#     st.query_params.clear()
+########################################################
 # Captura de salvamento via query params (comunicação iframe -> streamlit)
 query_params = st.query_params
 if "action" in query_params and query_params["action"] == "salvar_obs":
-    aluno_alvo = query_params.get("aluno", "")
-    nova_obs = query_params.get("obs", "")
+    aluno_alvo = str(query_params.get("aluno", "")).strip()
+    nova_obs = str(query_params.get("obs", "")).strip()
     sala_alvo = st.session_state.salaAtiva
     linkSala = DICIONARIO_SALAS[sala_alvo]
-    
+
     df_sheet = conn.read(spreadsheet=linkSala)
-    if "Aluno" in df_sheet.columns and "Observações" in df_sheet.columns:
-        df_sheet.loc[df_sheet["Aluno"].astype(str).str.strip().str.upper() == aluno_alvo.strip().upper(), "Observações"] = nova_obs
+    if "Aluno" in df_sheet.columns:
+        if "Observações" not in df_sheet.columns:
+            df_sheet["Observações"] = ""
+
+        mask = df_sheet["Aluno"].astype(str).str.strip().str.upper() == aluno_alvo.upper()
+        df_sheet.loc[mask, "Observações"] = nova_obs
         conn.update(spreadsheet=linkSala, data=df_sheet)
-        st.toast(f"Deliberação de {aluno_alvo} salva com sucesso no Google Sheets!", icon="✅")
+        st.toast(f"Deliberação de {aluno_alvo} salva com sucesso!", icon="✅")
     st.query_params.clear()
+########################################################
 
 st.sidebar.title("Conselho de Classe")
 st.sidebar.markdown("---")
@@ -155,20 +175,44 @@ def extrairDados(arquivosPdf):
             if mTipSuper and mTipSuper.group(1).strip() not in ["-", ""]:
                 tipoSuperdotacao = mTipSuper.group(1).strip()
 
-            # Disciplinas
+#            # Disciplinas
+#            padraoBloco = re.findall(
+#                r"(INT\.\d{5}\s*\([A-Z0-9]+\)\s*-\s*[^0-9\n]+)([\s\S]*?)(?=(?:INT\.\d{5}|Total|Este documento|Boituva|\Z))",
+#                bloco
+#            )
+#            
+#
+#            for match in padraoBloco:
+#                nomeMateria = match[0].strip()
+#                blocoTexto = match[1]
+#
+#                if "Turma:" in nomeMateria or "Sit." in nomeMateria or "Série" in nomeMateria:
+#                    continue
+#
+#                candidatosNotas = re.findall(r"\b(\d{1,2}[\.,]\d{1,2})\b", blocoTexto)
+            ####################ACRESCIMO##################
             padraoBloco = re.findall(
-                r"(INT\.\d{5}\s*\([A-Z0-9]+\)\s*-\s*[^0-9\n]+)([\s\S]*?)(?=(?:INT\.\d{5}|Total|Este documento|Boituva|\Z))",
-                bloco
+              r"([A-Z0-9]{2,}\.\d{4,5}\s*\([A-Z0-9]+\)\s*-\s*[^0-9\n]+|[A-Z0-9\.\(\)]+\s*-\s*[^0-9\n]+)([\s\S]*?)(?=(?:[A-Z0-9]{2,}\.\d{4,5}|Total|Este documento|Boituva|\Z))",
+              bloco
             )
-
-            for match in padraoBloco:
+              for match in padraoBloco:
                 nomeMateria = match[0].strip()
                 blocoTexto = match[1]
 
-                if "Turma:" in nomeMateria or "Sit." in nomeMateria or "Série" in nomeMateria:
+                if "Turma:" in nomeMateria or "Sit." in nomeMateria or "Série" in nomeMateria or "Diário" in nomeMateria:
                     continue
 
+                # Extração correta de Faltas por Matéria
+                candidatosInteiros = re.findall(r"\b(\d{1,3})\b", blocoTexto)
+                totalFaltasMatéria = 0
+                if len(candidatosInteiros) >= 4:
+                    try:
+                        totalFaltasMatéria = int(candidatosInteiros[3])
+                    except ValueError:
+                        pass
+
                 candidatosNotas = re.findall(r"\b(\d{1,2}[\.,]\d{1,2})\b", blocoTexto)
+                  ##########################FIMACRESCIMO############################
                 notasEncontradas = []
 
                 for val in candidatosNotas:
@@ -202,6 +246,7 @@ def extrairDados(arquivosPdf):
                     '4º BI': b4,
                     'Média Final': mediaFinal,
                     'Freq. Final': freqGlobal,
+                    'Total Faltas': totalFaltasMatéria, ################### <--- ADICIONE ESTA LINHA AQUI
                     'Núcleo': nucleo,
                     'Observações': '',
                     'Necessidades Especiais': necEspeciais,
@@ -305,6 +350,12 @@ else:
             if v is None or pd.isna(v): return None
             try: return float(str(v).replace(',', '.'))
             except ValueError: return None
+        ######################################################
+        def tratar_inteiro(v):
+          if v is None or pd.isna(v): return 0
+          try: return int(float(str(v).replace(',', '.')))
+          except ValueError: return 0
+        ##########################################################
 
         alunosMapeados[prontuario]["disciplinas"].append({
             "nome": item.get("Disciplina", "Disciplina"),
@@ -312,7 +363,8 @@ else:
             "b2": tratar_nota(item.get("2º BI")),
             "b3": tratar_nota(item.get("3º BI")),
             "b4": tratar_nota(item.get("4º BI")),
-            "faltas": 0
+            #"faltas": 0###################################
+            'faltas': tratar_inteiro(item.get("Total Faltas"))
         })
 
     json_estruturado = json.dumps(list(alunosMapeados.values()), ensure_ascii=False)
