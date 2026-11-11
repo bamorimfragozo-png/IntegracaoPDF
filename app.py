@@ -105,12 +105,12 @@ def extrairDados(arquivosPdf):
 
         for bloco in blocosBoletins:
         # Se for um bloco exclusivo de dados pessoais (NAPNE), extraímos os dados sem procurar disciplinas falsas como EAD
-          is_dados_pessoais = "Portador(a)" in bloco or "Dados Gerais" in bloco or "Naturalidade" in bloco
+            is_dados_pessoais = "Portador(a)" in bloco or "Dados Gerais" in bloco or "Naturalidade" in bloco
 
-          if not is_dados_pessoais and "Disciplina" not in bloco and "TÉCNICO" not in bloco and "Técnico" not in bloco:
-              continue
+            if not is_dados_pessoais and "Disciplina" not in bloco and "TÉCNICO" not in bloco and "Técnico" not in bloco:
+                continue
 
-          blocoLimpo = re.sub(r'\s+', ' ', bloco)
+            blocoLimpo = re.sub(r'\s+', ' ', bloco)
         ################################
 
         # # Divisão estrita por boletim individual
