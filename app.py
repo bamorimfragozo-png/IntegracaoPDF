@@ -195,7 +195,7 @@ def extrairDados(arquivosPdf):
               r"([A-Z0-9]{2,}\.\d{4,5}\s*\([A-Z0-9]+\)\s*-\s*[^0-9\n]+|[A-Z0-9\.\(\)]+\s*-\s*[^0-9\n]+)([\s\S]*?)(?=(?:[A-Z0-9]{2,}\.\d{4,5}|Total|Este documento|Boituva|\Z))",
               bloco
             )
-              for match in padraoBloco:
+            for match in padraoBloco:
                 nomeMateria = match[0].strip()
                 blocoTexto = match[1]
 
