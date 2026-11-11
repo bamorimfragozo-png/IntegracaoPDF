@@ -170,7 +170,7 @@ def extrairDados(arquivosPdf):
                     continue
                 ###################################################
                 # Extração correta de Faltas por Matéria
-                candidatosInteiros = re.findall(r"\b(\d{1,3})\b", blocoTexto)
+                candidatosInteiros = re.findall(r"\b(\d{1,4})\b", blocoTexto)
                 totalFaltasMatéria = 0
                 if len(candidatosInteiros) >= 4:
                     try:
