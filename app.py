@@ -37,40 +37,20 @@ if "dadosCarregados" not in st.session_state:
 if "salaAtiva" not in st.session_state:
     st.session_state.salaAtiva = "Redes 1"
 
-# # Captura de salvamento via query params (comunicação iframe -> streamlit)
-# query_params = st.query_params
-# if "action" in query_params and query_params["action"] == "salvar_obs":
-#     aluno_alvo = query_params.get("aluno", "")
-#     nova_obs = query_params.get("obs", "")
-#     sala_alvo = st.session_state.salaAtiva
-#     linkSala = DICIONARIO_SALAS[sala_alvo]
-    
-#     df_sheet = conn.read(spreadsheet=linkSala)
-#     if "Aluno" in df_sheet.columns and "Observações" in df_sheet.columns:
-#         df_sheet.loc[df_sheet["Aluno"].astype(str).str.strip().str.upper() == aluno_alvo.strip().upper(), "Observações"] = nova_obs
-#         conn.update(spreadsheet=linkSala, data=df_sheet)
-#         st.toast(f"Deliberação de {aluno_alvo} salva com sucesso no Google Sheets!", icon="✅")
-#     st.query_params.clear()
-########################################################
 # Captura de salvamento via query params (comunicação iframe -> streamlit)
 query_params = st.query_params
 if "action" in query_params and query_params["action"] == "salvar_obs":
-    aluno_alvo = str(query_params.get("aluno", "")).strip()
-    nova_obs = str(query_params.get("obs", "")).strip()
+    aluno_alvo = query_params.get("aluno", "")
+    nova_obs = query_params.get("obs", "")
     sala_alvo = st.session_state.salaAtiva
     linkSala = DICIONARIO_SALAS[sala_alvo]
-
+    
     df_sheet = conn.read(spreadsheet=linkSala)
-    if "Aluno" in df_sheet.columns:
-        if "Observações" not in df_sheet.columns:
-            df_sheet["Observações"] = ""
-
-        mask = df_sheet["Aluno"].astype(str).str.strip().str.upper() == aluno_alvo.upper()
-        df_sheet.loc[mask, "Observações"] = nova_obs
+    if "Aluno" in df_sheet.columns and "Observações" in df_sheet.columns:
+        df_sheet.loc[df_sheet["Aluno"].astype(str).str.strip().str.upper() == aluno_alvo.strip().upper(), "Observações"] = nova_obs
         conn.update(spreadsheet=linkSala, data=df_sheet)
-        st.toast(f"Deliberação de {aluno_alvo} salva com sucesso!", icon="✅")
+        st.toast(f"Deliberação de {aluno_alvo} salva com sucesso no Google Sheets!", icon="✅")
     st.query_params.clear()
-########################################################
 
 st.sidebar.title("Conselho de Classe")
 st.sidebar.markdown("---")
@@ -100,28 +80,15 @@ def extrairDados(arquivosPdf):
         for pagina in leitorPdf.pages:
             textoCompleto += pagina.extract_text() + "\n"
 
-        ####################################
-        blocosBoletins = re.split(r"(?=BOLETIM DE NOTAS INDIVIDUAL|Aluno\(a\):|Dados Gerais)", textoCompleto)
+        # Divisão estrita por boletim individual
+        blocosBoletins = re.split(r"(?=BOLETIM DE NOTAS INDIVIDUAL|Aluno\(a\):)", textoCompleto)
 
         for bloco in blocosBoletins:
-        # Se for um bloco exclusivo de dados pessoais (NAPNE), extraímos os dados sem procurar disciplinas falsas como EAD
-            is_dados_pessoais = "Portador(a)" in bloco or "Dados Gerais" in bloco or "Naturalidade" in bloco
-
-            if not is_dados_pessoais and "Disciplina" not in bloco and "TÉCNICO" not in bloco and "Técnico" not in bloco:
+            if "Disciplina" not in bloco and "TÉCNICO" not in bloco:
                 continue
 
+            # Limpeza do bloco para regex do NAPNE
             blocoLimpo = re.sub(r'\s+', ' ', bloco)
-        ################################
-
-        # # Divisão estrita por boletim individual
-        # blocosBoletins = re.split(r"(?=BOLETIM DE NOTAS INDIVIDUAL|Aluno\(a\):)", textoCompleto)
-
-        # for bloco in blocosBoletins:
-        #     if "Disciplina" not in bloco and "TÉCNICO" not in bloco:
-        #         continue
-
-        #     # Limpeza do bloco para regex do NAPNE
-        #     blocoLimpo = re.sub(r'\s+', ' ', bloco)
 
             nomeAluno = ""
             matriculaAluno = ""
@@ -188,58 +155,30 @@ def extrairDados(arquivosPdf):
             if mTipSuper and mTipSuper.group(1).strip() not in ["-", ""]:
                 tipoSuperdotacao = mTipSuper.group(1).strip()
 
-#            # Disciplinas
-#            padraoBloco = re.findall(
-#                r"(INT\.\d{5}\s*\([A-Z0-9]+\)\s*-\s*[^0-9\n]+)([\s\S]*?)(?=(?:INT\.\d{5}|Total|Este documento|Boituva|\Z))",
-#                bloco
-#            )
-#            
-#
-#            for match in padraoBloco:
-#                nomeMateria = match[0].strip()
-#                blocoTexto = match[1]
-#
-#                if "Turma:" in nomeMateria or "Sit." in nomeMateria or "Série" in nomeMateria:
-#                    continue
-#
-#                candidatosNotas = re.findall(r"\b(\d{1,2}[\.,]\d{1,2})\b", blocoTexto)
-            ####################ACRESCIMO##################
-            # Regex altamente tolerante para Redes e Automação (captura códigos numéricos ou alfanuméricos de diários)
+            # Disciplinas
             padraoBloco = re.findall(
-                r"(\d{5,6}\s*-\s*[^0-9\n]+|[A-Z0-9\.\(\)]+\s*-\s*[^0-9\n]+)([\s\S]*?)(?=(?:\d{5,6}\s*-|[A-Z0-9]{2,}\.\d{4,5}|Total|Este documento|Boituva|\Z))",
+                r"(INT\.\d{5}\s*\([A-Z0-9]+\)\s*-\s*[^0-9\n]+)([\s\S]*?)(?=(?:INT\.\d{5}|Total|Este documento|Boituva|\Z))",
                 bloco
             )
+           
+
             for match in padraoBloco:
                 nomeMateria = match[0].strip()
                 blocoTexto = match[1]
 
-                if "Turma:" in nomeMateria or "Sit." in nomeMateria or "Série" in nomeMateria or "Diário" in nomeMateria:
+                if "Turma:" in nomeMateria or "Sit." in nomeMateria or "Série" in nomeMateria:
                     continue
-
-                ############################
-                # Extração precisa de Faltas (procurando o valor logo após as colunas de aulas ou por posição segura)
+                ###################################################
+                # Extração correta de Faltas por Matéria
                 candidatosInteiros = re.findall(r"\b(\d{1,3})\b", blocoTexto)
                 totalFaltasMatéria = 0
-                # No SUAP, a sequência costuma ser: C.H. Horas, C.H. Aulas, T. de Aulas, T. Faltas. 
-                # O quinto número ou o índice correspondente às faltas costuma ser o valor real de faltas (geralmente menor que o total de aulas).
-                if len(candidatosInteiros) >= 5:
+                if len(candidatosInteiros) >= 4:
                     try:
-                        # O 4º ou 5º número na linha do diário representa as faltas efetivas
-                        totalFaltasMatéria = int(candidatosInteiros[4]) if int(candidatosInteiros[4]) < int(candidatosInteiros[3]) else int(candidatosInteiros[3])
+                        totalFaltasMatéria = int(candidatosInteiros[3])
                     except ValueError:
-                        totalFaltasMatéria = 0
-                ###################################3
-                # # Extração correta de Faltas por Matéria
-                # candidatosInteiros = re.findall(r"\b(\d{1,3})\b", blocoTexto)
-                # totalFaltasMatéria = 0
-                # if len(candidatosInteiros) >= 4:
-                #     try:
-                #         totalFaltasMatéria = int(candidatosInteiros[3])
-                #     except ValueError:
-                #         pass
-
+                        pass
+                #####################################################
                 candidatosNotas = re.findall(r"\b(\d{1,2}[\.,]\d{1,2})\b", blocoTexto)
-                  ##########################FIMACRESCIMO############################
                 notasEncontradas = []
 
                 for val in candidatosNotas:
@@ -253,7 +192,7 @@ def extrairDados(arquivosPdf):
                 b1 = notasEncontradas[0] if len(notasEncontradas) > 0 else None
                 b2 = notasEncontradas[1] if len(notasEncontradas) > 1 else None
                 b3 = notasEncontradas[2] if len(notasEncontradas) > 2 else None
-                b4 = notasEncontradas[3] if len(notasEncontradas) > 3 else None
+                b4 = notasEncontradas[3] if len(notasEncontradas) > 3 else None  
 
                 notasValidas = [n for n in [b1, b2, b3, b4] if n is not None]
                 mediaFinal = round(sum(notasValidas) / len(notasValidas), 2) if notasValidas else 0.0
